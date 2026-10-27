@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.4';
+const LIFE_VERSION = '1.5';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -36,6 +36,9 @@ const I = {
   user: svg('<circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>'),
   pin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 3 21 8.5l-2.2.7-3.4 3.4.4 4.6-1.7 1.7-3.8-3.8L5 20.4 3.6 19l5.3-5.3-3.8-3.8 1.7-1.7 4.6.4 3.4-3.4z"/></svg>',
   back: svg('<path d="M15 5 8 12l7 7"/>', 2.4),
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
+  book: svg('<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5v-15z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7.5h6M9 11h4"/>'),
+  widgets: svg('<rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="3.5" y="13" width="17" height="7.5" rx="2"/>'),
   food: svg('<path d="M4 13h16a8 8 0 0 1-16 0z"/><path d="M8 9c0-2 1.5-2.5 1.5-4.5M12 9c0-2 1.5-2.5 1.5-4.5M16 9c0-2 1.5-2.5 1.5-4.5"/>'),
   dumbbell: svg('<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>', 2),
   scale: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0L13 12"/>')
@@ -122,14 +125,17 @@ const SECTION_DEFS = {
   car: { name: 'Авто', icon: 'car', desc: 'Регламент, заправки, история' },
   objects: { name: 'Объекты', icon: 'building', desc: 'Замечания, обходы, подрядчики' },
   food: { name: 'Питание', icon: 'food', desc: 'Еда, калории и БЖУ, вода, вес' },
-  sport: { name: 'Тренировки', icon: 'dumbbell', desc: 'Турник, бег, бокс, зал, рекорды' }
+  sport: { name: 'Тренировки', icon: 'dumbbell', desc: 'Турник, бег, бокс, зал, рекорды' },
+  diary: { name: 'Дневник', icon: 'book', desc: 'Книжка: текст, фото, видео, рисунки' }
 };
 const FEATURE_DEFS = {
   income: { sec: 'bank', name: 'Доходы' }, recurring: { sec: 'bank', name: 'Регулярные платежи' }, piggy: { sec: 'bank', name: 'Копилка' },
   fuel: { sec: 'car', name: 'Заправки' }, photos: { sec: 'notes', name: 'Фото в заметках' }
 };
 const WIDGETS = {
-  quick: { name: 'Быстрые кнопки' }, food: { name: 'Питание сегодня', sec: 'food' }, sport: { name: 'Тренировки', sec: 'sport' }, reminders: { name: 'Ближайшие напоминания', sec: 'reminders' }, plans: { name: 'Планы на сегодня', sec: 'plans' },
+  quick: { name: 'Быстрые кнопки' }, today: { name: 'Сегодня' }, next: { name: 'Скоро: ближайшее дело' }, water: { name: 'Вода', sec: 'food' }, streak: { name: 'Серия тренировок', sec: 'sport' },
+  money: { name: 'Траты за день', sec: 'bank' }, memory: { name: 'Дневник: воспоминание', sec: 'diary' }, week: { name: 'Неделя планов', sec: 'plans' },
+  food: { name: 'Питание сегодня', sec: 'food' }, sport: { name: 'Тренировки', sec: 'sport' }, reminders: { name: 'Ближайшие напоминания', sec: 'reminders' }, plans: { name: 'Планы на сегодня', sec: 'plans' },
   expenses: { name: 'Деньги за месяц', sec: 'bank' }, objects: { name: 'Объекты: сроки', sec: 'objects' }, car: { name: 'Машина', sec: 'car' },
   bank: { name: 'Копилка', sec: 'bank', feat: 'piggy' }, notes: { name: 'Последние заметки', sec: 'notes' }
 };
@@ -140,7 +146,7 @@ const QUICK_DEFS = {
   mileage: { name: 'Пробег', icon: 'odo', sec: 'car' }, 'new-remark': { name: 'Замечание', icon: 'building', sec: 'objects' },
   'quick-deposit': { name: 'В копилку', icon: 'bank', sec: 'bank', feat: 'piggy' },
   'add-food': { name: 'Еда', icon: 'food', sec: 'food' }, 'start-workout': { name: 'Тренировка', icon: 'dumbbell', sec: 'sport' },
-  'add-weight': { name: 'Вес', icon: 'scale', sec: 'food' }
+  'add-weight': { name: 'Вес', icon: 'scale', sec: 'food' }, 'd-new': { name: 'Запись', icon: 'book', sec: 'diary' }
 };
 
 /* ================= Данные ================= */
@@ -157,19 +163,21 @@ function seed() {
     v: 2,
     settings: {
       name: '', theme: 'auto', accent: 'blue', wallpaper: 'dots', icon: 'light', budget: null,
-      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false, food: true, sport: true },
-      order: ['plans', 'food', 'bank', 'sport', 'notes', 'car', 'reminders', 'objects'],
+      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false, food: true, sport: true, diary: true },
+      order: ['plans', 'food', 'bank', 'diary', 'sport', 'notes', 'car', 'reminders', 'objects'],
       features: { income: true, recurring: true, piggy: true, fuel: true, photos: true },
       quick: ['add-food', 'start-workout', 'new-exp', 'new-plan', 'new-note'],
-      widgets: Object.keys(WIDGETS).map((id) => ({ id, on: true })),
+      widgets: ['quick', 'today', 'next', 'plans', 'water', 'food', 'streak', 'money', 'reminders', 'week', 'memory', 'expenses', 'car', 'bank', 'notes', 'objects', 'sport'].map((id) => ({ id, on: id !== 'sport', size: id === 'food' ? 's' : undefined })),
+      planZoom: 1, notifyMethod: 'calendar', badge: true,
       pin: null, lockAfter: 1, onboarded: false
     },
     notes: [], reminders: [], plans: [], expenses: [], incomes: [], recurring: [], customCats: [], goals: [],
     car: { name: '', body: '', year: '', engine: '', color: '#C9CDD3', mileage: null, mileageDate: null },
     services: DEFAULT_SERVICES.map(([name, km, months]) => ({ id: uid(), name, km, months, lastKm: null, lastDate: null, rec: true })),
     carLog: [], carTodo: [], fuel: [], objects: [],
-    food: { entries: [], my: [], recent: [], water: {}, weights: [], goals: { mode: 'loss', sex: 'm', age: '', height: '', weight: '', activity: 1.55, manual: false, set: false } },
-    workouts: [], wTemplates: [], workoutActive: null, myExercises: []
+    food: { entries: [], my: [], recent: [], waterMl: {}, weights: [], goals: { mode: 'loss', sex: 'm', age: '', height: '', weight: '', activity: 1.55, manual: false, set: false } },
+    workouts: [], wTemplates: [], workoutActive: null, myExercises: [],
+    diary: { cover: { title: 'Мой дневник', color: '#22325C', texture: 'leather', titleColor: '#E8C66A', font: 'display', items: [], drawing: null }, pages: [] }
   };
 }
 function normalize(s) {
@@ -183,16 +191,22 @@ function normalize(s) {
   if (!Array.isArray(st.quick)) st.quick = d.settings.quick;
   st.quick = st.quick.filter((q) => QUICK_DEFS[q]);
   const wids = (st.widgets || []).filter((w) => WIDGETS[w.id]);
-  Object.keys(WIDGETS).forEach((id) => { if (!wids.some((w) => w.id === id)) wids.push({ id, on: true }); });
+  const qi = Math.max(0, wids.findIndex((w) => w.id === 'quick') + 1);
+  ['streak', 'water', 'next', 'today'].forEach((id) => { if (!wids.some((w) => w.id === id)) wids.splice(qi, 0, { id, on: true }); });
+  Object.keys(WIDGETS).forEach((id) => { if (!wids.some((w) => w.id === id)) wids.push({ id, on: id !== 'sport' }); });
   st.widgets = wids;
+  if (!st.quick.includes('start-workout') && !st.quickMigrated) { st.quick = ['start-workout', ...st.quick].slice(0, 5); } st.quickMigrated = true;
   ['notes', 'reminders', 'plans', 'expenses', 'incomes', 'recurring', 'customCats', 'goals', 'services', 'carLog', 'carTodo', 'fuel', 'objects'].forEach((k) => {
     if (!Array.isArray(s[k])) s[k] = k === 'services' ? d.services : [];
   });
   if (legacy) { st.onboarded = false; st.freshOffer = true; }
   s.car = Object.assign({}, d.car, s.car || {});
   s.food = Object.assign({}, d.food, s.food || {}); ['entries', 'my', 'recent', 'weights'].forEach((k) => { if (!Array.isArray(s.food[k])) s.food[k] = []; });
-  if (!s.food.water || typeof s.food.water !== 'object') s.food.water = {}; s.food.goals = Object.assign({}, d.food.goals, s.food.goals || {});
+  if (!s.food.waterMl || typeof s.food.waterMl !== 'object') { s.food.waterMl = {}; Object.entries(s.food.water || {}).forEach(([k, n]) => { s.food.waterMl[k] = Math.round(n * 250 / 200) * 200; }); }
+  delete s.food.water; s.food.goals = Object.assign({}, d.food.goals, s.food.goals || {});
   ['workouts', 'wTemplates', 'myExercises'].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; }); if (s.workoutActive === undefined) s.workoutActive = null;
+  s.diary = Object.assign({}, d.diary, s.diary || {}); s.diary.cover = Object.assign({}, d.diary.cover, s.diary.cover || {}); if (!Array.isArray(s.diary.cover.items)) s.diary.cover.items = []; if (!Array.isArray(s.diary.pages)) s.diary.pages = [];
+  s.diary.pages.forEach((p) => { if (!Array.isArray(p.items)) p.items = []; });
   s.notes.forEach((n) => { if (!Array.isArray(n.photos)) n.photos = []; });
   s.goals.forEach((g) => { if (!Array.isArray(g.ops)) g.ops = []; });
   s.objects.forEach((o) => { ['contractors', 'remarks', 'walks'].forEach((k) => { if (!Array.isArray(o[k])) o[k] = []; }); o.remarks.forEach((r) => { if (!Array.isArray(r.photos)) r.photos = []; }); if (!o.days) o.days = 20; });
@@ -214,11 +228,13 @@ async function wipeAll(keepSetup) {
     fresh.objects = old.objects.map((o) => Object.assign({}, o, { remarks: [], walks: [] }));
     fresh.customCats = old.customCats;
     fresh.food.my = old.food.my; fresh.food.goals = old.food.goals; fresh.wTemplates = old.wTemplates; fresh.myExercises = old.myExercises;
+    fresh.diary.cover = Object.assign({}, old.diary.cover, { drawing: null, items: old.diary.cover.items.filter((i) => i.kind !== 'photo' && i.kind !== 'video') });
   }
   S = fresh; save();
 }
 let saveFailed = false;
 function save() {
+  updateBadge();
   try { localStorage.setItem(KEY, JSON.stringify(S)); saveFailed = false; }
   catch (e) { if (!saveFailed) toast('Не удалось сохранить: память телефона заполнена. Удалите старые фото или сделайте резервную копию.'); saveFailed = true; }
 }
@@ -245,7 +261,7 @@ function phTx(mode, fn) {
 }
 const phGet = (id) => phTx('readonly', (st) => st.get(id));
 const phPut = (rec) => phTx('readwrite', (st) => st.put(rec));
-const phDel = (id) => { const u = PH.urls.get(id); if (u) { URL.revokeObjectURL(u.full); URL.revokeObjectURL(u.thumb); PH.urls.delete(id); } return phTx('readwrite', (st) => st.delete(id)).catch(() => {}); };
+const phDel = (id) => { const u = PH.urls.get(id); if (u) { URL.revokeObjectURL(u.full); URL.revokeObjectURL(u.thumb); PH.urls.delete(id); } ['full', 'thumb', 'video'].forEach((k) => { const v = PH.urls.get(id + ':' + k); if (v) { URL.revokeObjectURL(v); PH.urls.delete(id + ':' + k); } }); return phTx('readwrite', (st) => st.delete(id)).catch(() => {}); };
 const phAll = () => phTx('readonly', (st) => st.getAll());
 function scaleImage(file, max, q) {
   return new Promise((res, rej) => {
@@ -443,6 +459,7 @@ function render(anim) {
 function go(tab) {
   if (tab !== 'home' && !sec(tab)) tab = 'home';
   if (sheetOpen) closeSheet();
+  if (tab !== 'home') ui.homeEdit = false;
   ui.scroll[ui.tab] = window.scrollY;
   const same = tab === ui.tab && !ui.stack.length;
   ui.stack = []; ui.tab = tab;
@@ -459,6 +476,7 @@ function back() {
   if (viewerOpen()) { closeViewer(); return; }
   if (sheetOpen) { if (sheetBack) sheetBack(); else closeSheet(); return; }
   if (!ui.stack.length) return;
+  if (ui.stack[ui.stack.length - 1].type === 'deditor' && DE.draw) { exitDraw(true).then(() => { ui.stack.pop(); render('anim-back'); }); return; }
   ui.stack.pop(); render('anim-back'); window.scrollTo(0, ui.scroll['d' + ui.stack.length + ui.tab] || 0);
 }
 const backBtn = (label) => `<button class="back-btn" data-act="back" aria-label="Назад">${I.back}<span>${esc(label)}</span></button>`;
@@ -852,101 +870,101 @@ const FOOD_DB = []; const FOOD_CATS = [];
 })();
 
 /* ================= База упражнений =================
-   тип: w — вес и повторы, bw — повторы (можно с доп. весом), time — время, cardio — минуты и км, rounds — раунды
-   met — затраты для оценки калорий */
+   название|тип|MET|слова для поиска|главные мышцы|вспомогательные|техника
+   тип: w — вес и повторы, bw — повторы (можно с доп. весом), time — время, cardio — минуты и км, rounds — раунды */
 const EX_RAW = `
 #Турник и брусья
-Подтягивания|bw|8|турник спина широкий хват
-Подтягивания обратным хватом|bw|8|турник бицепс
-Подтягивания узким хватом|bw|8|турник
-Австралийские подтягивания|bw|5|турник низкая перекладина
-Негативные подтягивания|bw|6|турник
-Отжимания на брусьях|bw|8|брусья трицепс грудь
-Подъём ног в висе|bw|5|турник пресс
-Подъём коленей в висе|bw|4|турник пресс
-Выход силой|bw|8|турник
-Вис на турнике|time|3|турник хват
+Подтягивания|bw|8|турник спина широкий хват|lats,upper_back,biceps|rear_delts,forearms,abs|Хват чуть шире плеч. Тянитесь грудью к перекладине, опускайтесь до прямых рук без рывков.
+Подтягивания обратным хватом|bw|8|турник бицепс|lats,biceps|upper_back,forearms,abs|Ладони к себе, хват на ширине плеч. Подбородок выше перекладины, локти ведите вниз к рёбрам.
+Подтягивания узким хватом|bw|8|турник|lats,biceps|upper_back,forearms|Ладони близко, корпус чуть отклонён назад, тянитесь к перекладине низом груди.
+Австралийские подтягивания|bw|5|турник низкая перекладина|upper_back,lats|biceps,rear_delts,abs|Тело прямое, пятки на земле. Тяните грудь к перекладине, сводя лопатки.
+Негативные подтягивания|bw|6|турник|lats,biceps|upper_back,forearms|Запрыгните в верхнюю точку и опускайтесь медленно, 3–5 секунд.
+Отжимания на брусьях|bw|8|брусья трицепс грудь|chest,triceps|delts,abs|Опускайтесь до 90° в локтях. Наклон вперёд нагружает грудь, прямой корпус — трицепс.
+Подъём ног в висе|bw|5|турник пресс|abs|obliques,forearms,lats|Без раскачки поднимайте прямые ноги до параллели или выше, опускайте медленно.
+Подъём коленей в висе|bw|4|турник пресс|abs|obliques,forearms|Подтягивайте колени к груди, подкручивая таз вверх.
+Выход силой|bw|8|турник|lats,chest,triceps|biceps,delts,upper_back,abs|Мощная тяга к поясу, быстрый переход через перекладину и дожим на прямые руки.
+Вис на турнике|time|3|турник хват|forearms|lats,upper_back|Висите на прямых руках, плечи слегка опущены, дыхание ровное.
 #Отжимания и вес тела
-Отжимания от пола|bw|8|грудь трицепс
-Отжимания узким хватом|bw|8|трицепс
-Отжимания на кулаках|bw|8|бокс грудь
-Отжимания с хлопком|bw|8|взрывные
-Отжимания с ног на возвышении|bw|8|грудь
-Приседания без веса|bw|5|ноги
-Выпрыгивания из приседа|bw|8|ноги прыжки
-Выпады|bw|5|ноги
-Болгарские выпады|bw|5|ноги
-Пистолетик|bw|6|ноги
-Берпи|bw|8|кардио
-Ягодичный мост|bw|4|ноги ягодицы
+Отжимания от пола|bw|8|грудь трицепс|chest,triceps|delts,abs|Ладони чуть шире плеч, тело прямое, грудь почти касается пола.
+Отжимания узким хватом|bw|8|трицепс|triceps,chest|delts,abs|Ладони под плечами, локти скользят вдоль корпуса.
+Отжимания на кулаках|bw|8|бокс грудь|chest,triceps|delts,forearms,abs|Кулаки под плечами, запястья прямые, корпус напряжён.
+Отжимания с хлопком|bw|8|взрывные|chest,triceps|delts,abs|Взрывной толчок, хлопок, мягкое приземление на согнутые руки.
+Отжимания с ног на возвышении|bw|8|грудь|chest,delts|triceps,abs|Ноги на скамье: акцент на верх груди и плечи.
+Приседания без веса|bw|5|ноги|quads,glutes|hamstrings,adductors,calves|Пятки на полу, колени по направлению носков, таз назад, спина прямая.
+Выпрыгивания из приседа|bw|8|ноги прыжки|quads,glutes|calves,hamstrings|Присед и мощный прыжок вверх, приземление мягко на носки.
+Выпады|bw|5|ноги|quads,glutes|hamstrings,adductors,calves|Шаг вперёд, оба колена под 90°, переднее колено не уходит за носок.
+Болгарские выпады|bw|5|ноги|quads,glutes|hamstrings,adductors|Задняя нога на скамье, опускайтесь вертикально вниз.
+Пистолетик|bw|6|ноги|quads,glutes|hamstrings,calves,abs|Присед на одной ноге, вторая вытянута вперёд, руки для баланса.
+Берпи|bw|8|кардио|quads,chest|glutes,triceps,delts,abs,calves|Присед, упор лёжа, отжимание, возврат и прыжок с хлопком над головой.
+Ягодичный мост|bw|4|ноги ягодицы|glutes|hamstrings,lower_back|Лёжа на спине поднимайте таз, сжимая ягодицы в верхней точке.
 #Грудь
-Жим штанги лёжа|w|6|грудь зал
-Жим гантелей лёжа|w|6|грудь зал
-Жим на наклонной скамье|w|6|грудь зал
-Разводка гантелей|w|5|грудь зал
-Кроссовер|w|5|грудь зал
-Жим в тренажёре|w|5|грудь зал
+Жим штанги лёжа|w|6|грудь зал|chest,triceps|delts|Лопатки сведены, гриф опускайте к низу груди, локти под 45°.
+Жим гантелей лёжа|w|6|грудь зал|chest,triceps|delts|Гантели до уровня груди, вверху сводите без удара.
+Жим на наклонной скамье|w|6|грудь зал|chest,delts|triceps|Наклон 30°: нагрузка смещается на верх груди.
+Разводка гантелей|w|5|грудь зал|chest|delts|Руки чуть согнуты, разводите до растяжения груди, сводите по дуге.
+Кроссовер|w|5|грудь зал|chest|delts|Сводите рукояти перед собой и задержитесь на секунду.
+Жим в тренажёре|w|5|грудь зал|chest,triceps|delts|Спина прижата, выжимайте без полного выпрямления локтей.
 #Спина
-Становая тяга|w|6|спина ноги зал
-Тяга штанги в наклоне|w|6|спина зал
-Тяга гантели одной рукой|w|5|спина зал
-Тяга верхнего блока|w|5|спина зал
-Тяга горизонтального блока|w|5|спина зал
-Гиперэкстензия|bw|4|поясница
-Шраги|w|4|трапеция
+Становая тяга|w|6|спина ноги зал|lower_back,glutes,hamstrings|traps,quads,forearms,lats|Гриф скользит по ногам, спина прямая, тяните ногами и тазом, а не поясницей.
+Тяга штанги в наклоне|w|6|спина зал|lats,upper_back|rear_delts,biceps,lower_back|Наклон 45°, тяните гриф к поясу, сводя лопатки.
+Тяга гантели одной рукой|w|5|спина зал|lats,upper_back|rear_delts,biceps|Упор коленом и рукой в скамью, локоть ведите вверх вдоль корпуса.
+Тяга верхнего блока|w|5|спина зал|lats|biceps,upper_back,rear_delts|Тяните рукоять к верху груди, грудь вперёд, локти вниз.
+Тяга горизонтального блока|w|5|спина зал|upper_back,lats|biceps,rear_delts|Корпус неподвижен, тяните к животу, в конце сведите лопатки.
+Гиперэкстензия|bw|4|поясница|lower_back|glutes,hamstrings|Опускайтесь медленно, поднимайтесь до прямой линии тела без переразгибания.
+Шраги|w|4|трапеция|traps|forearms|Поднимайте плечи прямо вверх к ушам, без вращения.
 #Ноги
-Приседания со штангой|w|6|ноги зал
-Жим ногами|w|6|ноги зал
-Румынская тяга|w|6|ноги зал
-Разгибание ног в тренажёре|w|5|ноги зал
-Сгибание ног в тренажёре|w|5|ноги зал
-Подъём на носки|w|4|икры
-Выпады с гантелями|w|6|ноги зал
+Приседания со штангой|w|6|ноги зал|quads,glutes|hamstrings,adductors,lower_back|Гриф на трапециях, присед до параллели, колени по носкам, пятки на полу.
+Жим ногами|w|6|ноги зал|quads,glutes|hamstrings,adductors|Поясница прижата, колени не сводите внутрь, не выпрямляйте до щелчка.
+Румынская тяга|w|6|ноги зал|hamstrings,glutes|lower_back,forearms|Ноги чуть согнуты, таз назад, гриф по бёдрам до середины голени.
+Разгибание ног в тренажёре|w|5|ноги зал|quads||Разгибайте до прямых ног и задержитесь на секунду.
+Сгибание ног в тренажёре|w|5|ноги зал|hamstrings|calves|Сгибайте без отрыва таза, опускайте медленно.
+Подъём на носки|w|4|икры|calves||Поднимайтесь максимально высоко, внизу растягивайте икры.
+Выпады с гантелями|w|6|ноги зал|quads,glutes|hamstrings,adductors,forearms|Корпус вертикально, шаг достаточно длинный.
 #Плечи и руки
-Жим штанги стоя|w|6|плечи зал
-Жим гантелей сидя|w|5|плечи зал
-Махи гантелями в стороны|w|4|плечи
-Разведения в наклоне|w|4|плечи
-Подъём штанги на бицепс|w|4|бицепс руки
-Молотки|w|4|бицепс руки
-Французский жим|w|4|трицепс руки
-Разгибания на блоке|w|4|трицепс руки
-Обратные отжимания от скамьи|bw|5|трицепс
+Жим штанги стоя|w|6|плечи зал|delts,triceps|traps,abs,upper_back|Ягодицы и пресс напряжены, гриф идёт вертикально над головой.
+Жим гантелей сидя|w|5|плечи зал|delts,triceps|traps|Гантели от уровня ушей вверх, без касания вверху.
+Махи гантелями в стороны|w|4|плечи|delts|traps|Локти чуть согнуты, поднимайте до уровня плеч.
+Разведения в наклоне|w|4|плечи|rear_delts|upper_back,traps|Наклон почти параллельно полу, разводите руки в стороны.
+Подъём штанги на бицепс|w|4|бицепс руки|biceps|forearms|Локти прижаты к корпусу, без раскачки.
+Молотки|w|4|бицепс руки|biceps,forearms||Ладони смотрят друг на друга, поднимайте поочерёдно.
+Французский жим|w|4|трицепс руки|triceps||Локти смотрят в потолок и не расходятся, двигаются только предплечья.
+Разгибания на блоке|w|4|трицепс руки|triceps|forearms|Локти прижаты, разгибайте до конца вниз.
+Обратные отжимания от скамьи|bw|5|трицепс|triceps|chest,delts|Спина близко к скамье, опускайтесь до 90° в локтях.
 #Пресс
-Скручивания|bw|4|пресс
-Планка|time|4|пресс
-Боковая планка|time|4|пресс
-Велосипед|bw|5|пресс
-Русский твист|bw|5|пресс
-Подъём ног лёжа|bw|4|пресс
-Ролик для пресса|bw|6|пресс
+Скручивания|bw|4|пресс|abs|obliques|Поясница прижата. Поднимайте лопатки, не тяните шею руками.
+Планка|time|4|пресс|abs|obliques,delts,glutes,lower_back|Тело прямое от головы до пяток, таз не провисает.
+Боковая планка|time|4|пресс|obliques|abs,delts,glutes|Опора на предплечье, таз высоко, тело в одну линию.
+Велосипед|bw|5|пресс|abs,obliques||Тянитесь локтем к противоположному колену, вторая нога прямая.
+Русский твист|bw|5|пресс|obliques|abs|Корпус отклонён назад, поворачивайте плечи, а не только руки.
+Подъём ног лёжа|bw|4|пресс|abs|obliques|Поясница прижата, опускайте ноги медленно, не касаясь пола.
+Ролик для пресса|bw|6|пресс|abs|lats,delts,triceps,obliques|Катите вперёд с напряжённым прессом, поясница не прогибается.
 #Бег и кардио
-Бег|cardio|9.8|пробежка улица
-Бег на дорожке|cardio|9|пробежка зал
-Интервальный бег|cardio|11|спринт
-Ходьба|cardio|3.5|прогулка шаги
-Велосипед (езда)|cardio|7.5|вело
-Велотренажёр|cardio|7|вело зал
-Скакалка|cardio|11|кардио бокс
-Плавание|cardio|7|бассейн
-Эллипс|cardio|5|зал
-Гребной тренажёр|cardio|7|зал
-Лестница|cardio|8|ступени
+Бег|cardio|9.8|пробежка улица|quads,calves|hamstrings,glutes|Спокойный темп, на котором можно говорить фразами. Приземляйтесь под себя.
+Бег на дорожке|cardio|9|пробежка зал|quads,calves|hamstrings,glutes|Наклон дорожки 1% ближе к бегу на улице.
+Интервальный бег|cardio|11|спринт|quads,hamstrings,calves|glutes|Чередуйте 30 с быстро и 90 с спокойно, 6–10 повторов.
+Ходьба|cardio|3.5|прогулка шаги|calves,quads|glutes|Бодрый шаг, руки работают.
+Велосипед (езда)|cardio|7.5|вело|quads|calves,glutes|Седло на высоте, при которой нога внизу почти выпрямляется.
+Велотренажёр|cardio|7|вело зал|quads|calves,glutes|Каденс 80–90 оборотов в минуту.
+Скакалка|cardio|11|кардио бокс|calves|quads,forearms,delts|Прыгайте на носках, вращайте кистями, а не руками.
+Плавание|cardio|7|бассейн|lats,delts|triceps,chest,quads|Длинный гребок, ровное дыхание.
+Эллипс|cardio|5|зал|quads,glutes|calves,hamstrings|Спина ровная, не опирайтесь на поручни.
+Гребной тренажёр|cardio|7|зал|lats,upper_back,quads|biceps,glutes,lower_back|Сначала толчок ногами, потом корпус, в конце руки к поясу.
+Лестница|cardio|8|ступени|quads,glutes|calves|Ставьте на ступень всю стопу.
 #Бокс
-Бой с тенью|rounds|6|бокс
-Работа на мешке|rounds|7|бокс груша
-Работа на лапах|rounds|8|бокс лапы
-Спарринг|rounds|9|бокс
-Работа ног|rounds|6|бокс
+Бой с тенью|rounds|6|бокс|delts,obliques|calves,triceps,abs|Стойка, работа ног, удары сериями, рука сразу возвращается к подбородку.
+Работа на мешке|rounds|7|бокс груша|delts,triceps,obliques|chest,calves,abs|Бейте с поворотом корпуса, выдох на удар, руки возвращайте к лицу.
+Работа на лапах|rounds|8|бокс лапы|delts,triceps,obliques|calves,abs|Слушайте команды партнёра, бейте точно в центр лапы.
+Спарринг|rounds|9|бокс|delts,obliques|calves,triceps,abs|Защита прежде всего: подбородок опущен, руки у лица.
+Работа ног|rounds|6|бокс|calves|quads|Короткие шаги, ноги не скрещиваются, вес на передней части стопы.
 #Растяжка и игры
-Разминка|cardio|3|суставы
-Растяжка|cardio|2.3|заминка
-Йога|cardio|2.5|
-Футбол|cardio|7|игра
-Баскетбол|cardio|6.5|игра
-Волейбол|cardio|4|игра
-Лыжи|cardio|7|зима
-Коньки|cardio|5.5|зима
+Разминка|cardio|3|суставы|||Вращения в суставах сверху вниз, затем 5 минут лёгкого кардио.
+Растяжка|cardio|2.3|заминка|hamstrings,quads|lower_back,chest|Тяните плавно по 20–30 секунд, без боли.
+Йога|cardio|2.5||abs|hamstrings,lower_back,delts|Дышите ровно, держите позы без рывков.
+Футбол|cardio|7|игра|quads,calves|hamstrings,glutes|
+Баскетбол|cardio|6.5|игра|quads,calves|delts,glutes|
+Волейбол|cardio|4|игра|quads,delts|calves|
+Лыжи|cardio|7|зима|quads,glutes|triceps,lats,calves|
+Коньки|cardio|5.5|зима|quads,glutes|adductors,calves|
 `;
 const EX_DB = []; const EX_GROUPS = [];
 (() => {
@@ -954,10 +972,140 @@ const EX_DB = []; const EX_GROUPS = [];
   EX_RAW.split('\n').forEach((ln) => {
     ln = ln.trim(); if (!ln) return;
     if (ln[0] === '#') { g = ln.slice(1); EX_GROUPS.push(g); return; }
-    const [name, type, met, tags] = ln.split('|');
-    EX_DB.push({ id: 'ex:' + name, name, type, met: +met, group: g, tags: ((tags || '') + ' ' + g).toLowerCase() });
+    const [name, type, met, tags, pri, sec, cue] = ln.split('|');
+    const list = (x) => (x || '').split(',').map((t) => t.trim()).filter(Boolean);
+    EX_DB.push({ id: 'ex:' + name, name, type, met: +met, group: g, tags: ((tags || '') + ' ' + g).toLowerCase(), pri: list(pri), sec: list(sec), cue: cue || '' });
   });
 })();
+
+/* ================= Картинки к еде ================= */
+const FOOD_PICS = [
+  [/гречк|греча/, '🥣'], [/овсян|овсяные|геркулес|мюсли|гранола|хлопья/, '🥣'], [/каша|манн|пшён|перлов|булгур|киноа|кускус/, '🥣'],
+  [/рис|плов/, '🍚'], [/макарон|спагетти|паста|флотски/, '🍝'], [/лапш|роллтон|доширак|бигбон|вермишел|удон|соба/, '🍜'],
+  [/пюре|картоф|картош/, '🥔'], [/фри|по-деревенски/, '🍟'], [/фасол|чечевиц|нут|горох/, '🫘'],
+  [/наггетс/, '🍗'], [/куриц|курин|бедро|голен|крыл|гриль|индейк/, '🍗'], [/шашлык/, '🍢'],
+  [/котлет|тефтел|фарш|гуляш|жаркое/, '🍖'], [/говядин|говяж|свинин|свиная|вырезк|стейк|мясо/, '🥩'], [/печень/, '🥩'],
+  [/сосиск|сардельк|хот-дог/, '🌭'], [/колбас|ветчин|сервелат|бекон/, '🥓'],
+  [/суши|ролл/, '🍣'], [/кревет|кальмар|краб|икра/, '🦐'], [/тунец|сардин|шпрот|консерв/, '🥫'], [/рыб|минтай|треск|хек|горбуш|кета|лосос|сёмг|семг|сельд|селёд|скумбр/, '🐟'],
+  [/яичниц|омлет/, '🍳'], [/яйц|белок/, '🥚'], [/сырник/, '🥞'], [/сыр|брынз|моцарел/, '🧀'],
+  [/йогурт|творожок|даниссимо|пудинг|активиа/, '🍨'], [/творог/, '🥣'], [/кефир|молоко|ряженк/, '🥛'], [/сметан|масло сливоч/, '🧈'],
+  [/мороженое|пломбир|эскимо/, '🍦'], [/сгущ/, '🥫'], [/сырок/, '🍫'],
+  [/огур/, '🥒'], [/помидор|томат/, '🍅'], [/перец/, '🫑'], [/брокколи|капуст/, '🥦'], [/морков/, '🥕'], [/свёкл|свекл|винегрет/, '🫜'],
+  [/лук/, '🧅'], [/баклажан/, '🍆'], [/кабачок/, '🥒'], [/салат|цезарь|греческий|оливье/, '🥗'], [/шампиньон|гриб/, '🍄'], [/горошек/, '🫛'],
+  [/кукуруз|попкорн/, '🌽'], [/авокадо/, '🥑'], [/рагу/, '🍲'],
+  [/банан/, '🍌'], [/яблок/, '🍎'], [/груш/, '🍐'], [/апельсин|сок апельсин/, '🍊'], [/мандарин/, '🍊'], [/грейпфрут/, '🍊'], [/киви/, '🥝'],
+  [/виноград|изюм/, '🍇'], [/арбуз/, '🍉'], [/дын/, '🍈'], [/клубник/, '🍓'], [/голубик|черник/, '🫐'], [/малин/, '🍓'], [/хурм|персик/, '🍑'], [/ананас/, '🍍'], [/финик|кураг/, '🥭'],
+  [/лаваш|шаурм|шаверм/, '🌯'], [/бургер|чизбургер/, '🍔'], [/пицц/, '🍕'], [/сэндвич|бутерброд/, '🥪'], [/хлебц|сушки|сухар|кириешк/, '🥨'], [/хлеб|батон|бородин/, '🍞'],
+  [/блин|оладь|блинчик/, '🥞'], [/круассан/, '🥐'], [/булоч|пирож|беляш|чебурек|самса|чебупел|бульмен/, '🥟'], [/пельмен|вареник|манты/, '🥟'], [/голубц/, '🥬'],
+  [/борщ|щи|солянк|суп|уха|окрошк|рассольник/, '🍲'],
+  [/чипс/, '🥔'], [/шоколад|сникерс|snickers|mars|twix|bounty|kitkat|батончик|конфет/, '🍫'], [/печенье|пряник|вафл/, '🍪'], [/торт|наполеон|пирожное/, '🍰'],
+  [/мармелад|зефир|халва/, '🍬'], [/мёд|мед /, '🍯'], [/сахар/, '🧂'], [/варенье|шоколадная паста/, '🍯'],
+  [/кофе|капучино|латте|американо/, '☕'], [/чай/, '🍵'], [/вода/, '💧'], [/кола|газиров/, '🥤'], [/энергетик/, '⚡'], [/морс|компот|сок|квас/, '🧃'], [/пиво/, '🍺'],
+  [/орех|миндал|арахис|кешью|семечк/, '🥜'], [/майонез|кетчуп|соус|горчиц|хумус/, '🫙'], [/масло/, '🫒'],
+  [/протеин|гейнер/, '💪']
+];
+const CAT_PIC = { 'Крупы и гарниры': '🥣', 'Каши и лапша быстрого приготовления': '🍜', 'Мясо и птица': '🍗', 'Рыба и морепродукты': '🐟', 'Яйца и молочное': '🥛', 'Овощи и салаты': '🥦', 'Фрукты и ягоды': '🍎', 'Хлеб и выпечка': '🥖', 'Готовые блюда': '🍲', 'Полуфабрикаты и магазин': '🛒', 'Фастфуд': '🍔', 'Сладкое': '🍬', 'Напитки': '🥤', 'Орехи, соусы и масла': '🥜', 'Спортивное питание': '💪' };
+function foodPic(f) {
+  const n = (f.name + ' ' + (f.tags || '')).toLowerCase();
+  for (const [re, e] of FOOD_PICS) if (re.test(n)) return e;
+  return CAT_PIC[f.cat] || '🍽️';
+}
+FOOD_DB.forEach((f) => { f.pic = foodPic(f); });
+
+/* ================= Схема мышц =================
+   Фигура в двух видах: спереди и сзади. Каждая мышца — отдельный контур (левая половина, правая отражается).
+   Цвет мышцы задаётся переменной --m-<id>, поэтому одна схема в спрайте служит всем миниатюрам. */
+const MUSCLE_NAMES = {
+  neck: 'Шея', traps: 'Трапеции', delts: 'Передние и средние дельты', rear_delts: 'Задние дельты', chest: 'Грудные',
+  biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечья', abs: 'Прямая мышца живота', obliques: 'Косые мышцы живота',
+  lats: 'Широчайшие', upper_back: 'Верх спины', lower_back: 'Поясница', glutes: 'Ягодицы', quads: 'Квадрицепс',
+  hamstrings: 'Бицепс бедра', adductors: 'Приводящие бедра', calves: 'Икры', shins: 'Передняя часть голени'
+};
+/* Силуэт: левая половина, замыкается по центру x = 100 */
+const BODY_HALF = {
+  front: 'M100 47 L92 47 C91 53 91 57 90 60 C82 64 70 68 60 71 C48 73 42 82 41 95 C39 108 37 122 36 136 C35 145 33 152 32 158 C28 175 25 195 25 212 L26 222 C22 232 21 246 25 256 C29 262 34 258 35 250 C36 240 36 232 35 224 C38 210 42 192 45 175 C47 166 48 160 49 152 C50 140 52 122 56 104 C57 102 57 101 57 100 C58 118 60 136 62 150 C63 162 63 172 62 184 C61 192 61 200 63 210 C60 220 58 230 58 240 C55 262 55 290 59 318 C60 328 60 336 61 342 C57 358 57 378 62 398 C63 406 64 412 64 418 C58 424 57 431 66 433 C76 434 84 433 86 429 C87 424 84 420 82 416 C83 404 85 392 86 378 C88 362 88 350 86 340 C88 332 89 326 90 316 C92 292 95 266 97 246 C98 242 99 240 100 240 Z',
+  back: 'M100 47 L92 47 C91 53 91 57 90 60 C82 64 70 68 60 71 C48 73 42 82 41 95 C39 108 37 122 36 136 C35 145 33 152 32 158 C28 175 25 195 25 212 L26 222 C22 232 21 246 25 256 C29 262 34 258 35 250 C36 240 36 232 35 224 C38 210 42 192 45 175 C47 166 48 160 49 152 C50 140 52 122 56 104 C57 102 57 101 57 100 C58 118 60 136 62 150 C63 162 63 172 62 184 C61 192 61 200 63 210 C60 220 58 230 58 240 C55 262 55 290 59 318 C60 328 60 336 61 342 C57 358 57 378 62 398 C63 406 64 412 64 418 C58 424 57 431 66 433 C76 434 84 433 86 429 C87 424 84 420 82 416 C83 404 85 392 86 378 C88 362 88 350 86 340 C88 332 89 326 90 316 C92 292 95 266 97 246 C98 242 99 240 100 240 Z'
+};
+const M_FRONT = [
+  ['neck', 'M93.4 48.2 C94.6 54.4 96.2 59.6 98.6 64.6 L99.4 64.6 C98.6 58 97 52 95.6 47.6 Z'],
+  ['traps', 'M91.4 51 C90.6 56 90 59.5 89.4 61.2 C81 65 71 68.4 62.5 71 C71.5 70.6 80.5 69.4 88.6 68.4 C91.6 67.6 92.6 64.4 92.6 58.6 Z'],
+  ['chest', 'M99.2 72.4 L99.2 116.8 C93 120.6 81 121.8 70.6 117.4 C64.4 113.6 60.4 107.4 57.6 99.4 C60.6 90.6 64.8 82.4 70.8 76.2 C78.6 72 90 71.2 99.2 72.4 Z'],
+  ['delts', 'M69.4 74.6 C63.6 81 59.4 89.4 56.6 98 C54 106 50.8 113.4 47.8 119.6 C44 112.4 41.4 102.4 42 92.6 C43 82.4 49.8 74.4 60.2 72.2 C63.8 71.8 66.8 72.8 69.4 74.6 Z'],
+  ['biceps', 'M48.8 118.4 C53.2 123.4 54.2 133.6 52.2 144.2 C50.8 150.4 47.8 154.6 44 155.8 C40.6 151.2 38.8 142.8 39.4 133.4 C40 125.4 43.2 119.4 46.6 117 Z'],
+  ['triceps', 'M41.2 106 C39.6 114 38.2 124 37.6 135 C37.2 143 36.2 150 34.8 155.4 C33.8 148 34.4 136 35.8 125.6 C36.8 117.6 38.6 111 41.2 106 Z'],
+  ['forearms', 'M42.4 157 C37.6 158.4 33.4 165.4 30.8 176.4 C28.2 190.2 27 206.2 27.4 221.6 L30.4 221.6 C31.6 206 34.4 190 38 178.2 C40.2 170.4 41.8 162.6 42.4 157 Z M44.8 157.6 C48.4 163 47.6 173 44.6 184.8 C41 198.2 37.8 210.8 35.6 221.6 L31.6 221.6 C32.8 208 35.6 192 39.4 179.2 C41.8 170.8 43.6 163.2 44.8 157.6 Z'],
+  ['abs', 'M98.8 120.2 L89 121 C87.2 127 87 133.2 87.8 139.4 L98.8 139.4 Z M98.8 142.4 L87.8 142.4 C87 148.6 87 154.6 87.8 160.4 L98.8 160.4 Z M98.8 163.4 L88 163.4 C87.4 169.6 87.6 175.6 88.4 181.4 L98.8 181.4 Z M98.8 184.4 L88.6 184.4 C88.4 194.2 89.6 203.6 92.4 211.2 C94.6 214.2 96.8 215.4 98.8 215.8 Z'],
+  ['obliques', 'M85.4 122.6 C80 126 74.6 131 71 136.6 C66 140 63.6 146 63.2 154 C62.6 168 63 182 64.6 196 C70.4 204 78 210 87.8 214.4 C85.6 202 84.6 188 84.8 172 C84.8 156 84.8 140 85.4 122.6 Z M62.4 112.2 C65.6 113.6 68.6 116 70.4 118.8 C67.2 119.8 64.4 119 62.8 117.6 Z M63 121.2 C66.6 122.2 70 124.8 72.2 128 C68.8 129.2 65.4 128.2 63.4 126.6 Z M63.4 130.6 C66.4 131.6 68.8 133.4 70.2 135.6 C67.6 136.6 65 136 63.4 134.8 Z'],
+  ['lats', 'M57.8 101.6 C59.8 108 61.2 118 61.8 128 C62.4 138 62.6 146 62.4 152 C61.2 145 60 132 59 120 C58.4 113 58 107 57.8 101.6 Z'],
+  ['adductors', 'M96.4 229.2 C97.8 235 98 240.6 96.8 246.2 C94.8 265.6 92.4 284.8 89.8 301.6 C87.6 292 86.4 280 86.2 268 C86.4 256 88.6 244 92 236 C93.4 232.6 94.8 230.6 96.4 229.2 Z'],
+  ['quads', 'M70.8 221.8 C63.2 234 57.6 254 57.2 278 C57 300 60 316 65.6 328.6 C69.2 331 72 330.4 73.6 327 C69.8 314.6 67 298.8 67 282.6 C67 260.6 68.6 238.8 72.6 224.6 Z M75.4 222.6 C81.8 240 84 264 82.4 290.4 C81 304.6 78 315.2 74.6 323.6 C70.8 313.8 68.8 300 68.8 286.4 C68.8 262.4 70.6 240.4 75.4 222.6 Z M84.6 287.6 C89 297.8 91 310.4 89.2 322.6 C87.4 329.4 81.6 332.6 76.4 331.4 C78.4 322.8 80.2 311 80.8 300.6 C81.2 295.4 82.6 290.8 84.6 287.6 Z'],
+  ['shins', 'M65 346 C68.6 358 71 376 72.6 395 C71 399.4 68.6 401.2 66.4 399.4 C62.6 384 60.6 366 61.4 350.4 C62.4 347.4 63.6 346 65 346 Z'],
+  ['calves', 'M83.6 344.6 C87.4 351.6 88.4 364 86.8 377.6 C85.8 384.2 83.4 386.6 80.8 384.6 C79.4 372 79.6 358 80.8 348.2 C81.6 346 82.6 344.8 83.6 344.6 Z']
+];
+const M_BACK = [
+  ['traps', 'M99.4 46.6 C96.4 52.6 92.6 58 88.6 61.6 C80.4 65.8 70.4 69.6 62.4 72.6 C72.4 78.2 82.2 88.6 89.8 105.8 C94.2 120.2 97.4 136 99.4 150.4 Z'],
+  ['rear_delts', 'M61.4 73.4 C51.8 74.4 44.4 80.4 42.4 92 C41.4 100.2 43.4 110 47.2 118 C50.2 108 54.4 98 60.2 90.2 C64.2 85.8 69.8 82 73.6 80.2 C69.6 76.6 65.6 74.4 61.4 73.4 Z'],
+  ['upper_back', 'M75.2 81 C82.4 86.6 87.4 96 89.4 106.6 C83.4 112.2 75.6 114 68 112.2 C64 106.4 62 100 60.8 92.6 C64.6 87 69.6 83 75.2 81 Z'],
+  ['lats', 'M59.6 104.6 C66.4 113 76.8 116.8 89.6 111 C93.2 124.4 96 138.4 97.6 152.4 C94.4 160.6 92 170.4 90.4 180.4 C89 187 86.2 191.8 81.8 193.8 C76 194.8 71 189.8 68.2 180.6 C64.8 166.6 62.4 150.2 61 134.2 C60.2 124.2 59.6 114 59.6 104.6 Z'],
+  ['lower_back', 'M99.4 153 L99.4 213.6 C95.4 215.4 91.4 213.4 89.4 207.4 C88.4 195.4 88.6 181 90.6 167 C92.6 161 95.6 156.4 99.4 153 Z'],
+  ['obliques', 'M62.6 152.4 C62.8 169.4 64.2 187 68 200 C71.4 203.8 74.4 202 74.8 196.8 C70.4 184.8 66.2 169 62.6 152.4 Z'],
+  ['glutes', 'M99.2 216.2 C99.4 230.4 99.4 244.4 98.2 256 C90.2 262.6 76.4 262.6 66.4 254.6 C60.4 246.4 59.2 234.4 60.4 224.4 C64.4 214.4 72.4 208.6 84.4 208.6 C90.4 208.6 95.4 211 99.2 216.2 Z M60.2 221.6 C60.6 213 64.4 205.8 71.8 202.2 C75.6 203.6 78 205.6 80.2 207.6 C70.2 209.6 64.2 214.6 60.2 221.6 Z'],
+  ['quads', 'M58.2 262 C56.6 280 57.2 300 60.8 318.4 C62.2 310 62.4 290 61.6 271 C61 266.6 59.8 263.4 58.2 262 Z'],
+  ['hamstrings', 'M63.6 262.4 C61.8 284.4 63.6 306 69.8 325.6 C71.8 329.6 74.6 329.8 76.8 327.6 C75.8 306 75.8 284.4 77.6 262.8 C73.4 264 68.4 264 63.6 262.4 Z M80.2 263 C80.2 284.4 81.2 306 80.4 326 C83.2 330 86 330 88 326 C91 306 92.8 286 93.6 262.4 C89.4 263.6 84.6 264 80.2 263 Z'],
+  ['adductors', 'M95.4 259.8 C96.8 264 97.4 268 96.6 273 C95 288 92.8 298 90.6 305 C92 290 93.8 274 95.4 259.8 Z'],
+  ['calves', 'M62.6 343.6 C59 355.6 59 370.6 63.4 385 C65.6 389.2 70.6 389.6 73 385 C74.8 370.6 74.6 356 72.6 344 C70 339.6 65.4 339.6 62.6 343.6 Z M75.6 343.6 C75.4 356.4 76.4 372.4 78.6 386.6 C81.8 391 86.4 389.4 87.6 383 C88.8 369 88.6 354.4 85.6 343.8 C82.6 339.4 77.8 339.6 75.6 343.6 Z M64.4 390.4 C66.4 398 69.8 403.4 73.6 404 C77.6 404.4 81.4 400.6 83.4 393.4 C80.6 394.2 77.8 394 75.8 392.2 C72.6 394.4 67.8 394 64.4 390.4 Z'],
+  ['triceps', 'M44.6 116.4 C40.8 121.8 38.6 132.6 38.4 144.4 C38.8 149 40.4 152.6 42.6 154.6 C43.4 142 44.2 128 46.4 118.2 Z M47.2 116.6 C50.8 120 53.4 128 53.4 138 C53.2 146 51 152.6 47.8 156.2 C45 154 43.6 148 44 140 C44.4 130 45.4 122 47.2 116.6 Z'],
+  ['forearms', 'M44.2 158.4 C40.2 166.4 34.6 180.4 31.4 196.4 C29.4 206.4 28.6 214.2 28.4 220.6 L32 220.6 C34 206.4 38.4 190.4 42.4 176.4 C44 170 44.8 164 44.2 158.4 Z M46.2 160 C47.4 166 46.6 172 45.2 178 C42 192 38 206 35.2 220.6 L33.4 220.6 C35.6 206 39.6 190 43.6 176.6 C45 171 45.8 165.4 46.2 160 Z']
+];
+/* Волокна и рельеф: тонкие линии поверх мышц */
+const M_FIBERS = {
+  front: 'M97 80 C88 82 76 88 64.4 96 M97 92 C88 94 76 98 63 101 M97 104 C88 106 78 107 67 105 M61 77 C56 88 52 100 49 112 M66.6 76.4 C62 86 58 96 54.4 106 M46 124 C47.4 132 47.6 140 46.2 148 M75 240 C78.6 264 78.6 290 75.6 316 M64 250 C62.6 270 63 292 66 312 M74 336.4 C71.2 333.6 71.4 328.8 74 327 C76.8 328.8 76.8 333.6 74 336.4 M68 356 C69 370 70 382 70.6 392 M38 168 C35 182 33 198 32 212',
+  back: 'M96 58 C86 64 76 70 66 74 M96 72 C88 78 80 86 74 92 M96 90 C92 96 90 100 89 104 M52 78 C49 88 47 98 46.6 108 M66 120 C70 140 76 160 80 184 M74 118 C78 138 84 156 86 176 M95 166 L95 208 M70 216 C76 226 84 236 96 242 M72 280 C72 296 73 310 74 322 M86 280 C86 296 86 310 85 322 M67 350 C66 362 66 372 68 382 M81 350 C82 362 82 372 82 382'
+};
+/* Тонкие линии формы: ключица, позвоночник, ягодичная складка, подколенные ямки */
+const M_LINES = {
+  front: 'M98.6 70.6 C90 69 78 70 68 73.6 M90 236 C93 232 96 230 99 229',
+  back: 'M100 60 L100 214 M66 254 C76 262 90 262 98 256 M70 331 C74 334 80 334 85 331'
+};
+const MUSCLES_FRONT = new Set(M_FRONT.map((m) => m[0]));
+const MUSCLES_BACK = new Set(M_BACK.map((m) => m[0]));
+const MIRROR = 'matrix(-1 0 0 1 200 0)';
+function bodyGroup(view, mode) {
+  const list = view === 'front' ? M_FRONT : M_BACK;
+  const half = list.map(([id, d]) => `<path class="mu mu-${id}" data-m="${id}" d="${d}"${mode === 'sprite' ? ` style="fill:var(--m-${id},var(--mu-base))"` : ''}/>`).join('');
+  const head = view === 'front'
+    ? '<ellipse cx="84.6" cy="29" rx="2.4" ry="4.6" class="mu-skin"/><ellipse cx="115.4" cy="29" rx="2.4" ry="4.6" class="mu-skin"/><ellipse cx="100" cy="27" rx="15.5" ry="19.5" class="mu-skin"/><path class="mu-hair" d="M84.8 22.6 C84.6 10 92 7.4 100 7.4 C108 7.4 115.4 10 115.2 22.6 C112.6 16.2 107 13.6 100 13.4 C93 13.6 87.4 16.2 84.8 22.6 Z"/>'
+    : '<ellipse cx="84.6" cy="29" rx="2.4" ry="4.6" class="mu-skin"/><ellipse cx="115.4" cy="29" rx="2.4" ry="4.6" class="mu-skin"/><ellipse cx="100" cy="27" rx="15.5" ry="19.5" class="mu-skin"/><path class="mu-hair" d="M84.6 26 C83.8 8 116.2 8 115.4 26 C113 37 108 42 100 42 C92 42 87 37 84.6 26 Z"/>';
+  const sil = `<path d="${BODY_HALF[view]}"/><path transform="${MIRROR}" d="${BODY_HALF[view]}"/>`;
+  const both = (cls, d) => `<path class="${cls}" d="${d}"/><path class="${cls}" transform="${MIRROR}" d="${d}"/>`;
+  return `<defs><linearGradient id="mshd-${view}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".10"/><stop offset=".32" stop-color="#fff" stop-opacity=".10"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset=".7" stop-color="#000" stop-opacity=".02"/><stop offset="1" stop-color="#000" stop-opacity=".14"/></linearGradient>
+    <clipPath id="mclip-${view}">${sil}</clipPath></defs>
+    ${head}<g class="mu-skin">${sil}</g>
+    <g class="mu-set">${half}</g><g class="mu-set" transform="${MIRROR}">${half}</g>
+    ${both('mu-fib', M_FIBERS[view])}${both('mu-line', M_LINES[view])}
+    <rect x="20" y="40" width="160" height="400" fill="url(#mshd-${view})" clip-path="url(#mclip-${view})" pointer-events="none"/>`;
+}
+/* Спрайт: один раз в документе. Миниатюры ссылаются на него через <use>. */
+function muscleSprite() {
+  return `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <symbol id="mbody-front" viewBox="20 2 160 436">${bodyGroup('front', 'sprite')}</symbol>
+    <symbol id="mbody-back" viewBox="20 2 160 436">${bodyGroup('back', 'sprite')}</symbol></defs></svg>`;
+}
+function muscleVars(pri, sec) {
+  return [...(sec || []).map((m) => `--m-${m}:var(--mu-sec)`), ...(pri || []).map((m) => `--m-${m}:var(--mu-pri)`)].join(';');
+}
+/* Миниатюра: спереди и сзади рядом */
+function muscleThumb(ex, cls) {
+  const st = muscleVars(ex.pri, ex.sec);
+  return `<span class="mthumb ${cls || ''}" style="${st}" aria-hidden="true"><svg viewBox="20 2 160 436"><use href="#mbody-front"/></svg><svg viewBox="20 2 160 436"><use href="#mbody-back"/></svg></span>`;
+}
+/* Большая схема с пульсацией рабочих мышц */
+function muscleFigure(ex) {
+  const pri = new Set(ex.pri || []), sec = new Set(ex.sec || []);
+  const mark = (svg) => svg.replace(/class="mu mu-(\w+)"/g, (m, id) => `class="mu mu-${id}${pri.has(id) ? ' pri' : sec.has(id) ? ' sec' : ''}"`);
+  return `<div class="mfig"><figure><svg viewBox="20 2 160 436" role="img" aria-label="Мышцы, вид спереди">${mark(bodyGroup('front'))}</svg><figcaption>Спереди</figcaption></figure>
+    <figure><svg viewBox="20 2 160 436" role="img" aria-label="Мышцы, вид сзади">${mark(bodyGroup('back'))}</svg><figcaption>Сзади</figcaption></figure></div>`;
+}
 
 /* ================= Главная ================= */
 const exampleCount = () => ['notes', 'reminders', 'plans', 'expenses', 'incomes', 'recurring', 'goals', 'fuel'].reduce((s, k) => s + S[k].filter((x) => x.example).length, 0)
@@ -973,18 +1121,31 @@ RENDER.home = function () {
   html += installBanner();
   if (exampleCount()) html += `<div class="banner"><div class="grow"><b>Это примеры</b>Записи с пометкой «пример» показывают, как всё выглядит. Удалите их, когда начнёте вести свои.</div><button class="btn sm" data-act="clear-examples">Удалить</button></div>`;
   const ws = S.settings.widgets.filter((w) => w.on && widgetAvailable(w.id));
-  ws.forEach((w) => { html += WIDGET[w.id] ? WIDGET[w.id]() : ''; });
+  const ed = !!ui.homeEdit;
+  html += `<div class="wgrid ${ed ? 'editing' : ''}" id="wgrid">${ws.map((w) => widgetBox(w, ed)).join('')}
+    ${ed ? `<button class="wg-add" data-act="w-gallery">${I.plus}Добавить виджет</button>` : ''}</div>`;
+  if (!ws.length && !ed) html += `<div class="card empty"><b>Главный экран пуст</b>Добавьте виджеты: напоминания, планы, воду, калории.<button class="btn primary sm" data-act="w-edit">Добавить виджеты</button></div>`;
+  html += ed ? `<div class="edit-done"><button class="btn primary" data-act="w-edit-done">Готово</button></div><p class="note-small" style="text-align:center">Удерживайте виджет и перетащите, чтобы поменять порядок</p>`
+    : (ws.length ? `<button class="btn ghost sm w-edit-link" data-act="w-edit">${I.widgets}Изменить виджеты</button>` : '');
   if (S.workoutActive) ui.mounts.push(tickElapsed);
-  if (!ws.length) html += `<div class="card empty"><b>Главный экран пуст</b>Включите виджеты в настройках.<button class="btn primary sm" data-act="settings">Открыть настройки</button></div>`;
+  ui.mounts.push(bindWidgetGrid);
   return html;
 };
+const WSIZES = { quick: ['w'], reminders: ['w'], plans: ['w'], expenses: ['w'], objects: ['w'], car: ['w', 's'], bank: ['w', 's'], notes: ['w'], food: ['w', 's'], sport: ['w', 's'],
+  today: ['s', 'w'], next: ['s', 'w'], water: ['s'], streak: ['s'], money: ['s'], memory: ['s', 'w'], week: ['w'] };
+const wSize = (w) => { const sz = WSIZES[w.id] || ['w']; return sz.includes(w.size) ? w.size : sz[0]; };
+function widgetBox(w, ed) {
+  const size = wSize(w); const fn = size === 's' && WIDGET_S[w.id] ? WIDGET_S[w.id] : WIDGET[w.id];
+  const inner = fn ? fn() : ''; if (!inner) return '';
+  return `<div class="wg wg-${size}" data-wid="${w.id}">${inner}${ed ? `<button class="wg-x" data-act="w-hide" data-wid="${w.id}" aria-label="Убрать виджет">${I.minus}</button>${(WSIZES[w.id] || []).length > 1 ? `<button class="wg-sz" data-act="w-size" data-wid="${w.id}" aria-label="Размер">${size === 's' ? '⇔' : '⇄'}</button>` : ''}` : ''}</div>`;
+}
 const WIDGET = {
   food() {
     const d = todayISO(); const g = goals(); const t = dayTotals(d); const left = g.kcal - t.kcal;
     return `<div class="card"><h2>Питание сегодня <button class="link" data-act="tab" data-tab="food">Открыть</button></h2>
       <div class="food-mini"><div class="ring-wrap sm">${kcalRing(t.kcal, g.kcal, 76)}<div class="ring-txt"><b>${nf.format(Math.round(t.kcal))}</b><span>ккал</span></div></div>
       <div class="macros">${macroBar('Белки', t.p, g.p, 'p')}<div class="left-line ${left < 0 ? 'neg' : ''}">${left >= 0 ? `Осталось ${nf.format(Math.round(left))} из ${nf.format(g.kcal)}` : `Больше нормы на ${nf.format(Math.round(-left))}`}</div></div></div>
-      <div class="btn-row" style="margin-top:12px"><button class="btn sm primary" data-act="add-food">${I.plus}Еда</button><button class="btn sm" data-act="water" data-n="${(S.food.water[d] || 0) + 1}">+ стакан воды</button></div></div>`;
+      <div class="btn-row" style="margin-top:12px"><button class="btn sm primary" data-act="add-food">${I.plus}Еда</button><button class="btn sm" data-act="water" data-n="add" data-today="1">+ стакан 200 мл</button></div></div>`;
   },
   sport() {
     const A = S.workoutActive; const last = [...S.workouts].sort((a, b) => b.start - a.start)[0];
@@ -1052,6 +1213,133 @@ ACT['clear-examples'] = () => {
   save(); render(); toast('Примеры удалены');
 };
 
+/* ---------- Маленькие виджеты ---------- */
+function nextItem() {
+  const now = new Date(); const items = [];
+  S.reminders.filter((r) => !r.done && new Date(r.at) >= now).forEach((r) => items.push({ t: new Date(r.at), title: r.title, kind: 'rem' }));
+  S.plans.filter((p) => !p.done && p.date && p.time).forEach((p) => { const t = new Date(p.date + 'T' + p.time); if (t >= now) items.push({ t, title: p.title, kind: 'plan' }); });
+  return items.sort((a, b) => a.t - b.t)[0] || null;
+}
+function untilText(t) {
+  const m = Math.round((t - new Date()) / 60000); if (m < 1) return 'сейчас'; if (m < 60) return `через ${m} мин`;
+  const h = Math.floor(m / 60); if (h < 24) return `через ${h} ч${m % 60 ? ' ' + (m % 60) + ' мин' : ''}`;
+  const d = Math.round(h / 24); return `через ${d} ${plural(d, 'день', 'дня', 'дней')}`;
+}
+const WIDGET_S = {
+  today() {
+    const d = new Date(); const t = todayISO(); const np = S.plans.filter((p) => p.date === t && !p.done).length; const nr = S.reminders.filter((r) => !r.done && isoOf(new Date(r.at)) === t).length;
+    return `<button class="card wsm w-today" data-act="tab" data-tab="plans"><span class="wl">${cap(WD_LONG[d.getDay()])}</span><span class="wbig">${d.getDate()}</span><span class="wl">${MONTH_GEN[d.getMonth()]}</span><span class="wfoot">${np || nr ? `${np ? np + ' ' + plural(np, 'план', 'плана', 'планов') : ''}${np && nr ? ', ' : ''}${nr ? nr + ' ' + plural(nr, 'напоминание', 'напоминания', 'напоминаний') : ''}` : 'Свободный день'}</span></button>`;
+  },
+  next() {
+    const n = nextItem();
+    return `<button class="card wsm w-next" data-act="tab" data-tab="${n && n.kind === 'plan' ? 'plans' : 'reminders'}"><span class="wl">${I.bell}Скоро</span>${n ? `<span class="wt">${esc(n.title)}</span><span class="wacc">${untilText(n.t)}</span><span class="wfoot">${relDay(n.t)}, ${fmtT(n.t)}</span>` : '<span class="wt muted">Ближайших дел нет</span><span class="wfoot">Нажмите, чтобы добавить</span>'}</button>`;
+  },
+  water() {
+    const ml = S.food.waterMl[todayISO()] || 0; const p = Math.min(1, ml / 2000);
+    return `<button class="card wsm w-water" data-act="water" data-n="add" data-today="1" aria-label="Добавить стакан воды"><span class="wl">💧 Вода</span><span class="glass"><i style="height:${Math.round(p * 100)}%"></i></span><span class="wbig sm">${fmtL(ml)}</span><span class="wfoot">+200 мл по нажатию</span></button>`;
+  },
+  food() {
+    const g = goals(); const t = dayTotals(todayISO()); const left = g.kcal - t.kcal;
+    return `<button class="card wsm" data-act="tab" data-tab="food"><span class="wl">🍽️ Калории</span><span class="ring-wrap sm c">${kcalRing(t.kcal, g.kcal, 76)}<span class="ring-txt"><b>${nf.format(Math.round(t.kcal))}</b><span>ккал</span></span></span><span class="wfoot ${left < 0 ? 't-warn' : ''}">${left >= 0 ? 'осталось ' + nf.format(Math.round(left)) : 'больше на ' + nf.format(Math.round(-left))}</span></button>`;
+  },
+  sport() { return WIDGET_S.streak(); },
+  streak() {
+    const days = weekDays(); const n = S.workouts.filter((w) => days.includes(isoOf(new Date(w.start)))).length;
+    const A = S.workoutActive;
+    return `<button class="card wsm w-streak" data-act="start-workout"><span class="wl">🔥 Тренировки</span><span class="wbig">${n}</span><span class="wl">на этой неделе</span><span class="wfoot wbtn">${A ? `Идёт <span data-elapsed="${A.start}">${fmtDur(Date.now() - A.start)}</span>` : '▶ Начать'}</span></button>`;
+  },
+  money() {
+    const t = todayISO(); const today = S.expenses.filter((x) => x.date === t).reduce((s2, x) => s2 + x.amount, 0); const mk = t.slice(0, 7);
+    const month = S.expenses.filter((x) => x.date.startsWith(mk)).reduce((s2, x) => s2 + x.amount, 0);
+    return `<button class="card wsm" data-act="money" data-sec="exp"><span class="wl">💳 Траты</span><span class="wbig sm">${money(today)}</span><span class="wl">сегодня</span><span class="wfoot">за месяц ${money(month)}</span></button>`;
+  },
+  bank() {
+    const g = S.goals[0]; if (!g) return `<button class="card wsm" data-act="goal-new"><span class="wl">🐷 Копилка</span><span class="wt muted">Целей нет</span><span class="wfoot">Создать цель</span></button>`;
+    const p = g.target ? Math.min(100, Math.round(goalSaved(g) / g.target * 100)) : 0;
+    return `<button class="card wsm" data-act="money" data-sec="bank"><span class="wl">🐷 ${esc(g.name)}</span><span class="ring c" style="--p:${p};--c:${g.color}"><span>${p}%</span></span><span class="wfoot">${money(goalSaved(g))}</span></button>`;
+  },
+  car() {
+    const n = nextService(); const c = S.car;
+    return `<button class="card wsm" data-act="tab" data-tab="car"><span class="wl">🚗 ${esc(c.name) || 'Машина'}</span><span class="wbig sm">${c.mileage != null ? nf.format(c.mileage) : '—'}</span><span class="wl">км</span><span class="wfoot">${n ? `<span class="pill ${n.st.cls}">${esc(n.s.name)}</span>` : 'Регламент без отметок'}</span></button>`;
+  },
+  memory() {
+    const pg = [...S.diary.pages].reverse().find((p) => p.items.some((i) => i.kind === 'photo')) || S.diary.pages[S.diary.pages.length - 1];
+    const ph = pg && pg.items.find((i) => i.kind === 'photo');
+    return `<button class="card wsm w-memory ${ph ? 'has-ph' : ''}" data-act="d-open" data-pid="${pg ? pg.id : ''}">${ph ? `<img data-media="${ph.ref}" data-kind="thumb" alt="">` : ''}<span class="wl">📖 Дневник</span>${pg ? `<span class="wt">${esc(pg.title || 'Запись')}</span><span class="wfoot">${fmtShort(toDate(pg.date))}</span>` : '<span class="wt muted">Первая запись ждёт</span><span class="wfoot">Нажмите, чтобы написать</span>'}</button>`;
+  }
+};
+WIDGET.today = () => { const d = new Date(); const t = todayISO(); const ps = S.plans.filter((p) => p.date === t); const rs = S.reminders.filter((r) => !r.done && isoOf(new Date(r.at)) === t);
+  return `<div class="card w-today-w"><div class="wtw-date"><span class="wbig">${d.getDate()}</span><span><b>${cap(WD_LONG[d.getDay()])}</b><br>${MONTH_GEN[d.getMonth()]}</span></div><div class="grow">${ps.length || rs.length ? [...rs.map((r) => `<div class="wtw-i">${I.bell}<span>${fmtT(new Date(r.at))} ${esc(r.title)}</span></div>`), ...ps.map((p) => `<div class="wtw-i ${p.done ? 'd' : ''}"><i class="dot cat-${p.cat}"></i><span>${p.time ? p.time + ' ' : ''}${esc(p.title)}</span></div>`)].slice(0, 5).join('') : '<span class="m">На сегодня ничего не запланировано</span>'}</div></div>`; };
+WIDGET.next = () => WIDGET_S.next().replace('card wsm', 'card wsm wide');
+WIDGET.memory = () => WIDGET_S.memory().replace('card wsm', 'card wsm wide');
+WIDGET.week = () => {
+  const days = weekDays(); const t = todayISO();
+  return `<div class="card"><h2>Неделя <button class="link" data-act="tab" data-tab="plans">Планы</button></h2><div class="wk-bubs">${days.map((d) => { const ps = S.plans.filter((p) => p.date === d); const dt = toDate(d); const done = ps.length && ps.every((p) => p.done);
+    return `<button class="wkb ${d === t ? 'today' : ''} ${ps.length ? 'has' : ''} ${done ? 'done' : ''}" data-act="plan-day" data-day="${d}" style="--s:${1 + Math.min(ps.length, 4) * 0.12}"><b>${dt.getDate()}</b><small>${WD_SHORT[dt.getDay()]}</small>${ps.length ? `<i>${ps.length}</i>` : ''}</button>`; }).join('')}</div></div>`;
+};
+WIDGET.water = WIDGET_S.water; WIDGET.streak = WIDGET_S.streak; WIDGET.money = WIDGET_S.money;
+
+/* ---------- Правка виджетов: удержать и перетащить ---------- */
+function bindWidgetGrid() {
+  const grid = $('#wgrid'); if (!grid) return; hydrateMedia(grid);
+  let lp = null, drag = null;
+  const startDrag = (el, e) => {
+    const r = el.getBoundingClientRect(); drag = { el, ox: e.clientX - r.left, oy: e.clientY - r.top, sx: e.clientX, sy: e.clientY, base: r, moved: false };
+    el.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(10);
+  };
+  grid.addEventListener('pointerdown', (e) => {
+    const el = e.target.closest('.wg'); if (!el || e.target.closest('.wg-x, .wg-sz')) return;
+    lp = { el, x: e.clientX, y: e.clientY, id: e.pointerId, t: setTimeout(() => {
+      if (!ui.homeEdit) { ui.homeEdit = true; ui.suppressClick = Date.now() + 500; render(); if (navigator.vibrate) navigator.vibrate(15); lp = null; return; }
+      startDrag(lp.el, { clientX: lp.x, clientY: lp.y }); lp = null;
+    }, ui.homeEdit ? 220 : 550) };
+  });
+  grid.addEventListener('pointermove', (e) => {
+    if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 8) { clearTimeout(lp.t); lp = null; }
+    if (!drag) return; drag.moved = true;
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy; drag.el.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.04)`;
+    drag.el.style.pointerEvents = 'none'; const under = document.elementFromPoint(e.clientX, e.clientY); drag.el.style.pointerEvents = '';
+    const tgt = under && under.closest && under.closest('.wg'); if (!tgt || tgt === drag.el || !grid.contains(tgt)) return;
+    // FLIP: запоминаем позиции, переставляем, плавно доезжаем
+    const sibs = $$('.wg', grid).filter((x) => x !== drag.el); const before = new Map(sibs.map((x) => [x, x.getBoundingClientRect()]));
+    const r0 = drag.el.getBoundingClientRect();
+    const tr = tgt.getBoundingClientRect(); const after = e.clientY > tr.top + tr.height / 2 || (e.clientX > tr.left + tr.width / 2 && Math.abs(e.clientY - (tr.top + tr.height / 2)) < tr.height / 2);
+    grid.insertBefore(drag.el, after ? tgt.nextSibling : tgt);
+    const r1 = drag.el.getBoundingClientRect(); drag.sx += r1.left - r0.left; drag.sy += r1.top - r0.top;
+    drag.el.style.transform = `translate3d(${e.clientX - drag.sx}px, ${e.clientY - drag.sy}px, 0) scale(1.04)`;
+    sibs.forEach((x) => { const b = before.get(x), a = x.getBoundingClientRect(); const ddx = b.left - a.left, ddy = b.top - a.top; if (!ddx && !ddy) return; x.style.transition = 'none'; x.style.transform = `translate(${ddx}px, ${ddy}px)`; requestAnimationFrame(() => { x.style.transition = 'transform .25s ease'; x.style.transform = ''; }); });
+  });
+  const end = () => {
+    if (lp) { clearTimeout(lp.t); lp = null; }
+    if (!drag) return; const el = drag.el; el.classList.remove('dragging'); el.style.transform = '';
+    const order = $$('.wg', grid).map((x) => x.dataset.wid); const ws = S.settings.widgets;
+    const shown = order.map((id) => ws.find((w) => w.id === id)).filter(Boolean); const rest = ws.filter((w) => !order.includes(w.id));
+    S.settings.widgets = shown.concat(rest); save(); drag = null; ui.suppressClick = Date.now() + 300;
+  };
+  grid.addEventListener('pointerup', end); grid.addEventListener('pointercancel', end);
+  grid.addEventListener('touchmove', (e) => { if (drag && e.cancelable) e.preventDefault(); }, { passive: false });
+  grid.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+function widgetGallery() {
+  const off = Object.keys(WIDGETS).filter((id) => widgetAvailable(id) && !S.settings.widgets.find((w) => w.id === id && w.on));
+  openSheet('Добавить виджет', `<div class="form">${off.length ? `<div class="wgal">${off.map((id) => { const w = S.settings.widgets.find((x) => x.id === id) || { id }; const size = (WSIZES[id] || ['w'])[0]; const fn = size === 's' && WIDGET_S[id] ? WIDGET_S[id] : WIDGET[id];
+    return `<div class="wgal-i"><div class="wgal-prev wg-${size}">${fn ? fn() : ''}</div><div class="wgal-f"><b>${WIDGETS[id].name}</b><button class="btn sm primary" data-wadd="${id}">${I.plus}Добавить</button></div></div>`; }).join('')}</div>` : '<div class="card empty"><b>Все виджеты уже на экране</b></div>'}</div>`, (body) => {
+    hydrateMedia(body);
+    body.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-wadd]'); if (!b) return; e.stopPropagation();
+      const id = b.dataset.wadd; let w = S.settings.widgets.find((x) => x.id === id);
+      if (!w) { w = { id, on: true }; S.settings.widgets.push(w); } else { w.on = true; S.settings.widgets = S.settings.widgets.filter((x) => x !== w).concat(w); }
+      save(); closeSheet(); render(); toast(`Виджет «${WIDGETS[id].name}» добавлен`);
+    });
+  });
+}
+ACT['w-edit'] = () => { ui.homeEdit = true; render(); };
+ACT['w-edit-done'] = () => { ui.homeEdit = false; render(); };
+ACT['w-hide'] = (el) => { const w = S.settings.widgets.find((x) => x.id === el.dataset.wid); if (!w) return; w.on = false; save(); render(); toast(`Виджет «${WIDGETS[w.id].name}» убран`, () => { w.on = true; save(); render(); }); };
+ACT['w-size'] = (el) => { const w = S.settings.widgets.find((x) => x.id === el.dataset.wid); if (!w) return; const sz = WSIZES[w.id]; w.size = sz[(sz.indexOf(wSize(w)) + 1) % sz.length]; save(); render(); };
+ACT['w-gallery'] = () => widgetGallery();
+ACT['d-open'] = (el) => { const i = S.diary.pages.findIndex((p) => p.id === el.dataset.pid); if (i < 0) { ACT['d-new'](); return; } ui.dIdx = i; go('diary'); };
+
 /* ================= Заметки ================= */
 RENDER.notes = function () {
   const count = (c) => S.notes.filter((n) => c === 'all' || n.cat === c).length;
@@ -1118,7 +1406,7 @@ function remRow(r) {
     <button class="check ${r.done ? 'on' : ''}" data-act="toggle-rem" data-id="${r.id}" aria-label="${r.done ? 'Вернуть' : 'Выполнено'}">${r.done ? I.tick : ''}</button>
     <span class="grow"><span class="t">${esc(r.title)}${r.example ? '<span class="tag-ex">пример</span>' : ''}</span>
     <span class="m" style="${over ? 'color:var(--bad)' : ''}">${relDay(d)}, ${fmtT(d)}${r.repeat !== 'none' ? ', ' + REPEAT[r.repeat].toLowerCase() : ''}</span></span>
-    ${!r.done ? `<button class="act" data-act="rem-cal" data-id="${r.id}" aria-label="В Календарь iPhone">${I.cal}</button>` : ''}</div>`;
+    ${!r.done ? `<button class="act ${r.iosSent || r.calExported ? 'sent' : ''}" data-act="rem-cal" data-id="${r.id}" aria-label="Сигнал на iPhone">${sigMethod() === 'reminders' ? I.bell : I.cal}</button>` : ''}</div>`;
 }
 RENDER.reminders = function () {
   const now = new Date();
@@ -1126,14 +1414,15 @@ RENDER.reminders = function () {
   const done = S.reminders.filter((r) => r.done).sort((a, b) => b.at.localeCompare(a.at));
   const groups = [['Просрочено', (d) => d < now], ['Сегодня', (d) => d >= now && dayDiff(d, now) === 0], ['Завтра', (d) => dayDiff(d, now) === 1], ['Позже', (d) => dayDiff(d, now) > 1]];
   let html = head('Напоминания', open.length ? `${open.length} ${plural(open.length, 'активное', 'активных', 'активных')}` : '', plusBtn('new-rem', 'Новое напоминание'));
-  if (notifState() === 'default') html += `<div class="banner"><div class="grow"><b>Уведомления в Life</b>Life покажет напоминание, пока он открыт. Чтобы сигнал пришёл при закрытом приложении, нажимайте значок календаря.</div><button class="btn sm primary" data-act="notif-on">Включить</button></div>`;
+  if (notifState() === 'default') html += `<div class="banner"><div class="grow"><b>Разрешите уведомления</b>Тогда Life покажет напоминание, пока он открыт, и цифру дел на иконке.</div><button class="btn sm primary" data-act="notif-on">Разрешить</button></div>`;
   if (!open.length) html += `<div class="card empty"><b>Активных напоминаний нет</b>Нажмите «+», чтобы добавить первое.</div>`;
   groups.forEach(([name, test]) => { const g = open.filter((r) => test(new Date(r.at))); if (g.length) html += `<div class="section-label">${name}</div><div class="list">${g.map(remRow).join('')}</div>`; });
   if (done.length) {
     html += `<button class="btn ghost" data-act="toggle-done" style="justify-self:start">${ui.showDone ? 'Скрыть выполненные' : `Показать выполненные (${done.length})`}</button>`;
     if (ui.showDone) html += `<div class="list">${done.map(remRow).join('')}</div><button class="btn sm" data-act="clear-done" style="justify-self:start">Удалить выполненные</button>`;
   }
-  html += `<p class="note-small">Значок календаря добавляет событие с сигналом в Календарь iPhone. Тогда уведомление придёт, даже если Life закрыт.</p>`;
+  html += `<div class="btn-row"><button class="btn sm" data-act="settings-notif">${I.bell}Настроить уведомления</button><button class="btn sm" data-act="cal-all">${I.cal}Все в Календарь</button></div>`;
+  html += `<p class="note-small">Кнопка справа у напоминания отправляет его в ${sigMethod() === 'reminders' ? '«Напоминания» iPhone' : 'Календарь iPhone'}: тогда сигнал придёт, даже если Life закрыт.</p>`;
   return html;
 };
 function remSheet(id, preset) {
@@ -1146,10 +1435,12 @@ function remSheet(id, preset) {
     <label class="field"><span>Время</span><input type="time" id="rTime" value="${fmtT(d)}"></label></div>
     <label class="field"><span>Повтор</span><select id="rRepeat">${Object.entries(REPEAT).map(([k, v]) => `<option value="${k}" ${r.repeat === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="field"><span>Комментарий</span><input type="text" id="rNote" value="${esc(r.note)}" placeholder="Необязательно"></label>
-    <div class="switch-row"><span>Добавить в Календарь iPhone</span><label class="switch"><input type="checkbox" id="rCal" ${id ? '' : 'checked'}><i></i></label></div>
+    <div class="field"><span>Сигнал на iPhone</span><div class="seg col3" id="rSig">${Object.entries(SIG).map(([k, v]) => `<button type="button" data-v="${k}" class="${(id ? 'none' : sigMethod()) === k ? 'on' : ''}">${k === 'reminders' ? 'Напоминания' : v}</button>`).join('')}</div></div>
     <div class="sticky-save"><button class="btn primary" type="submit">Сохранить</button></div>
     ${id ? `<button class="btn danger" type="button" id="rDel">${I.trash}Удалить напоминание</button>` : ''}
   </form>`, (body) => {
+    let sig = id ? 'none' : sigMethod();
+    $('#rSig', body).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; sig = b.dataset.v; $$('#rSig button', body).forEach((x) => x.classList.toggle('on', x === b)); });
     $('#f', body).addEventListener('submit', (e) => {
       e.preventDefault();
       const title = $('#rTitle', body).value.trim(); if (!title) { toast('Напишите, что напомнить'); $('#rTitle', body).focus(); return; }
@@ -1158,9 +1449,8 @@ function remSheet(id, preset) {
       const [y, m, dd] = dv.split('-').map(Number); const [hh, mm] = tv.split(':').map(Number);
       const data = { title, note: $('#rNote', body).value.trim(), at: new Date(y, m - 1, dd, hh, mm).toISOString(), repeat: $('#rRepeat', body).value, done: false, notified: false };
       let rec; if (id) rec = Object.assign(r, data, { example: false }); else { rec = Object.assign({ id: uid() }, data); S.reminders.push(rec); }
-      const toCal = $('#rCal', body).checked;
       save(); closeSheet(); render(); toast('Напоминание сохранено');
-      if (toCal) addToCalendar(rec);
+      if (sig !== 'none') setTimeout(() => sendSignal(rec, sig), 250);
     });
     const del = $('#rDel', body);
     if (del) del.addEventListener('click', () => { const idx = S.reminders.indexOf(r); closeSheet(); removeWithUndo('Напоминание удалено', () => S.reminders.splice(idx, 1), () => S.reminders.splice(idx, 0, r)); });
@@ -1213,7 +1503,7 @@ ACT['toggle-rem'] = (el) => {
   if (!r.done && r.repeat !== 'none') { r.at = nextOccurrence(r); r.notified = false; save(); render(); toast('Выполнено. Следующее: ' + relDay(new Date(r.at))); }
   else { r.done = !r.done; save(); render(); if (r.done) toast('Выполнено'); }
 };
-ACT['rem-cal'] = (el) => { const r = S.reminders.find((x) => x.id === el.dataset.id); if (r) addToCalendar(r); };
+ACT['rem-cal'] = (el) => { const r = S.reminders.find((x) => x.id === el.dataset.id); if (r) sendSignal(r, sigMethod() === 'none' ? 'calendar' : sigMethod()); };
 ACT['toggle-done'] = () => { ui.showDone = !ui.showDone; render(); };
 ACT['clear-done'] = () => { const old = S.reminders.slice(); removeWithUndo('Выполненные удалены', () => { S.reminders = S.reminders.filter((r) => !r.done); }, () => { S.reminders = old; }); };
 ACT['notif-on'] = () => { if ('Notification' in window) Notification.requestPermission().then((p) => { render(); toast(p === 'granted' ? 'Уведомления включены' : 'Уведомления не разрешены. Их можно включить в настройках iPhone.'); }); };
@@ -1227,24 +1517,30 @@ function planRow(p) {
     <span class="dot cat-${p.cat}"></span>
     <span class="grow"><span class="t">${esc(p.title)}${p.example ? '<span class="tag-ex">пример</span>' : ''}</span>${meta ? `<span class="m">${meta}</span>` : ''}</span></div>`;
 }
+const ZOOM_HINT = ['', 'Сведите или разведите пальцы, чтобы увидеть планы внутри пузырей', 'Разведите пальцы ещё, чтобы видеть все планы', 'Сведите пальцы, чтобы увидеть весь месяц'];
 RENDER.plans = function () {
   const m = planMonth(); const mk = monthKey(m); const isCur = mk === todayISO().slice(0, 7);
   const all = S.plans.filter((p) => p.month === mk);
   const done = all.filter((p) => p.done).length;
   const goals = all.filter((p) => !p.date);
   const days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+  const z = S.settings.planZoom || 1;
   let html = head('Планы', '', plusBtn('new-plan', 'Новый план', `data-date="${isCur ? todayISO() : mk + '-01'}"`));
   html += `<div class="month-nav"><button class="icon-btn" data-act="plan-month" data-dir="-1" aria-label="Предыдущий месяц">${I.left}</button><b>${monthTitle(m)}</b><button class="icon-btn" data-act="plan-month" data-dir="1" aria-label="Следующий месяц">${I.right}</button></div>`;
-  html += `<div class="bubbles-card"><div class="bubbles" id="bubbleStage" aria-label="Дни месяца">`;
+  html += `<div class="bubbles-card"><div class="zoom-bar"><span class="zoom-hint">${ZOOM_HINT[z]}</span><div class="zoom-btns"><button class="icon-btn" data-act="plan-zoom" data-d="-1" aria-label="Отдалить" ${z <= 1 ? 'disabled' : ''}>${I.minus}</button><button class="icon-btn" data-act="plan-zoom" data-d="1" aria-label="Приблизить" ${z >= 3 ? 'disabled' : ''}>${I.plus}</button></div></div>
+    <div class="bubbles z${z}" id="bubbleStage" aria-label="Дни месяца"><div class="bub-layer" id="bubLayer">`;
   for (let d = 1; d <= days; d++) {
-    const iso = `${mk}-${pad(d)}`; const ps = all.filter((p) => p.date === iso); const dt = new Date(m.getFullYear(), m.getMonth(), d);
+    const iso = `${mk}-${pad(d)}`; const ps = all.filter((p) => p.date === iso).sort((a, b) => (a.time || '99').localeCompare(b.time || '99')); const dt = new Date(m.getFullYear(), m.getMonth(), d);
     const isToday = iso === todayISO(); const past = dayDiff(dt, new Date()) < 0;
     const allDone = ps.length && ps.every((p) => p.done);
     const cls = ['bub', isToday && 'today', ps.length && 'has', allDone && 'all-done', past && !isToday && 'past', (dt.getDay() === 0 || dt.getDay() === 6) && 'wkend'].filter(Boolean).join(' ');
-    html += `<button class="${cls}" data-act="plan-day" data-day="${iso}" data-n="${ps.length}" aria-label="${d} ${MONTH_GEN[m.getMonth()]}, планов: ${ps.length}"><span class="bub-in"><b>${d}</b><small>${WD_SHORT[dt.getDay()]}</small>${ps.length ? `<span class="bub-dots">${ps.slice(0, 4).map((p) => `<i class="${p.done ? 'd' : ''}"></i>`).join('')}</span>` : ''}</span></button>`;
+    const inner = z === 1 || !ps.length
+      ? `<b>${d}</b><small>${WD_SHORT[dt.getDay()]}</small>${ps.length ? `<span class="bub-dots">${ps.slice(0, 4).map((p) => `<i class="${p.done ? 'd' : ''}"></i>`).join('')}</span>` : ''}`
+      : `<span class="bub-h"><b>${d}</b><small>${WD_SHORT[dt.getDay()]}</small></span><span class="bub-list">${(z === 2 ? ps.slice(0, 3) : ps).map((p) => `<span class="bp ${p.done ? 'd' : ''}"><i class="dot cat-${p.cat}"></i>${p.time ? `<em>${p.time}</em> ` : ''}${esc(p.title)}</span>`).join('')}${z === 2 && ps.length > 3 ? `<span class="bp more">ещё ${ps.length - 3}</span>` : ''}</span>`;
+    html += `<button class="${cls}" data-act="plan-day" data-day="${iso}" data-n="${ps.length}" aria-label="${d} ${MONTH_GEN[m.getMonth()]}, планов: ${ps.length}${ps.length ? ': ' + esc(ps.map((p) => p.title).join(', ')) : ''}"><span class="bub-in"><span class="bub-c">${inner}</span></span></button>`;
   }
-  goals.slice(0, 4).forEach((g) => { html += `<button class="bub goal ${g.done ? 'all-done' : ''}" data-act="edit-plan" data-id="${g.id}" data-goal="1"><span class="bub-in"><span class="g-t">${esc(g.title)}</span>${g.done ? `<span class="g-ok">${I.tick}</span>` : ''}</span></button>`; });
-  html += `</div><div class="bubbles-foot"><span>${all.length ? `Выполнено ${done} из ${all.length}` : 'Планов на этот месяц нет'}</span><span>Нажмите на день</span></div>${all.length ? `<div class="bar" style="margin:0 14px 14px"><i style="width:${Math.round(done / all.length * 100)}%"></i></div>` : ''}</div>`;
+  goals.forEach((g) => { html += `<button class="bub goal ${g.done ? 'all-done' : ''}" data-act="edit-plan" data-id="${g.id}" data-goal="1"><span class="bub-in"><span class="bub-c"><span class="g-t">${esc(g.title)}</span>${g.done ? `<span class="g-ok">${I.tick}</span>` : ''}</span></span></button>`; });
+  html += `</div></div><div class="bubbles-foot"><span>${all.length ? `Выполнено ${done} из ${all.length}` : 'Планов на этот месяц нет'}</span><span>Нажмите на день</span></div>${all.length ? `<div class="bar" style="margin:0 14px 14px"><i style="width:${Math.round(done / all.length * 100)}%"></i></div>` : ''}</div>`;
   html += `<div class="section-label"><span>Цели на ${MONTH_NOM[m.getMonth()]}</span></div>`;
   html += goals.length ? `<div class="list">${goals.map(planRow).join('')}</div>` : '';
   html += `<button class="btn sm" data-act="new-plan" data-goal="1" style="justify-self:start">${I.plus}Цель на месяц</button>`;
@@ -1255,99 +1551,110 @@ RENDER.plans = function () {
     const byDay = {}; upcoming.forEach((p) => { (byDay[p.date] = byDay[p.date] || []).push(p); });
     Object.keys(byDay).forEach((d) => { const dt = toDate(d); html += `<div class="day-head"><button class="link" data-act="plan-day" data-day="${d}">${cap(relDay(dt))}${Math.abs(dayDiff(dt, new Date())) > 1 ? ', ' + WD_SHORT[dt.getDay()] : ''}</button></div><div class="list">${byDay[d].map(planRow).join('')}</div>`; });
   } else if (!all.length) html += `<div class="card empty"><b>Месяц пока пустой</b>Нажмите на любой пузырь-день или на «+», чтобы добавить план.</div>`;
-  ui.mounts.push(startBubbles);
+  ui.mounts.push(layoutBubbles);
   return html;
 };
 
-/* Пузыри: мягкая физика — пружина к своему месту, лёгкое кружение и расталкивание */
-const BUB = { raf: 0, items: [], stage: null, W: 0, H: 0, drag: null, suppress: 0 };
-function stopBubbles() { if (BUB.raf) cancelAnimationFrame(BUB.raf); BUB.raf = 0; BUB.items = []; BUB.stage = null; }
-function startBubbles() {
-  stopBubbles();
-  const stage = $('#bubbleStage'); if (!stage) return;
-  const W = stage.clientWidth || 340; const els = $$('.bub', stage);
-  const dayEls = els.filter((e) => !e.dataset.goal); const goalEls = els.filter((e) => e.dataset.goal);
-  const cols = W >= 340 ? 6 : 5; const cell = W / cols; const rows = Math.ceil(dayEls.length / cols);
-  const base = Math.min(cell * 0.36, 25); const rowH = cell * 0.88; const top = cell * 0.18;
-  const goalH = goalEls.length ? cell * 1.75 : 0;
-  const H = Math.round(top * 2 + rows * rowH + goalH); stage.style.height = H + 'px';
-  const motion = !reduceMotion();
-  BUB.items = els.map((el, i) => {
-    let r, hx, hy;
-    if (el.dataset.goal) {
-      const gi = goalEls.indexOf(el); r = Math.min(cell * 0.78, 50);
-      hx = W * (gi + 0.5) / goalEls.length; hy = top + rows * rowH + goalH * 0.52;
-    } else {
-      const n = +el.dataset.n; const c = i % cols, row = Math.floor(i / cols);
-      r = base + Math.min(n, 4) * base * 0.16 + (el.classList.contains('today') ? 3 : 0);
-      hx = (c + 0.5 + (row % 2 ? 0.22 : -0.22)) * cell; hx = Math.max(r + 2, Math.min(W - r - 2, hx));
-      hy = top + (row + 0.5) * rowH;
-    }
-    el.style.width = el.style.height = (r * 2) + 'px';
-    el.style.setProperty('--fs', Math.round(r * 0.66) + 'px');
-    const it = { el, r, hx, hy, x: motion ? W / 2 + (Math.random() - 0.5) * 30 : hx, y: motion ? H / 2 + (Math.random() - 0.5) * 30 : hy, vx: 0, vy: 0, ph: Math.random() * 6.28, w: 0.45 + Math.random() * 0.35 };
-    el.style.transform = `translate3d(${it.x - r}px, ${it.y - r}px, 0)`;
-    el.style.setProperty('--d', motion ? (i * 16) + 'ms' : '0ms');
-    return it;
-  });
-  BUB.stage = stage; BUB.W = W; BUB.H = H;
-  requestAnimationFrame(() => stage.classList.add('ready'));
-  bindBubbleDrag(stage);
-  if (!motion) return;
-  let last = performance.now(); const t0 = last;
-  const frame = (now) => {
-    if (!BUB.stage || !BUB.stage.isConnected) { stopBubbles(); return; }
-    const dt = Math.min(2.5, (now - last) / 16.7); last = now; const t = (now - t0) / 1000;
-    const its = BUB.items; const A = 4.5; const K = t < 1.4 ? 0.022 : 0.016;
-    for (const b of its) {
-      if (b === BUB.drag) continue;
-      const tx = b.hx + Math.cos(t * b.w + b.ph) * A, ty = b.hy + Math.sin(t * b.w * 1.3 + b.ph * 1.7) * A;
-      b.vx += (tx - b.x) * K * dt; b.vy += (ty - b.y) * K * dt;
-    }
-    for (let i = 0; i < its.length; i++) {
-      const a = its[i];
-      for (let j = i + 1; j < its.length; j++) {
-        const b = its[j]; const dx = b.x - a.x, dy = b.y - a.y; const min = a.r + b.r + 3; const d2 = dx * dx + dy * dy;
-        if (d2 < min * min && d2 > 0.01) {
-          const d = Math.sqrt(d2); const push = (min - d) / d * 0.18 * dt;
-          const fa = b === BUB.drag ? 1 : a === BUB.drag ? 0 : 0.5, fb = 1 - fa;
-          a.vx -= dx * push * fa; a.vy -= dy * push * fa; b.vx += dx * push * fb; b.vy += dy * push * fb;
-        }
-      }
-    }
-    const damp = Math.pow(0.86, dt);
-    for (const b of its) {
-      if (b !== BUB.drag) {
-        b.vx *= damp; b.vy *= damp; b.x += b.vx * dt; b.y += b.vy * dt;
-        if (b.x < b.r) { b.x = b.r; b.vx *= -0.4; } if (b.x > BUB.W - b.r) { b.x = BUB.W - b.r; b.vx *= -0.4; }
-        if (b.y < b.r) { b.y = b.r; b.vy *= -0.4; } if (b.y > BUB.H - b.r) { b.y = BUB.H - b.r; b.vy *= -0.4; }
-      }
-      b.el.style.transform = `translate3d(${(b.x - b.r).toFixed(1)}px, ${(b.y - b.r).toFixed(1)}px, 0)`;
-    }
-    BUB.raf = requestAnimationFrame(frame);
-  };
-  BUB.raf = requestAnimationFrame(frame);
+/* Пузыри. Раскладка считается один раз, плавание делает CSS (на видеочипе, без нагрузки на телефон).
+   Зум: щипок двумя пальцами или кнопки ±, три уровня; на 2 и 3 внутри пузыря видны планы. */
+const BUB = { suppress: 0 };
+const seeded = (n) => { const x = Math.sin(n * 9301 + 49297) * 233280; return x - Math.floor(x); };
+function bubRadius(el, z, W) {
+  const n = +el.dataset.n || 0;
+  if (el.dataset.goal) return z === 1 ? Math.min(W / 6 * 0.78, 50) : z === 2 ? 62 : Math.min(W / 2 - 10, 92);
+  if (z === 1) { const base = Math.min(W / 6 * 0.36, 25); return base + Math.min(n, 4) * base * 0.16 + (el.classList.contains('today') ? 3 : 0); }
+  if (z === 2) return n ? Math.min(W / 3 - 8, 50 + Math.min(n, 3) * 6) : 21 + (el.classList.contains('today') ? 3 : 0);
+  return n ? Math.min(W / 2 - 10, 70 + Math.min(n, 8) * 9) : 23 + (el.classList.contains('today') ? 3 : 0);
 }
-function bindBubbleDrag(stage) {
-  let st = null;
+function layoutBubbles() {
+  const stage = $('#bubbleStage'), layer = $('#bubLayer'); if (!stage || !layer) return;
+  const W = stage.clientWidth || 340; const z = S.settings.planZoom || 1; const pad = 8, gap = z === 1 ? 4 : 6;
+  const els = $$('.bub', layer); const rows = []; let row = [], x = pad;
+  els.forEach((el) => {
+    const r = bubRadius(el, z, W); const d = r * 2;
+    if ((row.length && x + d > W - pad) || (el.dataset.goal && row.length && !row[row.length - 1].el.dataset.goal)) { rows.push(row); row = []; x = pad; }
+    row.push({ el, r }); x += d + gap;
+  });
+  if (row.length) rows.push(row);
+  let y = pad; const reduce = reduceMotion();
+  rows.forEach((rw, ri) => {
+    const h = Math.max(...rw.map((b) => b.r * 2));
+    const used = rw.reduce((s2, b) => s2 + b.r * 2, 0) + gap * (rw.length - 1); const extra = Math.max(0, W - pad * 2 - used) / (rw.length + 1);
+    let cx = pad + extra;
+    rw.forEach((b, i) => {
+      const n = ri * 7 + i + 1; const slack = h - b.r * 2;
+      const by = y + slack / 2 + (seeded(n) - 0.5) * Math.min(slack, 18) * 0.9 + (z === 1 ? (seeded(n + 50) - 0.5) * 6 : 0);
+      const bx = cx + (z === 1 ? (seeded(n + 99) - 0.5) * Math.min(extra, 6) : 0);
+      b.el.style.width = b.el.style.height = (b.r * 2).toFixed(1) + 'px';
+      b.el.style.transform = `translate3d(${bx.toFixed(1)}px, ${by.toFixed(1)}px, 0)`;
+      b.el.dataset.x = bx.toFixed(1); b.el.dataset.y = by.toFixed(1);
+      b.el.style.setProperty('--fs', Math.round(b.r * (z === 1 ? 0.66 : 0.34) + (z === 1 ? 0 : 6)) + 'px');
+      const amp = z === 1 ? 3.5 : 2;
+      const inn = b.el.firstElementChild;
+      inn.style.setProperty('--fx', ((seeded(n + 7) - 0.5) * 2 * amp).toFixed(1) + 'px');
+      inn.style.setProperty('--fy', ((seeded(n + 13) - 0.5) * 2 * amp).toFixed(1) + 'px');
+      inn.style.setProperty('--dur', (4.5 + seeded(n + 21) * 3.5).toFixed(2) + 's');
+      inn.style.setProperty('--dl', (-seeded(n + 31) * 6).toFixed(2) + 's');
+      b.el.style.setProperty('--d', reduce ? '0ms' : Math.min(500, (ri * rw.length + i) * 14) + 'ms');
+      cx += b.r * 2 + gap + extra;
+    });
+    y += h + gap + (z === 1 ? 2 : 4);
+  });
+  stage.style.height = Math.round(y + pad) + 'px';
+  if (!stage.dataset.bound) { stage.dataset.bound = '1'; bindBubbleGestures(stage); }
+  requestAnimationFrame(() => stage.classList.add('ready'));
+}
+function setPlanZoom(z, anchor) {
+  z = Math.max(1, Math.min(3, z)); const old = S.settings.planZoom || 1; if (z === old) return false;
+  let anchorDay = null, anchorTop = 0;
+  if (anchor) { const el = document.elementFromPoint(anchor.x, anchor.y); const b = el && el.closest && el.closest('.bub'); if (b) { anchorDay = b.dataset.day; anchorTop = b.getBoundingClientRect().top; } }
+  S.settings.planZoom = z; save(); render();
+  if (anchorDay) { const nb = $(`.bub[data-day="${anchorDay}"]`); if (nb) window.scrollBy(0, nb.getBoundingClientRect().top - anchorTop); }
+  const layer = $('#bubLayer'); if (layer) { layer.classList.add(z > old ? 'zin' : 'zout'); setTimeout(() => layer.classList.remove('zin', 'zout'), 420); }
+  return true;
+}
+function bindBubbleGestures(stage) {
+  const layer = $('#bubLayer', stage);
+  let pinch = null, drag = null;
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  stage.addEventListener('gesturestart', (e) => e.preventDefault());
+  stage.addEventListener('gesturechange', (e) => e.preventDefault());
+  stage.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      const r = layer.getBoundingClientRect(); const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2, my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      pinch = { d0: dist(e.touches), s: 1, mx, my }; layer.style.transformOrigin = `${mx - r.left}px ${my - r.top}px`; layer.style.transition = 'none';
+      if (drag) { drag.el.classList.remove('drag'); drag.el.style.transform = `translate3d(${drag.el.dataset.x}px, ${drag.el.dataset.y}px, 0)`; drag = null; }
+    }
+  }, { passive: true });
+  stage.addEventListener('touchmove', (e) => {
+    if (!pinch || e.touches.length < 2) return;
+    if (e.cancelable) e.preventDefault();
+    pinch.s = Math.max(0.5, Math.min(2.6, dist(e.touches) / pinch.d0)); layer.style.transform = `scale(${pinch.s.toFixed(3)})`;
+  }, { passive: false });
+  const pinchEnd = () => {
+    if (!pinch) return; const p = pinch; pinch = null;
+    const z = S.settings.planZoom || 1; const step = p.s > 1.85 ? 2 : p.s > 1.15 ? 1 : p.s < 0.6 ? -2 : p.s < 0.87 ? -1 : 0;
+    layer.style.transition = 'transform .25s ease'; layer.style.transform = '';
+    if (step) setTimeout(() => setPlanZoom(z + step, { x: p.mx, y: p.my }), 60);
+    BUB.suppress = Date.now() + 400;
+  };
+  stage.addEventListener('touchend', (e) => { if (e.touches.length < 2) pinchEnd(); });
+  stage.addEventListener('touchcancel', pinchEnd);
+  stage.addEventListener('wheel', (e) => { if (!e.ctrlKey) return; e.preventDefault(); clearTimeout(stage._wt); stage._ws = (stage._ws || 0) - e.deltaY; stage._wt = setTimeout(() => { const st2 = stage._ws; stage._ws = 0; if (Math.abs(st2) > 20) setPlanZoom((S.settings.planZoom || 1) + (st2 > 0 ? 1 : -1), { x: e.clientX, y: e.clientY }); }, 120); }, { passive: false });
+  // Пузырь можно потянуть пальцем: он мягко вернётся на место
   stage.addEventListener('pointerdown', (e) => {
-    const el = e.target.closest('.bub'); if (!el || reduceMotion()) return;
-    const b = BUB.items.find((x) => x.el === el); if (!b) return;
-    const box = stage.getBoundingClientRect();
-    st = { b, box, sx: e.clientX, sy: e.clientY, moved: false, lx: e.clientX, ly: e.clientY, id: e.pointerId };
+    if (pinch || reduceMotion()) return; const el = e.target.closest('.bub'); if (!el) return;
+    drag = { el, sx: e.clientX, sy: e.clientY, id: e.pointerId, moved: false };
   });
   stage.addEventListener('pointermove', (e) => {
-    if (!st || e.pointerId !== st.id) return;
-    const dx = e.clientX - st.sx, dy = e.clientY - st.sy;
-    if (!st.moved && Math.hypot(dx, dy) > 8) { st.moved = true; BUB.drag = st.b; st.b.el.classList.add('drag'); try { stage.setPointerCapture(e.pointerId); } catch (er) { /* нет захвата */ } }
-    if (st.moved) {
-      st.b.vx = (e.clientX - st.lx) * 0.6; st.b.vy = (e.clientY - st.ly) * 0.6; st.lx = e.clientX; st.ly = e.clientY;
-      st.b.x = Math.max(st.b.r, Math.min(BUB.W - st.b.r, e.clientX - st.box.left)); st.b.y = Math.max(st.b.r, Math.min(BUB.H - st.b.r, e.clientY - st.box.top));
-    }
+    if (!drag || e.pointerId !== drag.id || pinch) return; const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+    if (!drag.moved) { if (Math.abs(dx) < 9 || Math.abs(dy) > Math.abs(dx)) return; drag.moved = true; drag.el.classList.add('drag'); try { stage.setPointerCapture(e.pointerId); } catch (er) { /* без захвата */ } }
+    drag.el.style.transform = `translate3d(${(+drag.el.dataset.x + dx).toFixed(1)}px, ${(+drag.el.dataset.y + dy).toFixed(1)}px, 0)`;
   });
-  const end = () => { if (!st) return; if (st.moved) { BUB.suppress = Date.now() + 350; st.b.el.classList.remove('drag'); } BUB.drag = null; st = null; };
-  stage.addEventListener('pointerup', end); stage.addEventListener('pointercancel', end);
+  const dragEnd = () => { if (!drag) return; if (drag.moved) { BUB.suppress = Date.now() + 350; drag.el.classList.remove('drag'); drag.el.style.transform = `translate3d(${drag.el.dataset.x}px, ${drag.el.dataset.y}px, 0)`; } drag = null; };
+  stage.addEventListener('pointerup', dragEnd); stage.addEventListener('pointercancel', dragEnd);
 }
+ACT['plan-zoom'] = (el) => setPlanZoom((S.settings.planZoom || 1) + (+el.dataset.d));
 
 /* Лист дня */
 function dayTitle(iso) { const d = toDate(iso); return `${cap(WD_LONG[d.getDay()])}, ${d.getDate()} ${MONTH_GEN[d.getMonth()]}`; }
@@ -1399,10 +1706,11 @@ function planSheet(id, preset, backFn) {
       const data = { title, date, month, time: kind === 'day' ? $('#pTime', body).value : '', cat, note: $('#pNote', body).value.trim() };
       if (p) Object.assign(p, data, { example: false }); else S.plans.push(Object.assign({ id: uid(), done: false }, data));
       const wantRem = $('#pRem', body) && $('#pRem', body).checked && date;
-      if (wantRem) { const [y, mo, dd] = date.split('-').map(Number); const [hh, mm] = (data.time || '09:00').split(':').map(Number); S.reminders.push({ id: uid(), title, note: '', at: new Date(y, mo - 1, dd, hh, mm).toISOString(), repeat: 'none', done: false }); }
+      let newRem = null; if (wantRem) { const [y, mo, dd] = date.split('-').map(Number); const [hh, mm] = (data.time || '09:00').split(':').map(Number); newRem = { id: uid(), title, note: '', at: new Date(y, mo - 1, dd, hh, mm).toISOString(), repeat: 'none', done: false }; S.reminders.push(newRem); }
       save(); render();
       if (backFn && date) backFn(); else closeSheet();
       toast(wantRem ? 'План и напоминание сохранены' : 'План сохранён');
+      if (newRem && sigMethod() !== 'none') setTimeout(() => sendSignal(newRem, sigMethod()), 250);
     });
     const del = $('#pDel', body);
     if (del) del.addEventListener('click', () => { const idx = S.plans.indexOf(p); if (!backFn || !p.date) closeSheet(); removeWithUndo('План удалён', () => S.plans.splice(idx, 1), () => S.plans.splice(idx, 0, p)); if (backFn && p.date) backFn(); });
@@ -2285,7 +2593,12 @@ const stem = (t) => t.length <= 3 ? t : t.slice(0, Math.max(3, t.length - 2));
 const normq = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[«»"'.,()%\-–—/]/g, ' ').replace(/\s+/g, ' ').trim();
 const foodDay = () => ui.foodDate || todayISO();
 function mealByTime() { const h = new Date().getHours(); return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : h < 21 ? 'dinner' : 'snack'; }
-const myFoodObj = (f) => ({ ...f, key: 'my:' + f.id, mine: true, tags: normq((f.tags || '') + ' ' + (f.brand || '') + ' мои') });
+const myFoodObj = (f) => ({ ...f, key: 'my:' + f.id, mine: true, pic: f.pic || foodPic(f), tags: normq((f.tags || '') + ' ' + (f.brand || '') + ' мои') });
+/* Картинка продукта: фото товара из интернета или рисунок */
+function foodImg(f, big) {
+  const e = f.pic || foodPic(f);
+  return `<span class="fpic ${big ? 'big' : ''}" style="--h:${(e.codePointAt(0) * 47) % 360}">${f.img ? `<img src="${esc(f.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<span class="fe">${e}</span></span>`;
+}
 function allFoods() { return S.food.my.map(myFoodObj).concat(FOOD_DB); }
 function findFood(key) { return allFoods().find((f) => f.key === key) || OFF_CACHE.get(key) || null; }
 const OFF_CACHE = new Map();
@@ -2326,13 +2639,13 @@ RENDER.food = function () {
     <div class="macros">${macroBar('Белки', t.p, g.p, 'p')}${macroBar('Жиры', t.f, g.f, 'f')}${macroBar('Углеводы', t.c, g.c, 'c')}
     <div class="left-line ${left < 0 ? 'neg' : ''}">${left >= 0 ? `Осталось ${nf.format(Math.round(left))} ккал` : `Больше нормы на ${nf.format(Math.round(-left))} ккал`}${burned ? `<span>Тренировки: −${nf.format(Math.round(burned))}</span>` : ''}</div></div></div>`;
   if (!S.food.goals.set) html += `<div class="banner"><div class="grow"><b>Посчитайте свою норму</b>Сейчас стоит средняя. Укажите рост, вес и цель, и Life посчитает калории и белок под вас.</div><button class="btn sm primary" data-act="food-goals">Посчитать</button></div>`;
-  const water = S.food.water[d] || 0;
-  html += `<div class="card water"><h2>Вода <span class="m">${nf1.format(water * 0.25).replace(',0', '')} из 2 л</span></h2><div class="cups">${Array.from({ length: 8 }, (_, i) => `<button class="cup ${i < water ? 'on' : ''}" data-act="water" data-n="${i + 1}" aria-label="${i + 1} стакан"><i></i></button>`).join('')}</div></div>`;
+  const ml = S.food.waterMl[d] || 0; const cups = Math.round(ml / 200);
+  html += `<div class="card water"><h2>Вода <span class="m">${fmtL(ml)} из 2 л, стакан 200 мл</span></h2><div class="cups">${Array.from({ length: 10 }, (_, i) => `<button class="cup ${i < cups ? 'on' : ''}" data-act="water" data-n="${i + 1}" aria-label="${i + 1} стакан, ${(i + 1) * 200} мл"><i></i></button>`).join('')}</div></div>`;
   MEALS.forEach(([id, name]) => {
     const es = S.food.entries.filter((e) => e.date === d && e.meal === id);
     const sum = es.reduce((s, e) => s + entryVals(e).kcal, 0);
     html += `<div class="card meal"><h2><span>${name}</span><span class="m">${es.length ? nf.format(Math.round(sum)) + ' ккал' : ''}</span></h2>
-      ${es.length ? `<div class="ops">${es.map((e) => { const v = entryVals(e); return `<button class="row" data-act="food-entry" data-id="${e.id}"><span class="grow"><span class="t">${esc(e.name)}</span><span class="m">${fmtG(e.grams)} г, Б ${fmtG(v.p)} Ж ${fmtG(v.f)} У ${fmtG(v.c)}</span></span><span class="r amt">${nf.format(Math.round(v.kcal))}</span></button>`; }).join('')}</div>` : ''}
+      ${es.length ? `<div class="ops">${es.map((e) => { const v = entryVals(e); const fo = findFood(e.key) || { name: e.name, cat: '' }; return `<button class="row" data-act="food-entry" data-id="${e.id}">${foodImg({ ...fo, name: e.name, pic: e.pic || fo.pic, img: e.img || fo.img })}<span class="grow"><span class="t">${esc(e.name)}</span><span class="m">${fmtG(e.grams)} г, Б ${fmtG(v.p)} Ж ${fmtG(v.f)} У ${fmtG(v.c)}</span></span><span class="r amt">${nf.format(Math.round(v.kcal))}</span></button>`; }).join('')}</div>` : ''}
       <button class="btn sm meal-add" data-act="add-food" data-meal="${id}">${I.plus}Добавить</button></div>`;
   });
   // Неделя
@@ -2372,7 +2685,7 @@ function foodSearch(q, cat) {
 }
 function foodRow(f) {
   const sub = [f.brand && esc(f.brand), f.mine ? (f.src === 'off' ? 'из интернета' : 'мой продукт') : '', f.store ? 'магазинный' : ''].filter(Boolean).join(', ');
-  return `<button class="row food-row" data-food="${esc(f.key)}"><span class="grow"><span class="t">${esc(f.name)}</span><span class="m">${nf.format(Math.round(f.kcal))} ккал, Б ${fmtG(f.p)} Ж ${fmtG(f.f)} У ${fmtG(f.c)}${sub ? ' — ' + sub : ''}</span></span><span class="chev">${I.right}</span></button>`;
+  return `<button class="row food-row" data-food="${esc(f.key)}">${foodImg(f)}<span class="grow"><span class="t">${esc(f.name)}</span><span class="m">${nf.format(Math.round(f.kcal))} ккал, Б ${fmtG(f.p)} Ж ${fmtG(f.f)} У ${fmtG(f.c)}${sub ? ' — ' + sub : ''}</span></span><span class="chev">${I.right}</span></button>`;
 }
 function foodSearchSheet(meal, state) {
   const st = state || { q: '', cat: S.food.recent.length ? 'recent' : '' };
@@ -2409,7 +2722,7 @@ function foodSearchSheet(meal, state) {
 /* Open Food Facts — открытая база продуктов со всего мира, в том числе российских */
 async function offSearch(q) {
   const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 12000);
-  const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=30&fields=code,product_name,product_name_ru,brands,nutriments,serving_quantity&search_terms=' + encodeURIComponent(q);
+  const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=30&fields=code,product_name,product_name_ru,brands,nutriments,serving_quantity,image_front_small_url,image_front_thumb_url&search_terms=' + encodeURIComponent(q);
   try {
     const r = await fetch(url, { signal: ctrl.signal }); if (!r.ok) throw new Error('http');
     const data = await r.json(); let n = 0; const qn = normq(q);
@@ -2417,7 +2730,7 @@ async function offSearch(q) {
       const nu = p.nutriments || {}; let kcal = nu['energy-kcal_100g']; if (kcal == null && nu.energy_100g != null) kcal = nu.energy_100g / 4.184;
       const name = (p.product_name_ru || p.product_name || '').trim(); if (!name || kcal == null) return;
       const key = 'off:' + p.code; if (OFF_CACHE.has(key)) return;
-      OFF_CACHE.set(key, { key, name, brand: (p.brands || '').split(',')[0].trim(), kcal: +kcal, p: +(nu.proteins_100g || 0), f: +(nu.fat_100g || 0), c: +(nu.carbohydrates_100g || 0), portion: Math.round(+p.serving_quantity) || 100, unit: '', unitG: 0, tags: '', off: true, code: p.code, q: qn });
+      OFF_CACHE.set(key, { key, name, brand: (p.brands || '').split(',')[0].trim(), kcal: +kcal, p: +(nu.proteins_100g || 0), f: +(nu.fat_100g || 0), c: +(nu.carbohydrates_100g || 0), portion: Math.round(+p.serving_quantity) || 100, unit: '', unitG: 0, tags: '', off: true, code: p.code, q: qn, img: p.image_front_small_url || p.image_front_thumb_url || '' }); OFF_CACHE.get(key).pic = foodPic(OFF_CACHE.get(key));
       n++;
     });
     return n;
@@ -2451,9 +2764,9 @@ function portionSheet({ food, meal, entry, back }) {
   const f = food; let grams = entry ? entry.grams : (f.unitG || f.portion || 100); let ml = entry ? entry.meal : meal;
   const max = Math.max(500, Math.ceil(Math.max(f.portion * 4, f.unitG * 6, grams * 1.5) / 100) * 100); const step = max <= 300 ? 1 : 5;
   const presets = f.unitG ? [0.5, 1, 2, 3].map((k) => [k * f.unitG, `${k === 0.5 ? '½' : k} ${f.unit}`]) : [50, 100, 150, 200, 300].map((g) => [g, g + ' г']);
-  openSheet(entry ? 'Порция' : f.name, `<div class="form">
-    ${entry ? `<div class="t" style="font-weight:700;font-size:17px">${esc(f.name)}</div>` : ''}
-    <div class="per100"><span class="v">На 100 г: <b>${nf.format(Math.round(f.kcal))} ккал</b>, Б ${fmtG(f.p)}, Ж ${fmtG(f.f)}, У ${fmtG(f.c)}${f.brand ? `. ${esc(f.brand)}` : ''}</span>
+  openSheet(entry ? 'Порция' : 'Сколько съели', `<div class="form">
+    <div class="food-hero">${foodImg(f, true)}<div class="grow"><div class="t">${esc(f.name)}</div>${f.brand ? `<div class="m">${esc(f.brand)}</div>` : ''}</div></div>
+    <div class="per100"><span class="v">На 100 г: <b>${nf.format(Math.round(f.kcal))} ккал</b>, Б ${fmtG(f.p)}, Ж ${fmtG(f.f)}, У ${fmtG(f.c)}</span>
       <button type="button" class="link" id="pEdit">Поправить</button></div>
     <div class="grams-box"><div class="grams-in"><input type="text" inputmode="decimal" id="pG" value="${fmtG(grams)}" aria-label="Граммы"><span>г</span></div>
       <div class="pm"><button type="button" class="icon-btn" id="pMinus" aria-label="Минус 10 грамм">${I.minus}</button><button type="button" class="icon-btn" id="pPlus" aria-label="Плюс 10 грамм">${I.plus}</button></div></div>
@@ -2478,8 +2791,8 @@ function portionSheet({ food, meal, entry, back }) {
     $('#pSave', body).onclick = () => {
       if (!grams) { toast('Укажите, сколько грамм'); gi.focus(); return; }
       let ff = f;
-      if (f.off && !f.mine) { const mf = { id: uid(), name: f.name, brand: f.brand, kcal: r1(f.kcal), p: r1(f.p), f: r1(f.f), c: r1(f.c), portion: f.portion, unit: '', unitG: 0, tags: '', src: 'off', code: f.code }; S.food.my.push(mf); ff = myFoodObj(mf); }
-      const data = { meal: ml, grams, name: ff.name, key: ff.key, kcal100: ff.kcal, p100: ff.p, f100: ff.f, c100: ff.c };
+      if (f.off && !f.mine) { const mf = { id: uid(), name: f.name, brand: f.brand, kcal: r1(f.kcal), p: r1(f.p), f: r1(f.f), c: r1(f.c), portion: f.portion, unit: '', unitG: 0, tags: '', src: 'off', code: f.code, img: f.img || '', pic: foodPic(f) }; S.food.my.push(mf); ff = myFoodObj(mf); }
+      const data = { meal: ml, grams, name: ff.name, key: ff.key, kcal100: ff.kcal, p100: ff.p, f100: ff.f, c100: ff.c, pic: ff.pic || foodPic(ff), img: ff.img || '' };
       if (entry) Object.assign(entry, data); else S.food.entries.push(Object.assign({ id: uid(), date: foodDay(), t: Date.now() }, data));
       S.food.recent = [ff.key, ...S.food.recent.filter((k) => k !== ff.key)].slice(0, 30);
       save(); closeSheet(); render(); toast(`${MEAL_NAME[ml]}: ${ff.name}, ${nf.format(Math.round(ff.kcal * grams / 100))} ккал`);
@@ -2584,7 +2897,12 @@ ACT['food-entry'] = (el) => { const e = S.food.entries.find((x) => x.id === el.d
 ACT['food-day'] = (el) => { const d = addDays(toDate(foodDay()), +el.dataset.dir); if (isoOf(d) <= todayISO()) { ui.foodDate = isoOf(d); render('anim-fade'); } };
 ACT['food-goto'] = (el) => { ui.foodDate = el.dataset.d; render(); };
 ACT['food-goals'] = () => goalsSheet();
-ACT.water = (el) => { const d = foodDay(); const n = +el.dataset.n; S.food.water[d] = (S.food.water[d] || 0) === n ? n - 1 : n; save(); render(); };
+const fmtL = (ml) => nf1.format(ml / 1000).replace(',0', '') + NB + 'л';
+ACT.water = (el) => {
+  const d = el.dataset.today ? todayISO() : foodDay(); const cur = Math.round((S.food.waterMl[d] || 0) / 200);
+  const n = el.dataset.n === 'add' ? cur + 1 : +el.dataset.n; S.food.waterMl[d] = (cur === n ? n - 1 : n) * 200;
+  save(); render(); if (el.dataset.n === 'add') toast(`Вода: ${fmtL(S.food.waterMl[d])} из 2 л`);
+};
 ACT['add-weight'] = () => weightSheet();
 ACT.weights = () => weightsSheet();
 
@@ -2604,7 +2922,8 @@ const BUILTIN_PROGRAMS = [
   { id: 'b:up', name: 'Зал: верх', items: ['Жим штанги лёжа', 'Тяга верхнего блока', 'Жим гантелей сидя', 'Подъём штанги на бицепс', 'Французский жим'] },
   { id: 'b:low', name: 'Зал: ноги и пресс', items: ['Приседания со штангой', 'Румынская тяга', 'Жим ногами', 'Подъём на носки', 'Скручивания'] }
 ].map((p) => ({ ...p, items: p.items.map((n) => 'ex:' + n) }));
-const allEx = () => S.myExercises.map((e) => ({ ...e, id: 'my:' + e.id, tags: normq(e.name + ' мои ' + (e.group || '')), mine: true })).concat(EX_DB);
+const allEx = () => S.myExercises.map((e) => ({ ...e, id: 'my:' + e.id, tags: normq(e.name + ' мои ' + (e.group || '')), mine: true, pri: e.pri || [], sec: e.sec || [], cue: e.cue || '' })).concat(EX_DB);
+const musclesText = (ex) => (ex.pri || []).map((m) => MUSCLE_NAMES[m]).join(', ') || 'Всё тело';
 const exById = (id) => allEx().find((e) => e.id === id);
 const pad2 = (n) => String(n).padStart(2, '0');
 const fmtDur = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}:${pad2(m)}:${pad2(s % 60)}` : `${pad2(m)}:${pad2(s % 60)}`; };
@@ -2653,13 +2972,19 @@ RENDER.sport = function () {
   let html = head('Тренировки', '', A ? '' : plusBtn('start-workout', 'Начать тренировку'));
   if (A) html += `<button class="card active-w" data-act="w-open"><span class="pulse"></span><span class="grow"><b>Идёт тренировка</b><span class="m">${esc(A.title)}, ${A.items.length} ${plural(A.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="w-el" data-elapsed="${A.start}">${fmtDur(Date.now() - A.start)}</span></button>`;
   html += `<div class="card"><h2>Эта неделя</h2>${weekStrip()}<div class="balance"><div><span>Тренировок</span><b>${wk.length}</b></div><div><span>Время</span><b>${fmtMin(min)}</b></div><div><span>Сожжено ≈</span><b>${nf.format(kc)} ккал</b></div></div></div>`;
-  if (!A) html += `<button class="btn primary big-add" data-act="start-workout">${I.plus}Начать тренировку</button>`;
-  html += `<div class="seg">${[['hist', 'История'], ['rec', 'Рекорды'], ['prog', 'Программы']].map(([k, v]) => `<button data-act="sport-sec" data-sec="${k}" class="${(ui.sportSec || 'hist') === k ? 'on' : ''}">${v}</button>`).join('')}</div>`;
+  if (!A) html += `<div class="card start-hero"><button class="btn primary big-add" data-act="start-workout">${I.play}Начать тренировку</button>
+    <div class="chips">${BUILTIN_PROGRAMS.map((t) => `<button class="chip" data-act="prog-start" data-id="${t.id}">${esc(t.name)}</button>`).join('')}</div></div>`;
+  html += `<div class="seg">${[['hist', 'История'], ['lib', 'Упражнения'], ['rec', 'Рекорды'], ['prog', 'Программы']].map(([k, v]) => `<button data-act="sport-sec" data-sec="${k}" class="${(ui.sportSec || 'hist') === k ? 'on' : ''}">${v}</button>`).join('')}</div>`;
   const sec2 = ui.sportSec || 'hist';
   if (sec2 === 'hist') {
     const ws = [...S.workouts].sort((a, b) => b.start - a.start);
     html += ws.length ? `<div class="list">${ws.map((w) => `<button class="row" data-act="w-view" data-id="${w.id}"><span class="sec-ic">${I.walk}</span><span class="grow"><span class="t">${esc(w.title)}</span><span class="m">${cap(relDay(new Date(w.start)))}, ${fmtMin((w.end - w.start) / 60000)}, ${w.items.length} ${plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="r">≈${nf.format(w.kcal || 0)} ккал</span></button>`).join('')}</div>`
       : `<div class="card empty"><b>Тренировок пока нет</b>Нажмите «Начать тренировку»: можно с нуля или по готовой программе — пробежка и турник, бокс, зал.</div>`;
+  } else if (sec2 === 'lib') {
+    html += `<label class="search">${I.search}<input type="search" id="libq" placeholder="Подтягивания, бег, мешок…" value="${esc(ui.libQ || '')}" autocomplete="off"></label>
+      <div class="chips" id="libg">${[['', 'Все'], ...EX_GROUPS.map((g) => [g, g])].map(([id, n]) => `<button class="chip ${(ui.libG || '') === id ? 'on' : ''}" data-act="lib-g" data-g="${esc(id)}">${n}</button>`).join('')}</div>
+      <div id="libList"></div>`;
+    ui.mounts.push(drawLib);
   } else if (sec2 === 'rec') {
     const recs = computeRecords();
     html += recs.length ? `<div class="list">${recs.map((r) => `<div class="row"><span class="cat-ic">🏆</span><span class="grow"><span class="t">${esc(r.name)}</span><span class="m">${fmtD(new Date(r.date))}</span></span><span class="r amt">${r.text}</span></div>`).join('')}</div>`
@@ -2670,9 +2995,38 @@ RENDER.sport = function () {
       : '<p class="note-small">Сохраните любую тренировку как программу, и её можно будет запускать в одно касание.</p>';
     html += `<div class="section-label"><span>Готовые</span></div><div class="list">${BUILTIN_PROGRAMS.map((t) => `<button class="row" data-act="prog-start" data-id="${t.id}"><span class="grow"><span class="t">${esc(t.name)}</span><span class="m">${t.items.map((id) => (exById(id) || { name: '?' }).name).join(', ')}</span></span><span class="chev">${I.right}</span></button>`).join('')}</div>`;
   }
+  html += `<div class="cta-bar"><button class="btn primary" data-act="start-workout">${A ? `${I.play}Продолжить <span data-elapsed="${A.start}">${fmtDur(Date.now() - A.start)}</span>` : `${I.play}Начать тренировку`}</button></div>`;
   if (A) ui.mounts.push(tickElapsed);
   return html;
 };
+function exRow(e, act) {
+  return `<div class="row ex-row" ${act ? `data-act="${act}" data-ex="${esc(e.id)}" role="button" tabindex="0"` : ''}><button class="mthumb-btn" data-act="ex-info" data-ex="${esc(e.id)}" aria-label="Какие мышцы работают">${muscleThumb(e)}</button>
+    <span class="grow"><span class="t">${esc(e.name)}</span><span class="m">${esc(musclesText(e))}</span></span><span class="chev">${act ? I.plus : I.right}</span></div>`;
+}
+function exFilter(q, g) {
+  const toks = normq(q).split(' ').filter(Boolean);
+  return allEx().filter((e) => (!g || (g === 'my' ? e.mine : e.group === g)) && toks.every((t) => (normq(e.name) + ' ' + e.tags + ' ' + normq(musclesText(e))).includes(stem(t))));
+}
+function drawLib() {
+  const el = $('#libList'); if (!el) return;
+  const list = exFilter(ui.libQ || '', ui.libG || '');
+  el.innerHTML = list.length ? `<div class="list">${list.map((e) => exRow(e, 'ex-info')).join('')}</div>` : `<div class="card empty"><b>Не нашлось</b>Попробуйте другое слово.</div>`;
+}
+function exInfoSheet(id, backFn) {
+  const ex = exById(id); if (!ex) return;
+  const A = S.workoutActive; const inW = A && A.items.some((x) => x.exId === id);
+  openSheet(ex.name, `<div class="form ex-info">
+    ${muscleFigure(ex)}
+    <div class="mlegend"><span><i class="pri"></i>Работают</span><span><i class="sec"></i>Помогают</span></div>
+    ${(ex.pri || []).length ? `<div class="field"><span>Главные мышцы</span><div class="chips wrap">${ex.pri.map((m) => `<span class="chip mchip pri">${MUSCLE_NAMES[m]}</span>`).join('')}</div></div>` : ''}
+    ${(ex.sec || []).length ? `<div class="field"><span>Помогают</span><div class="chips wrap">${ex.sec.map((m) => `<span class="chip mchip">${MUSCLE_NAMES[m]}</span>`).join('')}</div></div>` : ''}
+    ${ex.cue ? `<div class="card cue"><b>Как делать</b><p>${esc(ex.cue)}</p></div>` : ''}
+    <div class="sticky-save"><button class="btn primary" type="button" id="exGo">${A ? (inW ? 'Уже в тренировке' : `${I.plus}Добавить в тренировку`) : `${I.play}Начать тренировку с этим упражнением`}</button></div>
+  </div>`, (body) => {
+    const go = $('#exGo', body); if (inW) go.disabled = true;
+    go.onclick = () => { if (A) addExercise(id); else { closeSheet(); startWorkout(ex.name, [id]); } };
+  }, { back: backFn });
+}
 function computeRecords() {
   const best = {};
   S.workouts.forEach((w) => w.items.forEach((it) => it.sets.forEach((s) => {
@@ -2707,7 +3061,8 @@ DETAIL.workout = function () {
     <div class="rest-pick"><span>Отдых</span>${[60, 90, 120, 180].map((s) => `<button class="chip ${rest === s ? 'on' : ''}" data-act="rest-set" data-s="${s}">${s < 120 ? s + ' с' : s / 60 + ' мин'}</button>`).join('')}</div>`;
   html += A.items.map((it, i) => {
     const fs = FIELDS[it.type]; const last = lastSetsFor(it.exId);
-    return `<div class="card ex-card"><div class="ex-head"><span class="grow"><b>${esc(it.name)}</b><span class="m">${last ? 'В прошлый раз: ' + setSummary({ ...it, sets: last }) : TYPE_NAME[it.type]}</span></span><button class="act" data-act="w-ex-del" data-i="${i}" aria-label="Убрать упражнение">${I.trash}</button></div>
+    const exo = exById(it.exId) || { pri: [], sec: [] };
+    return `<div class="card ex-card"><div class="ex-head"><button class="mthumb-btn" data-act="ex-info" data-ex="${esc(it.exId)}" aria-label="Какие мышцы работают">${muscleThumb(exo, 'sm')}</button><span class="grow"><b>${esc(it.name)}</b><span class="m">${last ? 'В прошлый раз: ' + setSummary({ ...it, sets: last }) : TYPE_NAME[it.type]}</span></span><button class="act" data-act="w-ex-del" data-i="${i}" aria-label="Убрать упражнение">${I.trash}</button></div>
       <div class="sets" style="--cols:${fs.length}"><div class="set-row head"><span>№</span>${fs.map(([, l]) => `<span>${l}</span>`).join('')}<span></span></div>
       ${it.sets.map((s, j) => `<div class="set-row ${s.done ? 'done' : ''}" id="sr-${i}-${j}"><span class="n">${j + 1}</span>${fs.map(([f, , , dec]) => stepper(i, j, f, s[f], dec)).join('')}<button class="check ${s.done ? 'on' : ''}" data-act="set-done" data-i="${i}" data-j="${j}" aria-label="Подход выполнен">${s.done ? I.tick : ''}</button></div>`).join('')}</div>
       <div class="btn-row"><button class="btn sm" data-act="set-add" data-i="${i}">${I.plus}Подход</button>${it.sets.length > 1 ? `<button class="btn sm" data-act="set-del" data-i="${i}">${I.minus}Подход</button>` : ''}</div></div>`;
@@ -2743,14 +3098,16 @@ function exPickSheet() {
     <div id="exres"></div>
     <button type="button" class="btn sm" id="exMine">${I.plus}Своё упражнение</button></div>`, (body) => {
     const draw = () => {
-      const toks = normq(st.q).split(' ').filter(Boolean);
-      const list = allEx().filter((e) => (st.g === '' || (st.g === 'my' ? e.mine : e.group === st.g)) && toks.every((t) => (normq(e.name) + ' ' + e.tags).includes(stem(t))));
-      $('#exres', body).innerHTML = list.length ? `<div class="list">${list.slice(0, 80).map((e) => `<button class="row" data-ex="${esc(e.id)}"><span class="grow"><span class="t">${esc(e.name)}</span><span class="m">${esc(e.group || 'Мои')}, ${TYPE_NAME[e.type].toLowerCase()}</span></span><span class="chev">${I.plus}</span></button>`).join('')}</div>`
+      const list = exFilter(st.q, st.g);
+      $('#exres', body).innerHTML = list.length ? `<div class="list">${list.slice(0, 90).map((e) => exRow(e, 'pick-ex')).join('')}</div>`
         : `<div class="card empty" style="padding:18px"><b>Не нашлось</b>Добавьте своё упражнение.</div>`;
     };
     $('#exq', body).addEventListener('input', (e) => { st.q = e.target.value; draw(); });
     $('#exg', body).addEventListener('click', (e) => { const b = e.target.closest('[data-g]'); if (!b) return; st.g = b.dataset.g; $$('#exg .chip', body).forEach((x) => x.classList.toggle('on', x === b)); draw(); });
-    $('#exres', body).addEventListener('click', (e) => { const b = e.target.closest('[data-ex]'); if (!b) return; addExercise(b.dataset.ex); });
+    $('#exres', body).addEventListener('click', (e) => {
+      const info = e.target.closest('[data-act="ex-info"]'); if (info) { e.stopPropagation(); exInfoSheet(info.dataset.ex, () => exPickSheet()); return; }
+      const b = e.target.closest('[data-ex]'); if (!b) return; e.stopPropagation(); addExercise(b.dataset.ex);
+    });
     $('#exMine', body).onclick = () => myExSheet(st.q);
     draw(); setTimeout(() => { const i = $('#exq', body); if (i) i.focus(); }, 320);
   });
@@ -2766,11 +3123,13 @@ function myExSheet(name) {
   openSheet('Своё упражнение', `<form id="f" class="form">
     <label class="field"><span>Название</span><input type="text" id="meName" value="${esc(name || '')}" maxlength="60" placeholder="Например, подтягивания с утяжелением"></label>
     <div class="field"><span>Как считать</span><div class="seg col" id="meType">${Object.entries(TYPE_NAME).map(([k, v]) => `<button type="button" data-v="${k}" class="${type === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+    <div class="field"><span>Какие мышцы работают</span><div class="chips wrap" id="meMus">${Object.entries(MUSCLE_NAMES).map(([k, v]) => `<button type="button" class="chip" data-m="${k}">${v}</button>`).join('')}</div></div>
     <div class="sticky-save"><button class="btn primary" type="submit">Добавить</button></div></form>`, (body) => {
     $('#meType', body).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; type = b.dataset.v; $$('#meType button', body).forEach((x) => x.classList.toggle('on', x === b)); });
+    $('#meMus', body).addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (b) b.classList.toggle('on'); });
     $('#f', body).addEventListener('submit', (e) => {
       e.preventDefault(); const n = $('#meName', body).value.trim(); if (!n) { toast('Напишите название'); return; }
-      const ex = { id: uid(), name: n, type, met: type === 'cardio' ? 7 : type === 'rounds' ? 7 : 5, group: 'Мои' }; S.myExercises.push(ex); save();
+      const ex = { id: uid(), name: n, type, met: type === 'cardio' ? 7 : type === 'rounds' ? 7 : 5, group: 'Мои', pri: $$('#meMus .chip.on', body).map((x) => x.dataset.m), sec: [] }; S.myExercises.push(ex); save();
       addExercise('my:' + ex.id);
     });
   }, { back: () => exPickSheet() });
@@ -2822,7 +3181,7 @@ DETAIL.wview = function (d) {
   return `<div class="detail-top">${backBtn('Тренировки')}<button class="icon-btn" data-act="w-hdel" data-id="${w.id}" aria-label="Удалить тренировку" style="color:var(--bad)">${I.trash}</button></div>
     ${head(esc(w.title), `${cap(fmtD(new Date(w.start), { weekday: 'long', day: 'numeric', month: 'long' }))}, ${fmtT(new Date(w.start))}`, '')}
     <div class="card"><div class="balance" style="margin:0;border:0;padding:0"><div><span>Время</span><b>${fmtMin((w.end - w.start) / 60000)}</b></div><div><span>Упражнений</span><b>${w.items.length}</b></div><div><span>Сожжено ≈</span><b>${nf.format(w.kcal || 0)} ккал</b></div></div></div>
-    <div class="list">${w.items.map((it) => `<div class="row"><span class="grow"><span class="t">${esc(it.name)}</span><span class="m">${setSummary(it)}</span></span></div>`).join('')}</div>
+    <div class="list">${w.items.map((it) => `<div class="row"><button class="mthumb-btn" data-act="ex-info" data-ex="${esc(it.exId)}" aria-label="Мышцы">${muscleThumb(exById(it.exId) || {}, 'sm')}</button><span class="grow"><span class="t">${esc(it.name)}</span><span class="m">${setSummary(it)}</span></span></div>`).join('')}</div>
     <div class="btn-row"><button class="btn primary" data-act="w-repeat" data-id="${w.id}">Повторить</button><button class="btn" data-act="w-totpl" data-id="${w.id}">В программы</button></div>`;
 };
 ACT['start-workout'] = () => { if (S.workoutActive) { if (ui.tab !== 'sport') { ui.tab = 'sport'; ui.stack = []; } push({ type: 'workout' }); } else startSheet(); };
@@ -2841,6 +3200,9 @@ ACT['prog-open'] = (el) => {
   });
 };
 ACT['sport-sec'] = (el) => { ui.sportSec = el.dataset.sec; render(); };
+ACT['ex-info'] = (el) => exInfoSheet(el.dataset.ex);
+ACT['pick-ex'] = (el) => addExercise(el.dataset.ex);
+ACT['lib-g'] = (el) => { ui.libG = el.dataset.g; $$('#libg .chip').forEach((x) => x.classList.toggle('on', x === el)); drawLib(); };
 ACT['w-add-ex'] = () => exPickSheet();
 ACT['w-rename'] = () => {
   const A = S.workoutActive; if (!A) return;
@@ -2871,6 +3233,583 @@ ACT['w-repeat'] = (el) => { const w = S.workouts.find((x) => x.id === el.dataset
 ACT['w-totpl'] = (el) => { const w = S.workouts.find((x) => x.id === el.dataset.id); if (!w) return; S.wTemplates.push({ id: uid(), name: w.title, items: w.items.map((x) => x.exId) }); save(); toast('Добавлено в «Программы»'); };
 ACT['w-hdel'] = (el) => { const w = S.workouts.find((x) => x.id === el.dataset.id); if (!w) return; const idx = S.workouts.indexOf(w); ui.stack.pop(); removeWithUndo('Тренировка удалена', () => S.workouts.splice(idx, 1), () => S.workouts.splice(idx, 0, w)); };
 
+/* ================= Дневник ================= */
+const D_COVERS = [['#6B2737', 'Вино'], ['#22325C', 'Ночь'], ['#2F5741', 'Лес'], ['#5A3B2A', 'Какао'], ['#2B2D33', 'Графит'], ['#C9A97A', 'Песок'], ['#6FA3C7', 'Небо'], ['#E3A6B0', 'Пудра']];
+const D_TEXTURES = [['leather', 'Кожа'], ['linen', 'Ткань'], ['dots', 'Горошек'], ['plain', 'Гладкая']];
+const D_PAPERS = [['lined', 'Линейка'], ['grid', 'Клетка'], ['dots', 'Точки'], ['plain', 'Чистая']];
+const D_PAPER_TONES = [['#FFFDF7', 'Белая'], ['#F6EEDC', 'Крафт'], ['#EEF4FB', 'Голубая'], ['#FBEFF1', 'Розовая'], ['#23252B', 'Тёмная']];
+const D_STICKERS = [
+  ['Настроение', '😊 😂 🥰 😍 🥳 😎 🤩 😴 🤔 🥺 😢 😡 🤗 🙏 👍 ✌️ 💪 👏'],
+  ['Сердечки и блёстки', '❤️ 🧡 💛 💚 💙 💜 🤍 💖 💕 💘 💋 ✨ ⭐ 🌟 💫 🔥 🎉 🎈'],
+  ['Природа', '☀️ 🌙 ⛅ 🌈 ❄️ 🌧️ 🌸 🌻 🌹 🍁 🍂 🌲 🌊 ⛰️ 🌴 🐾 🐶 🐱 🦋 🐟'],
+  ['Еда', '☕ 🍰 🍕 🍔 🍣 🍓 🍉 🍦 🍩 🍷 🥂 🍾'],
+  ['Поездки', '✈️ 🚗 🚆 🏕️ 🏖️ 🗺️ 📍 🎒 🏨 🎡 🏔️ 🛶'],
+  ['Дела и учёба', '💼 🏗️ 🔧 📚 🎓 💡 📌 ✅ 🏆 💰 📝 🗓️'],
+  ['Спорт', '🏃 🥊 🏋️ ⚽ 🚴 🏊 ⛷️ 🧘 🏀 🎯 🥇 ⏱️']
+];
+const D_LABELS = [['Лучший день', '#F4C430'], ['Запомнить', '#7EC8E3'], ['Ура!', '#FF8FA3'], ['Люблю', '#FF6B6B'], ['Отпуск', '#6BCB77'], ['Мечта', '#B39DDB'], ['Важно', '#FFA94D'], ['Спасибо', '#80CBC4'], ['Впервые', '#F48FB1'], ['Мы', '#90CAF9']];
+const D_COLORS = ['#1F2328', '#5B6270', '#FFFFFF', '#E5484D', '#FF8A3D', '#F5C518', '#3DBB6E', '#18A0A8', '#3A6FF0', '#7B5CF0', '#E86FB4', '#8B5A2B'];
+const D_TOOLS = [['pen', 'Ручка'], ['marker', 'Маркер'], ['brush', 'Кисть'], ['glow', 'Неон'], ['eraser', 'Ластик']];
+const dPages = () => S.diary.pages;
+const dIdx = () => Math.max(-1, Math.min(ui.dIdx ?? -1, dPages().length - 1));
+const dPageW = () => Math.min(Math.max(window.innerWidth - 32, 260), 440);
+
+/* ---------- Медиа: видео и рисунки в той же базе, что и фото ---------- */
+async function addVideoFile(f) {
+  const id = 'v' + uid(); let thumb = null;
+  try { thumb = await videoPoster(f); } catch (e) { /* без обложки */ }
+  await phPut({ id, video: f, type: f.type || 'video/mp4', thumb, full: thumb, isVideo: true, created: Date.now() });
+  return id;
+}
+function videoPoster(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file); const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+    const done = (b) => { URL.revokeObjectURL(url); b ? res(b) : rej(new Error('poster')); };
+    const tm = setTimeout(() => done(null), 6000);
+    v.addEventListener('loadeddata', () => { try { v.currentTime = Math.min(0.3, (v.duration || 1) / 3); } catch (e) { /* без перемотки */ } }, { once: true });
+    v.addEventListener('seeked', () => {
+      clearTimeout(tm); const k = Math.min(1, 720 / Math.max(v.videoWidth, v.videoHeight || 1));
+      const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(v.videoWidth * k)); cv.height = Math.max(1, Math.round(v.videoHeight * k));
+      try { cv.getContext('2d').drawImage(v, 0, 0, cv.width, cv.height); cv.toBlob((b) => done(b), 'image/jpeg', 0.8); } catch (e) { done(null); }
+    }, { once: true });
+    v.addEventListener('error', () => { clearTimeout(tm); done(null); }, { once: true });
+  });
+}
+async function mediaURL(id, kind) {
+  const key = id + ':' + kind; let u = PH.urls.get(key);
+  if (u) return u;
+  const rec = await phGet(id).catch(() => null); if (!rec) return '';
+  const blob = kind === 'video' ? rec.video : (kind === 'thumb' ? rec.thumb : rec.full) || rec.thumb;
+  if (!blob) return '';
+  u = URL.createObjectURL(blob); PH.urls.set(key, u); return u;
+}
+function hydrateMedia(root) {
+  $$('img[data-media]', root || document).forEach((im) => {
+    if (im.dataset.loaded) return; im.dataset.loaded = '1';
+    mediaURL(im.dataset.media, im.dataset.kind || 'full').then((u) => { if (u) im.src = u; else im.closest('.d-item, .d-draw-wrap')?.classList.add('missing'); });
+  });
+}
+async function mediaFiles(ids) {
+  const out = [];
+  for (const id of ids) {
+    const rec = await phGet(id).catch(() => null); if (!rec) continue;
+    if (rec.video) { const ext = (rec.type || '').includes('quicktime') ? 'mov' : 'mp4'; out.push(new File([rec.video], `life-${id}.${ext}`, { type: rec.type || 'video/mp4' })); }
+    else if (rec.full) out.push(new File([rec.full], `life-${id}.jpg`, { type: rec.full.type || 'image/jpeg' }));
+  }
+  return out;
+}
+async function saveToGallery(ids, label) {
+  const files = await mediaFiles(ids);
+  if (!files.length) { toast('Здесь нет фото и видео'); return; }
+  try {
+    if (navigator.canShare && navigator.canShare({ files })) { await navigator.share({ files, title: label || 'Life' }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  files.forEach((f) => { const url = URL.createObjectURL(f); const a = document.createElement('a'); a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000); });
+  toast(files.length === 1 ? 'Файл сохранён' : `Сохранено файлов: ${files.length}`);
+}
+const pageMedia = (p) => p.items.filter((it) => it.kind === 'photo' || it.kind === 'video').map((it) => it.ref);
+
+/* ---------- Отрисовка страницы и обложки ---------- */
+function itemHTML(it, edit) {
+  const st = `left:${it.x}%;top:${it.y}%;width:${it.w}%;--rot:${it.rot || 0}deg;z-index:${(it.z || 1) + 2}`;
+  const common = `class="d-item ${it.kind}${edit ? ' ed' : ''}" data-item="${it.id}" style="${st}"`;
+  if (it.kind === 'photo') return `<div ${common}><span class="tape"></span><img data-media="${it.ref}" alt="" draggable="false"></div>`;
+  if (it.kind === 'video') return `<div ${common}><span class="tape"></span><img data-media="${it.ref}" data-kind="thumb" alt="" draggable="false"><span class="play">${I.play}</span></div>`;
+  if (it.kind === 'label') return `<div ${common}><span class="dlbl" style="--c:${it.c}">${esc(it.text)}</span></div>`;
+  return `<div ${common}><span class="stk">${it.e}</span></div>`;
+}
+function paperStyle(p) { return `--paper:${p.tone || '#FFFDF7'};--ink-p:${p.tone === '#23252B' ? '#ECEFF4' : '#2B2F3A'};--line-p:${p.tone === '#23252B' ? 'rgba(255,255,255,.12)' : 'rgba(70,110,170,.22)'}`; }
+function pageHTML(p, n, opts = {}) {
+  const d = toDate(p.date);
+  return `<div class="dpage paper-${p.paper || 'lined'}" style="${paperStyle(p)}" data-page="${p.id}">
+    <div class="dp-head"><span class="dp-date">${d ? `${d.getDate()} ${MONTH_GEN[d.getMonth()]} ${d.getFullYear()}, ${WD_LONG[d.getDay()]}` : ''}</span>${p.title ? `<span class="dp-title">${esc(p.title)}</span>` : ''}</div>
+    ${p.text ? `<div class="dp-text">${esc(p.text)}</div>` : (opts.edit ? '' : (!p.items.length && !p.drawing ? '<div class="dp-text dp-empty">Пустая страница. Нажмите «Изменить», чтобы написать, вклеить фото или порисовать.</div>' : ''))}
+    ${p.drawing ? `<div class="d-draw-wrap"><img class="d-draw" data-media="${p.drawing}" alt="" draggable="false"></div>` : ''}
+    ${p.items.map((it) => itemHTML(it, opts.edit)).join('')}
+    ${n ? `<span class="dp-num">${n}</span>` : ''}</div>`;
+}
+function coverHTML(c, opts = {}) {
+  return `<div class="dcover tex-${c.texture || 'leather'}" style="--cv:${c.color}">
+    <span class="dc-spine"></span>
+    ${c.drawing ? `<div class="d-draw-wrap"><img class="d-draw" data-media="${c.drawing}" alt="" draggable="false"></div>` : ''}
+    <div class="dc-title ${c.font === 'hand' ? 'hand' : ''}" style="color:${c.titleColor || '#fff'}">${esc(c.title || 'Мой дневник')}</div>
+    ${c.items.map((it) => itemHTML(it, opts.edit)).join('')}
+    <span class="dc-band"></span></div>`;
+}
+
+/* ---------- Книга: просмотр ---------- */
+RENDER.diary = function () {
+  const pages = dPages(); const idx = dIdx(); ui.dIdx = idx;
+  let html = head('Дневник', pages.length ? `${pages.length} ${plural(pages.length, 'страница', 'страницы', 'страниц')}` : '', `<button class="icon-btn" data-act="d-pages" aria-label="Все страницы" ${pages.length ? '' : 'disabled'}>${I.widgets}</button>${plusBtn('d-new', 'Новая страница')}`);
+  const W = dPageW();
+  html += `<div class="dstage" id="dstage" style="--pw:${W}px"><div class="dzoom" id="dzoom"><div class="dbook ${idx < 0 ? 'closed' : 'open'}" id="dbook">
+    <div class="dleaf top" id="dTop">${idx < 0 ? coverHTML(S.diary.cover) : pageHTML(pages[idx], idx + 1)}<span class="dshade"></span></div></div></div></div>`;
+  html += `<div class="dnav"><button class="icon-btn" data-act="d-flip" data-dir="-1" aria-label="Назад" ${idx < 0 ? 'disabled' : ''}>${I.left}</button>
+    <span class="dnav-c">${idx < 0 ? 'Обложка' : `${idx + 1} из ${pages.length}`}</span>
+    <button class="icon-btn" data-act="d-flip" data-dir="1" aria-label="Вперёд" ${idx >= pages.length - 1 ? 'disabled' : ''}>${I.right}</button></div>`;
+  html += `<div class="btn-row">${idx < 0 ? `<button class="btn" data-act="d-cover">${I.edit}Оформить обложку</button>${pages.length ? `<button class="btn primary" data-act="d-flip" data-dir="1">Открыть</button>` : `<button class="btn primary" data-act="d-new">${I.plus}Первая запись</button>`}`
+    : `<button class="btn" data-act="d-edit">${I.edit}Изменить</button><button class="btn" data-act="d-save-media">${I.down}В галерею</button>`}</div>`;
+  html += `<p class="note-small">Листайте свайпом или нажатием на край страницы. Разведите два пальца, чтобы приблизить, дважды нажмите, чтобы вернуть.</p>`;
+  ui.mounts.push(mountBook);
+  return html;
+};
+function mountBook() {
+  const stage = $('#dstage'); if (!stage) return; hydrateMedia(stage);
+  bindBook(stage);
+}
+let DZ = { s: 1, x: 0, y: 0 };
+function applyZoom() { const z = $('#dzoom'); if (z) { z.style.transform = DZ.s === 1 ? '' : `translate3d(${DZ.x}px, ${DZ.y}px, 0) scale(${DZ.s})`; z.classList.toggle('zoomed', DZ.s > 1); } }
+function bindBook(stage) {
+  DZ = { s: 1, x: 0, y: 0 }; applyZoom();
+  let flip = null, pan = null, pinch = null, lastTap = 0;
+  const book = $('#dbook', stage);
+  const W = () => book.getBoundingClientRect().width / DZ.s;
+  const pages = dPages();
+  const canGo = (dir) => { const i = dIdx() + dir; return i >= -1 && i < pages.length; };
+  const leafFor = (i) => i < 0 ? coverHTML(S.diary.cover) : pageHTML(pages[i], i + 1);
+  const startFlip = (dir) => {
+    if (!canGo(dir)) return null; const cur = dIdx(), to = cur + dir;
+    book.className = 'dbook open flipping';
+    if (dir > 0) { book.innerHTML = `<div class="dleaf under">${leafFor(to)}</div><div class="dleaf top">${leafFor(cur)}<span class="dshade"></span></div>`; }
+    else { book.innerHTML = `<div class="dleaf under">${leafFor(cur)}</div><div class="dleaf top" style="transform:rotateY(-180deg)">${leafFor(to)}<span class="dshade"></span></div>`; }
+    hydrateMedia(book);
+    return { dir, to, top: book.querySelector('.dleaf.top'), shade: book.querySelector('.dshade'), p: 0 };
+  };
+  const setP = (f, p) => {
+    f.p = Math.max(0, Math.min(1, p)); const ang = f.dir > 0 ? -180 * f.p : -180 * (1 - f.p);
+    f.top.style.transform = `rotateY(${ang}deg)`; f.shade.style.opacity = String(Math.sin(Math.PI * Math.abs(ang) / 180) * 0.55);
+  };
+  const finish = (f, go) => {
+    const t = f.top; t.style.transition = 'transform .42s cubic-bezier(.25, .8, .3, 1)'; f.shade.style.transition = 'opacity .42s';
+    setP(f, go ? 1 : 0);
+    setTimeout(() => { if (go) { ui.dIdx = f.to; } render(); }, 430);
+  };
+  ui.dFlip = (dir) => { if (DZ.s > 1 || flip) return; const f = startFlip(dir); if (!f) return; flip = f; requestAnimationFrame(() => requestAnimationFrame(() => finish(f, true))); };
+  stage.addEventListener('gesturestart', (e) => e.preventDefault());
+  stage.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      if (flip && flip.state === 'drag') { flip.top.style.transition = ''; setP(flip, 0); render(); } flip = null; pan = null;
+      const [a, b] = e.touches; pinch = { d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), s0: DZ.s, x0: DZ.x, y0: DZ.y, mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2 };
+    }
+  }, { passive: true });
+  stage.addEventListener('touchmove', (e) => {
+    if (!pinch || e.touches.length < 2) return; if (e.cancelable) e.preventDefault();
+    const [a, b] = e.touches; const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const s = Math.max(1, Math.min(3.5, pinch.s0 * d / pinch.d0)); const r = stage.getBoundingClientRect();
+    const ox = pinch.mx - r.left - r.width / 2, oy = pinch.my - r.top;
+    DZ.x = pinch.x0 + ox * (1 - s / pinch.s0) * (pinch.s0 === 1 ? 1 : 1); DZ.y = pinch.y0 + oy * (1 - s / pinch.s0); DZ.s = s; if (s === 1) { DZ.x = 0; DZ.y = 0; } applyZoom();
+  }, { passive: false });
+  stage.addEventListener('touchend', (e) => { if (pinch && e.touches.length < 2) { pinch = null; if (DZ.s < 1.05) { DZ = { s: 1, x: 0, y: 0 }; applyZoom(); } } });
+  stage.addEventListener('pointerdown', (e) => {
+    if (pinch || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (DZ.s > 1) { pan = { sx: e.clientX, sy: e.clientY, x0: DZ.x, y0: DZ.y, id: e.pointerId, moved: false }; return; }
+    flip = { sx: e.clientX, sy: e.clientY, id: e.pointerId, t0: Date.now(), state: 'wait' };
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (pinch) return;
+    if (pan && e.pointerId === pan.id) { if (Math.hypot(e.clientX - pan.sx, e.clientY - pan.sy) > 6) pan.moved = true; DZ.x = pan.x0 + e.clientX - pan.sx; DZ.y = pan.y0 + e.clientY - pan.sy; applyZoom(); return; }
+    if (!flip || e.pointerId !== flip.id) return;
+    const dx = e.clientX - flip.sx, dy = e.clientY - flip.sy;
+    if (flip.state === 'wait') {
+      if (Math.abs(dx) < 10) return; if (Math.abs(dy) > Math.abs(dx)) { flip = null; return; }
+      const f = startFlip(dx < 0 ? 1 : -1); if (!f) { flip = null; return; }
+      flip = Object.assign(f, { sx: flip.sx, id: flip.id, t0: flip.t0, state: 'drag' }); try { stage.setPointerCapture(e.pointerId); } catch (er) { /* без захвата */ }
+    }
+    if (flip.state === 'drag') setP(flip, (flip.dir > 0 ? -dx : dx) / W());
+  });
+  const up = (e) => {
+    let f = flip;
+    if (pan) { const pn = pan; pan = null; if (pn.moved) return; f = { state: 'tap' }; }
+    if (!f) return; flip = null;
+    if (f.state === 'drag') { const v = Math.abs(e.clientX - f.sx) / Math.max(1, Date.now() - f.t0); finish(f, f.p > 0.35 || v > 0.6); return; }
+    // нажатие: двойное — сброс зума; по краю — листание; по видео — воспроизведение
+    const now = Date.now(); if (now - lastTap < 300) { lastTap = 0; if (DZ.s > 1) { DZ = { s: 1, x: 0, y: 0 }; } else { const r = stage.getBoundingClientRect(); DZ.s = 2.2; DZ.x = -(e.clientX - r.left - r.width / 2) * 1.2; DZ.y = -(e.clientY - r.top) * 1.2; } const z = $('#dzoom'); z.style.transition = 'transform .3s ease'; applyZoom(); setTimeout(() => { z.style.transition = ''; }, 320); return; }
+    lastTap = now;
+    const vid = e.target.closest('.d-item.video');
+    if (vid) { playVideo(vid); return; }
+    const r = book.getBoundingClientRect(); const rel = (e.clientX - r.left) / r.width;
+    if (DZ.s > 1) return;
+    setTimeout(() => { if (lastTap !== now) return; if (dIdx() < 0 && rel > 0.15 && pages.length) ui.dFlip(1); else if (rel > 0.75) ui.dFlip(1); else if (rel < 0.25) ui.dFlip(-1); }, 280);
+  };
+  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', () => { if (flip && flip.state === 'drag') finish(flip, false); flip = null; pan = null; });
+}
+async function playVideo(el) {
+  const it = el.dataset.item; const p = dPages()[dIdx()]; const item = p && p.items.find((x) => x.id === it); if (!item) return;
+  const url = await mediaURL(item.ref, 'video'); if (!url) { toast('Видео не найдено на этом телефоне'); return; }
+  el.innerHTML = `<video src="${url}" controls playsinline autoplay></video>`;
+}
+
+/* ---------- Список страниц ---------- */
+function pagesSheet() {
+  const pages = dPages();
+  openSheet('Все страницы', `<div class="form"><div class="dthumbs">${pages.map((p, i) => `<button class="dthumb" data-pi="${i}" style="--pw:132px"><span class="dthumb-in">${pageHTML(p, i + 1)}</span><span class="m">${fmtShort(toDate(p.date))}${p.title ? ', ' + esc(p.title) : ''}</span></button>`).join('')}</div>
+    <button class="btn" type="button" id="dAll">${I.down}Все фото и видео дневника в галерею</button></div>`, (body) => {
+    hydrateMedia(body);
+    body.addEventListener('click', (e) => { const b = e.target.closest('[data-pi]'); if (!b) return; ui.dIdx = +b.dataset.pi; closeSheet(); render('anim-fade'); });
+    $('#dAll', body).onclick = () => saveToGallery(pages.flatMap(pageMedia), 'Дневник Life');
+  });
+}
+
+/* ---------- Редактор страницы и обложки ---------- */
+const DE = { target: null, kind: 'page', sel: null, draw: false, tool: 'pen', color: '#1F2328', size: 6, strokes: [], base: null, dirtyDraw: false };
+function newPage() {
+  const last = dPages()[dPages().length - 1];
+  const p = { id: uid(), date: todayISO(), title: '', text: '', paper: last ? last.paper : 'lined', tone: last ? last.tone : '#FFFDF7', items: [], drawing: null, created: Date.now(), updated: Date.now() };
+  S.diary.pages.push(p); save(); ui.dIdx = dPages().length - 1; return p;
+}
+function openEditor(kind, target) {
+  DE.kind = kind; DE.target = target; DE.sel = null; DE.draw = false; DE.strokes = []; DE.base = null; DE.dirtyDraw = false;
+  push({ type: 'deditor' });
+}
+DETAIL.deditor = function () {
+  const t = DE.target; if (!t) { ui.stack.pop(); return currentHTML(); }
+  const isCover = DE.kind === 'cover';
+  const W = Math.min(window.innerWidth - 24, 420);
+  ui.mounts.push(mountEditor);
+  return `<div class="deditor">
+    <div class="de-top">${backBtn('Готово')}<span class="de-title">${isCover ? 'Обложка' : 'Страница ' + (dPages().indexOf(t) + 1)}</span>${isCover ? '<span style="width:44px"></span>' : `<button class="icon-btn" data-act="d-page-menu" aria-label="Ещё">${I.more}</button>`}</div>
+    <div class="de-selbar" id="deSel" hidden>
+      <button class="icon-btn" data-de="smaller" aria-label="Меньше">${I.minus}</button><button class="icon-btn" data-de="bigger" aria-label="Больше">${I.plus}</button>
+      <button class="icon-btn" data-de="rotl" aria-label="Повернуть влево">↺</button><button class="icon-btn" data-de="rotr" aria-label="Повернуть вправо">↻</button>
+      <button class="icon-btn" data-de="front" aria-label="На передний план">${I.up}</button><button class="icon-btn" data-de="gallery" aria-label="В галерею" id="deGal">${I.down}</button>
+      <button class="icon-btn del" data-de="del" aria-label="Удалить">${I.trash}</button></div>
+    <div class="de-canvas-wrap" style="--pw:${W}px"><div class="de-page" id="dePage">${isCover ? coverHTML(t, { edit: true }) : pageHTML(t, 0, { edit: true })}<canvas id="deCanvas"></canvas></div></div>
+    <div class="de-brush" id="deBrush" hidden>
+      <div class="de-tools">${D_TOOLS.map(([k, n]) => `<button type="button" class="de-tool ${DE.tool === k ? 'on' : ''}" data-tool="${k}"><span class="tl tl-${k}"></span>${n}</button>`).join('')}</div>
+      <div class="de-colors">${D_COLORS.map((c) => `<button type="button" class="swatch sm ${DE.color === c ? 'on' : ''}" data-color="${c}" style="background:${c}" aria-label="Цвет"></button>`).join('')}</div>
+      <div class="de-size"><span>Толщина</span><input type="range" id="deSize" min="1" max="40" value="${DE.size}"><span class="de-dot" id="deDot"></span></div>
+      <div class="btn-row"><button type="button" class="btn sm" id="deUndo">↶ Отменить</button><button type="button" class="btn sm" id="deClear">Стереть рисунок</button><button type="button" class="btn sm primary" id="deDrawDone">Готово</button></div>
+    </div>
+    <div class="de-bar" id="deBar">
+      ${isCover ? '<button type="button" data-de="cover-style"><span class="dei">🎨</span>Обложка</button>' : '<button type="button" data-de="text"><span class="dei">✍️</span>Текст</button>'}
+      <label class="de-file"><span class="dei">🖼️</span>Фото и видео<input type="file" accept="image/*,video/*" multiple hidden id="deFile"></label>
+      <button type="button" data-de="stickers"><span class="dei">⭐</span>Стикеры</button>
+      <button type="button" data-de="draw"><span class="dei">🖌️</span>Кисти</button>
+      ${isCover ? '' : '<button type="button" data-de="paper"><span class="dei">📄</span>Бумага</button>'}
+    </div></div>`;
+};
+function deTouch() { const t = DE.target; if (DE.kind === 'page') t.updated = Date.now(); save(); }
+function deRerenderPage() {
+  const pg = $('#dePage'); if (!pg) return; const t = DE.target; const cv = $('#deCanvas', pg);
+  const html = DE.kind === 'cover' ? coverHTML(t, { edit: true }) : pageHTML(t, 0, { edit: true });
+  const tmp = document.createElement('div'); tmp.innerHTML = html; pg.replaceChild(tmp.firstElementChild, pg.firstElementChild); pg.appendChild(cv);
+  hydrateMedia(pg); deSelect(DE.sel);
+}
+function deSelect(id) {
+  DE.sel = id; $$('#dePage .d-item').forEach((el) => el.classList.toggle('sel', el.dataset.item === id));
+  const bar = $('#deSel'); if (bar) bar.hidden = !id;
+  const it = id && DE.target.items.find((x) => x.id === id); const g = $('#deGal'); if (g) g.hidden = !(it && (it.kind === 'photo' || it.kind === 'video'));
+}
+function deAddItem(item) {
+  const t = DE.target; const z = t.items.reduce((m, x) => Math.max(m, x.z || 1), 0) + 1;
+  t.items.push(Object.assign({ id: uid(), x: 25 + Math.random() * 20, y: 25 + Math.random() * 25, rot: Math.round((Math.random() - 0.5) * 12), z }, item));
+  deTouch(); deRerenderPage(); deSelect(t.items[t.items.length - 1].id);
+}
+function mountEditor() {
+  const pg = $('#dePage'); if (!pg) return; hydrateMedia(pg);
+  const cv = $('#deCanvas', pg);
+  const fit = () => { const r = pg.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; };
+  fit();
+  // Перетаскивание и щипок по элементам
+  let drag = null, pinch = null;
+  pg.addEventListener('pointerdown', (e) => {
+    if (DE.draw) return; const el = e.target.closest('.d-item'); if (!el) { deSelect(null); return; }
+    const it = DE.target.items.find((x) => x.id === el.dataset.item); if (!it) return;
+    deSelect(it.id); const r = pg.getBoundingClientRect();
+    drag = { it, el, sx: e.clientX, sy: e.clientY, x0: it.x, y0: it.y, W: r.width, H: r.height, id: e.pointerId, moved: false };
+    try { pg.setPointerCapture(e.pointerId); } catch (er) { /* без захвата */ }
+    e.preventDefault();
+  });
+  pg.addEventListener('pointermove', (e) => {
+    if (!drag || pinch || e.pointerId !== drag.id) return;
+    const dx = (e.clientX - drag.sx) / drag.W * 100, dy = (e.clientY - drag.sy) / drag.H * 100; if (Math.abs(dx) + Math.abs(dy) > 0.6) drag.moved = true;
+    drag.it.x = Math.max(-20, Math.min(95, drag.x0 + dx)); drag.it.y = Math.max(-10, Math.min(95, drag.y0 + dy));
+    drag.el.style.left = drag.it.x + '%'; drag.el.style.top = drag.it.y + '%';
+  });
+  const end = () => { if (drag) { if (drag.moved) deTouch(); drag = null; } };
+  pg.addEventListener('pointerup', end); pg.addEventListener('pointercancel', end);
+  pg.addEventListener('touchstart', (e) => {
+    if (DE.draw || e.touches.length !== 2 || !DE.sel) return; const it = DE.target.items.find((x) => x.id === DE.sel); if (!it) return;
+    const [a, b] = e.touches; drag = null;
+    pinch = { it, d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), a0: Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX), w0: it.w, r0: it.rot || 0 };
+  }, { passive: true });
+  pg.addEventListener('touchmove', (e) => {
+    if (DE.draw) { if (e.cancelable) e.preventDefault(); return; }
+    if (!pinch || e.touches.length < 2) { if (drag && e.cancelable) e.preventDefault(); return; }
+    if (e.cancelable) e.preventDefault();
+    const [a, b] = e.touches; const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); const ang = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
+    pinch.it.w = Math.max(6, Math.min(140, pinch.w0 * d / pinch.d0)); pinch.it.rot = Math.round(pinch.r0 + (ang - pinch.a0) * 180 / Math.PI);
+    const el = $(`.d-item[data-item="${pinch.it.id}"]`, pg); if (el) { el.style.width = pinch.it.w + '%'; el.style.setProperty('--rot', pinch.it.rot + 'deg'); }
+  }, { passive: false });
+  pg.addEventListener('touchend', (e) => { if (pinch && e.touches.length < 2) { pinch = null; deTouch(); } });
+  // Рисование
+  const ctx = cv.getContext('2d');
+  const loadBase = async () => {
+    DE.base = null; const id = DE.target.drawing; if (!id) return;
+    const u = await mediaURL(id, 'full'); if (!u) return;
+    await new Promise((res) => { const im = new Image(); im.onload = () => { DE.base = im; res(); }; im.onerror = res; im.src = u; });
+  };
+  const redraw = () => { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); if (DE.base) ctx.drawImage(DE.base, 0, 0, cv.width, cv.height); DE.strokes.forEach((s) => drawStroke(ctx, s, cv)); };
+  ui.deRedraw = redraw;
+  let cur = null;
+  cv.addEventListener('pointerdown', (e) => {
+    if (!DE.draw) return; e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) { /* без захвата */ }
+    const r = cv.getBoundingClientRect();
+    cur = { tool: DE.tool, color: DE.color, size: DE.size / r.width, pts: [[(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.pressure || 0.5, Date.now()]] };
+    DE.strokes.push(cur); DE.dirtyDraw = true;
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!cur) return; const r = cv.getBoundingClientRect();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    evs.forEach((ev) => cur.pts.push([(ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height, ev.pressure || 0.5, Date.now()]));
+    redraw();
+  });
+  const stop = () => { cur = null; };
+  cv.addEventListener('pointerup', stop); cv.addEventListener('pointercancel', stop);
+  ui.deLoadBase = loadBase;
+  bindEditorBar();
+}
+function drawStroke(ctx, s, cv) {
+  const W = cv.width, H = cv.height; const pts = s.pts; if (!pts.length) return;
+  const base = s.size * W;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.globalCompositeOperation = s.tool === 'eraser' ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = s.tool === 'eraser' ? '#000' : s.color;
+  if (s.tool === 'marker') { ctx.globalAlpha = 0.38; ctx.lineCap = 'square'; }
+  if (s.tool === 'glow') { ctx.shadowColor = s.color; ctx.shadowBlur = base * 2.2; }
+  if (s.tool === 'brush') {
+    // Кисть: толщина зависит от скорости — медленно толще, быстро тоньше
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i]; const dist = Math.hypot((b[0] - a[0]) * W, (b[1] - a[1]) * H); const dt = Math.max(1, b[3] - a[3]);
+      const v = dist / dt; ctx.lineWidth = Math.max(base * 0.25, base * 1.6 / (1 + v * 0.9));
+      ctx.beginPath(); ctx.moveTo(a[0] * W, a[1] * H); ctx.lineTo(b[0] * W, b[1] * H); ctx.stroke();
+    }
+    ctx.restore(); return;
+  }
+  ctx.lineWidth = s.tool === 'marker' ? base * 2.4 : s.tool === 'eraser' ? base * 2 : base;
+  ctx.beginPath(); ctx.moveTo(pts[0][0] * W, pts[0][1] * H);
+  if (pts.length === 1) ctx.lineTo(pts[0][0] * W + 0.1, pts[0][1] * H);
+  for (let i = 1; i < pts.length - 1; i++) { const mx = (pts[i][0] + pts[i + 1][0]) / 2, my = (pts[i][1] + pts[i + 1][1]) / 2; ctx.quadraticCurveTo(pts[i][0] * W, pts[i][1] * H, mx * W, my * H); }
+  if (pts.length > 1) { const l = pts[pts.length - 1]; ctx.lineTo(l[0] * W, l[1] * H); }
+  ctx.stroke(); if (s.tool === 'glow') { ctx.shadowBlur = 0; ctx.globalAlpha = 0.9; ctx.strokeStyle = '#fff'; ctx.lineWidth = base * 0.35; ctx.stroke(); }
+  ctx.restore();
+}
+async function enterDraw() {
+  DE.draw = true; deSelect(null); DE.strokes = []; DE.dirtyDraw = false;
+  $('#deBrush').hidden = false; $('#deBar').hidden = true; $('#dePage').classList.add('drawing');
+  await ui.deLoadBase(); ui.deRedraw();
+  const dw = $('#dePage .d-draw-wrap'); if (dw) dw.style.visibility = 'hidden';
+  paintDot();
+}
+async function exitDraw(saveIt) {
+  const cv = $('#deCanvas');
+  if (saveIt && DE.dirtyDraw && cv) {
+    const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+    const empty = !DE.base && DE.strokes.every((s) => s.tool === 'eraser');
+    if (blob && !empty) {
+      const id = DE.target.drawing || ('d' + uid()); PH.urls.delete(id + ':full'); PH.urls.delete(id + ':thumb');
+      await phPut({ id, full: blob, thumb: blob, isDrawing: true, created: Date.now() }); DE.target.drawing = id; deTouch();
+    }
+  }
+  DE.draw = false; DE.strokes = []; const ctx = cv && cv.getContext('2d'); if (ctx) ctx.clearRect(0, 0, cv.width, cv.height);
+  $('#deBrush').hidden = true; $('#deBar').hidden = false; $('#dePage').classList.remove('drawing');
+  deRerenderPage();
+}
+function paintDot() { const d = $('#deDot'); if (d) { const px = Math.max(3, DE.size * ($('#dePage').getBoundingClientRect().width / 360)); d.style.width = d.style.height = px + 'px'; d.style.background = DE.tool === 'eraser' ? 'var(--ink-3)' : DE.color; } }
+function bindEditorBar() {
+  const root = $('.deditor'); if (!root) return;
+  root.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-de]'); if (b) {
+      const a = b.dataset.de; const it = DE.sel && DE.target.items.find((x) => x.id === DE.sel);
+      if (a === 'text') textSheet(); else if (a === 'stickers') stickerSheet(); else if (a === 'draw') enterDraw(); else if (a === 'paper') paperSheet(); else if (a === 'cover-style') coverSheet();
+      else if (it) {
+        if (a === 'smaller') it.w = Math.max(6, it.w * 0.85); if (a === 'bigger') it.w = Math.min(140, it.w * 1.15);
+        if (a === 'rotl') it.rot = (it.rot || 0) - 10; if (a === 'rotr') it.rot = (it.rot || 0) + 10;
+        if (a === 'front') it.z = DE.target.items.reduce((m, x) => Math.max(m, x.z || 1), 0) + 1;
+        if (a === 'gallery') { saveToGallery([it.ref]); return; }
+        if (a === 'del') { const t = DE.target; const idx = t.items.indexOf(it); t.items.splice(idx, 1); deTouch(); deSelect(null); deRerenderPage(); toast('Удалено со страницы', () => { t.items.splice(idx, 0, it); deTouch(); deRerenderPage(); }); pendingFinal = (it.kind === 'photo' || it.kind === 'video') ? () => phDel(it.ref) : null; return; }
+        deTouch(); deRerenderPage();
+      }
+      return;
+    }
+    const tl = e.target.closest('[data-tool]'); if (tl) { DE.tool = tl.dataset.tool; $$('.de-tool', root).forEach((x) => x.classList.toggle('on', x === tl)); paintDot(); return; }
+    const sw = e.target.closest('[data-color]'); if (sw) { DE.color = sw.dataset.color; $$('.de-colors .swatch', root).forEach((x) => x.classList.toggle('on', x === sw)); if (DE.tool === 'eraser') { DE.tool = 'pen'; $$('.de-tool', root).forEach((x) => x.classList.toggle('on', x.dataset.tool === 'pen')); } paintDot(); return; }
+    if (e.target.id === 'deUndo') { DE.strokes.pop(); ui.deRedraw(); return; }
+    if (e.target.id === 'deClear') { DE.base = null; DE.strokes = []; DE.dirtyDraw = true; ui.deRedraw(); if (DE.target.drawing) { const old = DE.target.drawing; DE.target.drawing = null; phDel(old); deTouch(); } return; }
+    if (e.target.id === 'deDrawDone') { exitDraw(true); }
+  });
+  $('#deSize', root).addEventListener('input', (e) => { DE.size = +e.target.value; paintDot(); });
+  $('#deFile', root).addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = ''; if (!files.length) return;
+    toast(files.length > 1 ? `Добавляю ${files.length}…` : 'Добавляю…');
+    for (const f of files) {
+      try {
+        if (/^video\//.test(f.type) || /\.(mov|mp4|m4v)$/i.test(f.name)) { const id = await addVideoFile(f); deAddItem({ kind: 'video', ref: id, w: 52 }); }
+        else { const [id] = await addPhotos([f]); if (id) deAddItem({ kind: 'photo', ref: id, w: 48 }); }
+      } catch (err) { toast('Не получилось добавить файл: не хватает памяти или формат не подходит'); }
+    }
+  });
+}
+function textSheet() {
+  const p = DE.target;
+  openSheet('Текст страницы', `<form id="f" class="form">
+    <label class="field"><span>Дата</span><input type="date" id="dtDate" value="${p.date}"></label>
+    <input type="text" id="dtTitle" value="${esc(p.title)}" placeholder="Заголовок, например «Поездка в Холдоми»" maxlength="80">
+    <textarea id="dtText" placeholder="Что сегодня случилось? Что почувствовали, что хочется запомнить…" style="min-height:220px">${esc(p.text)}</textarea>
+    <div class="sticky-save"><button class="btn primary" type="submit">Готово</button></div></form>`, (body) => {
+    $('#f', body).addEventListener('submit', (e) => { e.preventDefault(); p.date = $('#dtDate', body).value || p.date; p.title = $('#dtTitle', body).value.trim(); p.text = $('#dtText', body).value.replace(/\s+$/, ''); deTouch(); closeSheet(); deRerenderPage(); });
+    setTimeout(() => { const t = $('#dtText', body); if (t && !p.text) t.focus(); }, 320);
+  });
+}
+function stickerSheet() {
+  openSheet('Стикеры', `<div class="form">
+    <div class="field"><span>Надписи</span><div class="lbl-grid">${D_LABELS.map(([t, c]) => `<button type="button" class="dlbl" style="--c:${c}" data-lbl="${esc(t)}" data-c="${c}">${esc(t)}</button>`).join('')}</div></div>
+    ${D_STICKERS.map(([g, list]) => `<div class="field"><span>${g}</span><div class="stk-grid">${list.split(' ').map((e) => `<button type="button" data-stk="${e}">${e}</button>`).join('')}</div></div>`).join('')}
+  </div>`, (body) => {
+    body.addEventListener('click', (e) => {
+      const s = e.target.closest('[data-stk]'); if (s) { closeSheet(); deAddItem({ kind: 'sticker', e: s.dataset.stk, w: 16 }); return; }
+      const l = e.target.closest('[data-lbl]'); if (l) { closeSheet(); deAddItem({ kind: 'label', text: l.dataset.lbl, c: l.dataset.c, w: 34 }); }
+    });
+  });
+}
+function paperSheet() {
+  const p = DE.target;
+  openSheet('Бумага', `<div class="form">
+    <div class="paper-pick">${D_PAPERS.map(([k, n]) => `<button type="button" class="pp ${p.paper === k ? 'on' : ''}" data-paper="${k}"><span class="dpage paper-${k}" style="${paperStyle(p)}"></span>${n}</button>`).join('')}</div>
+    <div class="field"><span>Цвет листа</span><div class="swatches">${D_PAPER_TONES.map(([c, n]) => `<button type="button" class="swatch ${(p.tone || '#FFFDF7') === c ? 'on' : ''}" data-tone="${c}" style="background:${c}" aria-label="${n}"></button>`).join('')}</div></div>
+  </div>`, (body) => {
+    body.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-paper]'); if (a) { p.paper = a.dataset.paper; $$('.pp', body).forEach((x) => x.classList.toggle('on', x === a)); deTouch(); deRerenderPage(); return; }
+      const t = e.target.closest('[data-tone]'); if (t) { p.tone = t.dataset.tone; $$('[data-tone]', body).forEach((x) => x.classList.toggle('on', x === t)); $$('.pp .dpage', body).forEach((x) => { x.setAttribute('style', paperStyle(p)); }); deTouch(); deRerenderPage(); }
+    });
+  });
+}
+function coverSheet() {
+  const c = DE.target;
+  openSheet('Обложка', `<div class="form">
+    <label class="field"><span>Название</span><input type="text" id="cvTitle" value="${esc(c.title)}" maxlength="40"></label>
+    <div class="field"><span>Шрифт названия</span><div class="seg" id="cvFont"><button type="button" data-v="display" class="${c.font !== 'hand' ? 'on' : ''}">Строгий</button><button type="button" data-v="hand" class="${c.font === 'hand' ? 'on' : ''}" style="font-family:var(--font-hand);font-size:19px">От руки</button></div></div>
+    <div class="field"><span>Цвет названия</span><div class="swatches" id="cvTc">${['#FFFFFF', '#1F2328', '#E8C66A', '#F4B6C2'].map((x) => `<button type="button" class="swatch ${c.titleColor === x ? 'on' : ''}" data-tc="${x}" style="background:${x}" aria-label="Цвет"></button>`).join('')}</div></div>
+    <div class="field"><span>Цвет обложки</span><div class="swatches" id="cvColor">${D_COVERS.map(([x, n]) => `<button type="button" class="swatch ${c.color === x ? 'on' : ''}" data-cv="${x}" style="background:${x}" aria-label="${n}"></button>`).join('')}</div></div>
+    <div class="field"><span>Фактура</span><div class="seg" id="cvTex">${D_TEXTURES.map(([k, n]) => `<button type="button" data-v="${k}" class="${(c.texture || 'leather') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+    <p class="note-small" style="margin:0">Порисовать и наклеить стикеры можно кнопками внизу редактора.</p></div>`, (body) => {
+    $('#cvTitle', body).addEventListener('input', (e) => { c.title = e.target.value; deTouch(); deRerenderPage(); });
+    body.addEventListener('click', (e) => {
+      const f = e.target.closest('#cvFont [data-v]'); if (f) { c.font = f.dataset.v; $$('#cvFont button', body).forEach((x) => x.classList.toggle('on', x === f)); }
+      const tc = e.target.closest('[data-tc]'); if (tc) { c.titleColor = tc.dataset.tc; $$('[data-tc]', body).forEach((x) => x.classList.toggle('on', x === tc)); }
+      const cv = e.target.closest('[data-cv]'); if (cv) { c.color = cv.dataset.cv; $$('[data-cv]', body).forEach((x) => x.classList.toggle('on', x === cv)); }
+      const tx = e.target.closest('#cvTex [data-v]'); if (tx) { c.texture = tx.dataset.v; $$('#cvTex button', body).forEach((x) => x.classList.toggle('on', x === tx)); }
+      if (f || tc || cv || tx) { deTouch(); deRerenderPage(); }
+    });
+  });
+}
+function pageMenuSheet() {
+  const p = DE.target; const idx = dPages().indexOf(p);
+  openSheet('Страница', `<div class="form">
+    <button class="btn" type="button" id="pmGal">${I.down}Фото и видео страницы в галерею</button>
+    <button class="btn danger" type="button" id="pmDel">${I.trash}Удалить страницу</button></div>`, (body) => {
+    $('#pmGal', body).onclick = () => saveToGallery(pageMedia(p), 'Страница дневника');
+    $('#pmDel', body).onclick = () => {
+      closeSheet(); ui.stack = []; ui.dIdx = Math.max(-1, Math.min(idx, dPages().length - 2));
+      removeWithUndo('Страница удалена', () => S.diary.pages.splice(idx, 1), () => { S.diary.pages.splice(idx, 0, p); ui.dIdx = idx; }, () => { pageMedia(p).forEach(phDel); if (p.drawing) phDel(p.drawing); });
+    };
+  });
+}
+ACT['d-new'] = () => { const p = newPage(); if (ui.tab !== 'diary') { ui.tab = 'diary'; ui.stack = []; } openEditor('page', p); };
+ACT['d-edit'] = () => { const p = dPages()[dIdx()]; if (p) openEditor('page', p); };
+ACT['d-cover'] = () => openEditor('cover', S.diary.cover);
+ACT['d-flip'] = (el) => { if (ui.dFlip) ui.dFlip(+el.dataset.dir); };
+ACT['d-pages'] = () => pagesSheet();
+ACT['d-save-media'] = () => { const p = dPages()[dIdx()]; if (p) saveToGallery(pageMedia(p), 'Страница дневника'); };
+ACT['d-page-menu'] = () => pageMenuSheet();
+
+/* ================= Уведомления =================
+   Без своего сервера iPhone даёт три надёжных пути:
+   1) «Напоминания» iPhone через Быструю команду «Life» — полноценные системные уведомления, виджет «Напоминания»;
+   2) «Календарь» — событие с сигналом из файла .ics;
+   3) цифра на иконке Life — сколько дел на сегодня. */
+const SIG = { none: 'Нет', reminders: 'Напоминания iPhone', calendar: 'Календарь' };
+const sigMethod = () => S.settings.notifyMethod || 'calendar';
+function fmtShortcutDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function sendToReminders(r) {
+  const payload = { title: r.title, date: fmtShortcutDate(new Date(r.at)), notes: r.note || '', list: 'Life' };
+  const url = 'shortcuts://run-shortcut?name=' + encodeURIComponent(S.settings.shortcutName || 'Life') + '&input=text&text=' + encodeURIComponent(JSON.stringify(payload));
+  r.iosSent = true; save();
+  try { sessionStorage.setItem('life.lastShortcut', url); } catch (e) { /* без истории */ }
+  location.href = url;
+}
+function sendSignal(r, method) {
+  if (!r || method === 'none') return;
+  if (method === 'reminders') sendToReminders(r); else { addToCalendar(r); r.calExported = true; save(); }
+}
+/* Все будущие напоминания и планы со временем одним файлом в Календарь */
+function exportAllToCalendar() {
+  const now = new Date(); const until = addDays(now, 60);
+  const rems = S.reminders.filter((r) => !r.done && !r.calExported && new Date(r.at) > now);
+  const plans = S.plans.filter((p) => !p.done && p.date && p.time && !p.calExported && toDate(p.date) <= until && new Date(p.date + 'T' + p.time) > now)
+    .map((p) => ({ id: 'p' + p.id, title: p.title, note: p.note, at: new Date(p.date + 'T' + p.time).toISOString(), repeat: 'none', _p: p }));
+  const all = rems.concat(plans);
+  if (!all.length) { toast('Новых напоминаний для Календаря нет'); return; }
+  const stamp = (() => { const n = new Date(); return `${n.getUTCFullYear()}${pad(n.getUTCMonth() + 1)}${pad(n.getUTCDate())}T${pad(n.getUTCHours())}${pad(n.getUTCMinutes())}00Z`; })();
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Life//RU', 'CALSCALE:GREGORIAN'];
+  all.forEach((r) => {
+    const d = new Date(r.at); const end = new Date(d.getTime() + 15 * 60000); const rr = { day: 'DAILY', week: 'WEEKLY', month: 'MONTHLY', year: 'YEARLY' }[r.repeat];
+    lines.push('BEGIN:VEVENT', `UID:${r.id}@life`, `DTSTAMP:${stamp}`, `DTSTART:${icsDate(d)}`, `DTEND:${icsDate(end)}`, `SUMMARY:${icsText(r.title)}`);
+    if (r.note) lines.push(`DESCRIPTION:${icsText(r.note)}`); if (rr) lines.push(`RRULE:FREQ=${rr}`);
+    lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsText(r.title)}`, 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' }); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; if (!isIOS()) a.download = 'life-напоминания.ics'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  rems.forEach((r) => { r.calExported = true; }); plans.forEach((x) => { x._p.calExported = true; }); save();
+  toast(`В Календарь: ${all.length}. Нажмите «Добавить все»`);
+}
+/* Цифра на иконке */
+function badgeCount() {
+  const t = todayISO(); const end = new Date(); end.setHours(23, 59, 59, 999);
+  return S.reminders.filter((r) => !r.done && new Date(r.at) <= end).length + S.plans.filter((p) => !p.done && p.date === t).length;
+}
+let badgeT;
+function updateBadge() {
+  clearTimeout(badgeT);
+  badgeT = setTimeout(() => {
+    try {
+      if (!('setAppBadge' in navigator)) return;
+      const n = S.settings.badge === false ? 0 : badgeCount();
+      if (n) navigator.setAppBadge(n).catch(() => {}); else navigator.clearAppBadge().catch(() => {});
+    } catch (e) { /* значки не поддерживаются */ }
+  }, 300);
+}
+DETAIL.notifcfg = function () {
+  const st = S.settings; const perm = notifState(); const badgeOk = 'setAppBadge' in navigator;
+  return `<div class="detail-top">${backBtn('Настройки')}</div>${head('Уведомления', '', '')}
+    <div class="card"><h2>Как приходят сигналы</h2>
+      <div class="seg col3" id="sigSeg">${Object.entries(SIG).map(([k, v]) => `<button data-set="notifyMethod" data-v="${k}" class="${sigMethod() === k ? 'on' : ''}">${v}</button>`).join('')}</div>
+      <p class="note-small" style="margin:10px 0 0;padding:0">${sigMethod() === 'reminders' ? 'Каждое новое напоминание Life сразу отправит в приложение «Напоминания». Уведомление придёт как обычно на iPhone: на заблокированный экран, со звуком и на часы. Нужна быстрая команда «Life», инструкция ниже.' : sigMethod() === 'calendar' ? 'Life создаст событие с сигналом. iPhone покажет окно «Добавить в Календарь», нажмите «Добавить».' : 'Сигналы только внутри Life, пока он открыт.'}</p></div>
+    <div class="card shortcut-guide"><h2>Напоминания iPhone: настройка один раз</h2>
+      <ol class="steps">
+        <li><b>Откройте приложение «Команды»</b>Нажмите «+» справа вверху.</li>
+        <li><b>Назовите команду ${esc(st.shortcutName || 'Life')}</b>Нажмите на название вверху → «Переименовать».</li>
+        <li><b>Добавьте действие «Получить словарь из входных данных»</b>Проще всего: в поиске действий напишите «словарь». Если в поле стоит не «Входные данные команды», нажмите на него и выберите их.</li>
+        <li><b>Добавьте «Получить значение словаря»</b>В поле ключа напишите <code>title</code>.</li>
+        <li><b>Ещё раз добавьте «Получить значение словаря»</b>Ключ <code>date</code>. Словарь в обоих действиях — «Словарь» из шага 3.</li>
+        <li><b>Добавьте «Добавить новое напоминание»</b>В текст подставьте первое «Значение словаря». Раскройте стрелкой, включите «Напомнить» → «В дату и время» и выберите второе «Значение словаря».</li>
+        <li><b>Нажмите «Готово»</b>Вернитесь в Life и нажмите кнопку проверки ниже.</li>
+      </ol>
+      <div class="btn-row"><button class="btn primary" data-act="sig-test">Проверить: напоминание через 2 минуты</button></div>
+      <p class="note-small" style="margin:8px 0 0;padding:0">Если после проверки в «Напоминаниях» появилась запись «Проверка Life», всё работает. Добавьте на рабочий стол виджет «Напоминания»: в нём будут видны дела из Life.</p></div>
+    <div class="list">
+      <div class="row big"><span class="sec-ic">${I.bell}</span><span class="grow"><span class="t">Уведомления внутри Life</span><span class="m">${perm === 'granted' ? 'Разрешены' : perm === 'denied' ? 'Запрещены в настройках iPhone' : perm === 'unsupported' ? 'Работают после установки на экран «Домой»' : 'Ещё не разрешены'}</span></span>${perm === 'default' ? '<button class="btn sm primary" data-act="notif-on">Разрешить</button>' : ''}</div>
+      <div class="row big"><span class="sec-ic">${I.widgets}</span><span class="grow"><span class="t">Цифра на иконке Life</span><span class="m">${badgeOk ? `Дел на сегодня: ${badgeCount()}` : 'Работает в установленном Life после разрешения уведомлений'}</span></span><label class="switch"><input type="checkbox" id="badgeSw" ${st.badge !== false ? 'checked' : ''}><i></i></label></div>
+      <button class="row big" data-act="cal-all"><span class="sec-ic">${I.cal}</span><span class="grow"><span class="t">Все напоминания в Календарь</span><span class="m">Одним файлом: напоминания и планы со временем на 2 месяца вперёд</span></span><span class="chev">${I.right}</span></button>
+    </div>
+    <p class="note-small">Пуш-уведомления прямо от Life при закрытом приложении требуют своего сервера. Это следующий шаг: его можно поднять бесплатно.</p>`;
+};
+ACT['settings-notif'] = () => push({ type: 'notifcfg' });
+ACT['sig-test'] = () => { const r = { id: uid(), title: 'Проверка Life', note: 'Если вы это видите, напоминания работают', at: new Date(Date.now() + 120000).toISOString(), repeat: 'none' }; sendToReminders(r); };
+ACT['cal-all'] = () => exportAllToCalendar();
+
 /* ================= Настройки ================= */
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const isStandalone = () => window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
@@ -2883,6 +3822,7 @@ DETAIL.settings = function () {
     <div class="list">
       <button class="row big" data-act="settings-sections"><span class="sec-ic">${I.more}</span><span class="grow"><span class="t">Разделы и функции</span><span class="m">${on.length ? on.join(', ') : 'все выключены'}</span></span><span class="chev">${I.right}</span></button>
       <button class="row big" data-act="settings-home"><span class="sec-ic">${I.home}</span><span class="grow"><span class="t">Главный экран</span><span class="m">Быстрые кнопки и виджеты</span></span><span class="chev">${I.right}</span></button>
+      <button class="row big" data-act="settings-notif"><span class="sec-ic">${I.bell}</span><span class="grow"><span class="t">Уведомления</span><span class="m">${SIG[sigMethod()]}${'setAppBadge' in navigator && st.badge !== false ? ', цифра на иконке' : ''}</span></span><span class="chev">${I.right}</span></button>
       <button class="row big" data-act="settings-lock"><span class="sec-ic">${I.lock}</span><span class="grow"><span class="t">Код-пароль</span><span class="m">${st.pin ? 'Включён' : 'Выключен'}</span></span><span class="chev">${I.right}</span></button>
       <button class="row big" data-act="install-help"><span class="sec-ic">${I.down}</span><span class="grow"><span class="t">Установить на экран «Домой»</span><span class="m">${isStandalone() ? 'Life уже установлен' : 'Пошаговая инструкция для iPhone'}</span></span><span class="chev">${I.right}</span></button>
     </div>
@@ -2894,7 +3834,7 @@ DETAIL.settings = function () {
       <p class="note-small" style="margin:0">Выберите вариант до того, как добавите Life на экран «Домой». Чтобы сменить потом, удалите значок и добавьте заново, данные останутся.</p></div>
     <div class="field"><span>Резервная копия</span><div class="btn-row"><button type="button" class="btn sm" data-act="export">Сохранить копию</button><button type="button" class="btn sm" data-act="import">Восстановить</button></div>
       <input type="file" id="impFile" accept="application/json,.json" hidden>
-      <p class="note-small" style="margin:0">Данные и фото хранятся только на этом телефоне. Сохраняйте копию в «Файлы» хотя бы раз в месяц.</p></div>
+      <p class="note-small" style="margin:0">Данные и фото хранятся только на этом телефоне. Сохраняйте копию в «Файлы» хотя бы раз в месяц. Видео из дневника в копию не входят: сохраните их в галерею кнопкой в дневнике.</p></div>
     <div class="field"><span>Сброс</span><button class="btn danger" type="button" data-act="ask-del">Стереть данные</button>
       <div class="confirm" id="delBox" hidden><p>Что стереть? Восстановить можно только из резервной копии.</p>
         <button type="button" class="btn sm danger" data-act="wipe" data-keep="1">Записи и фото, машину и объекты оставить</button>
@@ -2957,7 +3897,7 @@ function installSheet() {
 const blobToDataURL = (b) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(b); });
 async function exportData() {
   save(); toast('Готовлю копию…');
-  const photos = {}; try { (await phAll() || []).forEach((p) => { photos[p.id] = p.full; }); } catch (e) { /* без фото */ }
+  const photos = {}; let skipped = 0; try { (await phAll() || []).forEach((p) => { if (p.video) { skipped++; return; } if (p.full) photos[p.id] = p.full; }); } catch (e) { /* без фото */ }
   const out = { life: S, photos: {} };
   for (const [id, b] of Object.entries(photos)) { const u = await blobToDataURL(b); if (u) out.photos[id] = u; }
   const name = `life-копия-${todayISO()}.json`;
@@ -3055,6 +3995,8 @@ document.addEventListener('click', (e) => {
     if (k === 'accent' || k === 'icon') { applyIcon(); ui.iconUrls = null; }
     render(); return;
   }
+  if (ui.suppressClick && Date.now() < ui.suppressClick) { e.preventDefault(); e.stopPropagation(); return; }
+  if (ui.homeEdit && e.target.closest('#wgrid .wg') && !e.target.closest('.wg-x, .wg-sz')) { e.preventDefault(); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
   if (el.closest('#sheetBody') && el.closest('form') && el.tagName === 'BUTTON' && el.type === 'submit') return;
   const fn = ACT[el.dataset.act]; if (!fn) return;
@@ -3069,6 +4011,7 @@ document.addEventListener('change', (e) => {
   if (t.matches('[data-feat-toggle]')) { S.settings.features[t.dataset.featToggle] = t.checked; save(); render(); return; }
   if (t.matches('[data-wid]')) { const w = S.settings.widgets.find((x) => x.id === t.dataset.wid); if (w) { w.on = t.checked; save(); render(); } return; }
   if (t.id === 'impFile') { importData(t.files[0]); t.value = ''; return; }
+  if (t.id === 'badgeSw') { S.settings.badge = t.checked; save(); render(); return; }
   if (t.id === 'remCtr') { ui.remContractor = t.value; refreshRemList(); }
 });
 document.addEventListener('input', (e) => {
@@ -3076,6 +4019,7 @@ document.addEventListener('input', (e) => {
   if (t.id === 'noteSearch') { ui.noteQuery = t.value; renderNoteList(); }
   else if (t.id === 'remSearch') { ui.remQuery = t.value; refreshRemList(); }
   else if (t.id === 'setName') { S.settings.name = t.value.trim(); save(); }
+  else if (t.id === 'libq') { ui.libQ = t.value; drawLib(); }
   else if (t.matches('[data-sv]') && S.workoutActive) { const it = S.workoutActive.items[+t.dataset.i]; const v = num(t.value); if (it && v != null) { it.sets[+t.dataset.j][t.dataset.f] = Math.max(0, v); save(); } }
 });
 document.addEventListener('submit', (e) => {
@@ -3093,7 +4037,7 @@ document.addEventListener('keydown', (e) => {
 (() => {
   let sx = null, sy = 0, dx = 0, active = false, v = null;
   document.addEventListener('touchstart', (e) => {
-    if (sheetOpen || lockShown() || viewerOpen() || !ui.stack.length) return;
+    if (sheetOpen || lockShown() || viewerOpen() || !ui.stack.length || (typeof DE !== 'undefined' && DE.draw) || ui.stack[ui.stack.length - 1].type === 'deditor') return;
     const t = e.touches[0]; if (t.clientX > 30) return;
     sx = t.clientX; sy = t.clientY; dx = 0; active = false; v = $('#view .view');
   }, { passive: true });
@@ -3152,7 +4096,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { save(); LK.hiddenAt = Date.now(); if (S.settings.pin && S.settings.lockAfter === 0 && !lockShown()) showLock('unlock'); }
   else {
     if (S.settings.pin && !lockShown() && LK.hiddenAt && Date.now() - LK.hiddenAt > S.settings.lockAfter * 60000) showLock('unlock');
-    checkDue(); const added = runRecurring();
+    checkDue(); updateBadge(); const added = runRecurring();
     if (!sheetOpen && (added || Date.now() - lastVisible > 60000)) render();
     lastVisible = Date.now();
   }
@@ -3163,6 +4107,7 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
 /* ================= Запуск ================= */
 function start() {
   S = load();
+  document.body.insertAdjacentHTML('afterbegin', muscleSprite());
   $('#sheetClose').innerHTML = I.close; $('#sheetBack').innerHTML = I.back; $('#sheetDel').innerHTML = I.trash;
   $('#vwClose').innerHTML = I.close; $('#vwPrev').innerHTML = I.left; $('#vwNext').innerHTML = I.right;
   $('#keypad').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map((k) => k === '' ? '<span></span>' : `<button type="button" data-k="${k}" aria-label="${k === 'del' ? 'Стереть' : k}">${k === 'del' ? I.left : k}</button>`).join('');
