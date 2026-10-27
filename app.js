@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.5';
+const LIFE_VERSION = '1.6';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -168,7 +168,7 @@ function seed() {
       features: { income: true, recurring: true, piggy: true, fuel: true, photos: true },
       quick: ['add-food', 'start-workout', 'new-exp', 'new-plan', 'new-note'],
       widgets: ['quick', 'today', 'next', 'plans', 'water', 'food', 'streak', 'money', 'reminders', 'week', 'memory', 'expenses', 'car', 'bank', 'notes', 'objects', 'sport'].map((id) => ({ id, on: id !== 'sport', size: id === 'food' ? 's' : undefined })),
-      planZoom: 1, notifyMethod: 'calendar', badge: true,
+      planFilter: 'all', notifyMethod: 'calendar', badge: true,
       pin: null, lockAfter: 1, onboarded: false
     },
     notes: [], reminders: [], plans: [], expenses: [], incomes: [], recurring: [], customCats: [], goals: [],
@@ -451,6 +451,8 @@ function currentHTML() {
 function render(anim) {
   ui.mounts = [];
   const el = $('#view');
+  const top = ui.stack[ui.stack.length - 1]; const ed = !!(top && top.type === 'deditor');
+  const root = document.documentElement; root.classList.toggle('fixed-screen', ed || (!top && ui.tab === 'diary')); root.classList.toggle('editor-screen', ed);
   el.innerHTML = `<div class="view ${anim || ''}">${currentHTML()}</div>`;
   renderTabbar();
   hydratePhotos(el);
@@ -1517,30 +1519,42 @@ function planRow(p) {
     <span class="dot cat-${p.cat}"></span>
     <span class="grow"><span class="t">${esc(p.title)}${p.example ? '<span class="tag-ex">пример</span>' : ''}</span>${meta ? `<span class="m">${meta}</span>` : ''}</span></div>`;
 }
-const ZOOM_HINT = ['', 'Сведите или разведите пальцы, чтобы увидеть планы внутри пузырей', 'Разведите пальцы ещё, чтобы видеть все планы', 'Сведите пальцы, чтобы увидеть весь месяц'];
+const PLAN_FILTERS = { all: 'Все', free: 'Свободные', busy: 'С планами' };
 RENDER.plans = function () {
   const m = planMonth(); const mk = monthKey(m); const isCur = mk === todayISO().slice(0, 7);
   const all = S.plans.filter((p) => p.month === mk);
   const done = all.filter((p) => p.done).length;
   const goals = all.filter((p) => !p.date);
   const days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
-  const z = S.settings.planZoom || 1;
-  let html = head('Планы', '', plusBtn('new-plan', 'Новый план', `data-date="${isCur ? todayISO() : mk + '-01'}"`));
-  html += `<div class="month-nav"><button class="icon-btn" data-act="plan-month" data-dir="-1" aria-label="Предыдущий месяц">${I.left}</button><b>${monthTitle(m)}</b><button class="icon-btn" data-act="plan-month" data-dir="1" aria-label="Следующий месяц">${I.right}</button></div>`;
-  html += `<div class="bubbles-card"><div class="zoom-bar"><span class="zoom-hint">${ZOOM_HINT[z]}</span><div class="zoom-btns"><button class="icon-btn" data-act="plan-zoom" data-d="-1" aria-label="Отдалить" ${z <= 1 ? 'disabled' : ''}>${I.minus}</button><button class="icon-btn" data-act="plan-zoom" data-d="1" aria-label="Приблизить" ${z >= 3 ? 'disabled' : ''}>${I.plus}</button></div></div>
-    <div class="bubbles z${z}" id="bubbleStage" aria-label="Дни месяца"><div class="bub-layer" id="bubLayer">`;
+  const f = PLAN_FILTERS[S.settings.planFilter] ? S.settings.planFilter : 'all';
+  const counts = { all: days, free: 0, busy: 0 };
+  // Раскладка считается сразу, чтобы страница открывалась за один проход вёрстки
+  const W = bubW(); const off = (m.getDay() + 6) % 7;
+  const dayInfo = Array.from({ length: days }, (_, i) => { const iso = `${mk}-${pad(i + 1)}`; return { n: all.filter((p) => p.date === iso).length, today: iso === todayISO() }; });
+  const geo = bubGeo(W, off, dayInfo, goals.length);
+  const pv = ui.planView; const view = { k: 1, tx: 0, ty: 0 };
+  if (pv && pv.mk === mk && Math.abs(pv.W - W) < 2) { Object.assign(view, { W, H: geo.H, k: pv.k, tx: pv.tx, ty: pv.ty }); clampView(view); }
+  let bubs = '';
   for (let d = 1; d <= days; d++) {
     const iso = `${mk}-${pad(d)}`; const ps = all.filter((p) => p.date === iso).sort((a, b) => (a.time || '99').localeCompare(b.time || '99')); const dt = new Date(m.getFullYear(), m.getMonth(), d);
-    const isToday = iso === todayISO(); const past = dayDiff(dt, new Date()) < 0;
-    const allDone = ps.length && ps.every((p) => p.done);
-    const cls = ['bub', isToday && 'today', ps.length && 'has', allDone && 'all-done', past && !isToday && 'past', (dt.getDay() === 0 || dt.getDay() === 6) && 'wkend'].filter(Boolean).join(' ');
-    const inner = z === 1 || !ps.length
-      ? `<b>${d}</b><small>${WD_SHORT[dt.getDay()]}</small>${ps.length ? `<span class="bub-dots">${ps.slice(0, 4).map((p) => `<i class="${p.done ? 'd' : ''}"></i>`).join('')}</span>` : ''}`
-      : `<span class="bub-h"><b>${d}</b><small>${WD_SHORT[dt.getDay()]}</small></span><span class="bub-list">${(z === 2 ? ps.slice(0, 3) : ps).map((p) => `<span class="bp ${p.done ? 'd' : ''}"><i class="dot cat-${p.cat}"></i>${p.time ? `<em>${p.time}</em> ` : ''}${esc(p.title)}</span>`).join('')}${z === 2 && ps.length > 3 ? `<span class="bp more">ещё ${ps.length - 3}</span>` : ''}</span>`;
-    html += `<button class="${cls}" data-act="plan-day" data-day="${iso}" data-n="${ps.length}" aria-label="${d} ${MONTH_GEN[m.getMonth()]}, планов: ${ps.length}${ps.length ? ': ' + esc(ps.map((p) => p.title).join(', ')) : ''}"><span class="bub-in"><span class="bub-c">${inner}</span></span></button>`;
+    const isToday = iso === todayISO(); const past = dayDiff(dt, new Date()) < 0; const wd = dt.getDay();
+    const allDone = ps.length && ps.every((p) => p.done); const free = !ps.length && (!past || isToday);
+    if (free) counts.free++; if (ps.length) counts.busy++;
+    const cls = ['bub', isToday && 'today', ps.length && 'has', allDone && 'all-done', past && !isToday && 'past', (wd === 0 || wd === 6) && 'wkend', free && 'free'].filter(Boolean).join(' ');
+    const list = ps.map((p, i) => `<span class="bp ${p.done ? 'd' : ''} ${i > 2 ? 'x' : ''}"><i class="dot cat-${p.cat}"></i>${p.time ? `<em>${p.time}</em> ` : ''}${esc(p.title)}</span>`).join('');
+    bubs += `<button class="${cls}" data-act="plan-day" data-day="${iso}" data-n="${ps.length}" data-wd="${(wd + 6) % 7}" style="${bubStyle(geo.days[d - 1], d - 1)}" aria-label="${d} ${MONTH_GEN[m.getMonth()]}, ${WD_LONG[wd]}, планов: ${ps.length}${ps.length ? ': ' + esc(ps.map((p) => p.title).join(', ')) : ''}"><span class="bub-in" style="${floatStyle(d - 1)}"><span class="bub-c"${ps.length > 3 ? ` style="--fit:${[1, 1, 1, 1, .9, .8, .72][ps.length] || .64}"` : ''}><span class="bub-t">
+      <span class="bub-h"><b>${d}</b><small>${WD_SHORT[wd]}</small></span>
+      ${ps.length ? `<span class="bub-dots">${ps.slice(0, 4).map((p) => `<i class="${p.done ? 'd' : ''}"></i>`).join('')}</span><span class="bub-list">${list}${ps.length > 3 ? `<span class="bp more">ещё ${ps.length - 3}</span>` : ''}</span>` : `<span class="bub-free">${past && !isToday ? 'прошёл' : 'свободно'}</span>`}
+    </span></span></span></button>`;
   }
-  goals.forEach((g) => { html += `<button class="bub goal ${g.done ? 'all-done' : ''}" data-act="edit-plan" data-id="${g.id}" data-goal="1"><span class="bub-in"><span class="bub-c"><span class="g-t">${esc(g.title)}</span>${g.done ? `<span class="g-ok">${I.tick}</span>` : ''}</span></span></button>`; });
-  html += `</div></div><div class="bubbles-foot"><span>${all.length ? `Выполнено ${done} из ${all.length}` : 'Планов на этот месяц нет'}</span><span>Нажмите на день</span></div>${all.length ? `<div class="bar" style="margin:0 14px 14px"><i style="width:${Math.round(done / all.length * 100)}%"></i></div>` : ''}</div>`;
+  goals.forEach((g, gi) => { bubs += `<button class="bub goal ${g.done ? 'all-done' : ''}" data-act="edit-plan" data-id="${g.id}" data-goal="1" style="${bubStyle(geo.goals[gi], 40 + gi)}"><span class="bub-in" style="${floatStyle(40 + gi)}"><span class="bub-c"><span class="bub-t"><span class="g-t">${esc(g.title)}</span>${g.done ? `<span class="g-ok">${I.tick}</span>` : ''}</span></span></span></button>`; });
+  let html = head('Планы', '', plusBtn('new-plan', 'Новый план', `data-date="${isCur ? todayISO() : mk + '-01'}"`));
+  html += `<div class="month-nav"><button class="icon-btn" data-act="plan-month" data-dir="-1" aria-label="Предыдущий месяц">${I.left}</button><b>${monthTitle(m)}</b><button class="icon-btn" data-act="plan-month" data-dir="1" aria-label="Следующий месяц">${I.right}</button></div>`;
+  html += `<div class="bubbles-card">
+    <div class="seg col3 plan-filter" role="tablist" aria-label="Какие дни показать">${Object.entries(PLAN_FILTERS).map(([k, v]) => `<button data-act="plan-filter" data-f="${k}" class="${f === k ? 'on' : ''}" role="tab" aria-selected="${f === k}">${v}<span>${counts[k]}</span></button>`).join('')}</div>
+    <div class="wd-head" id="wdHead" aria-hidden="true">${[1, 2, 3, 4, 5, 6, 0].map((w, i) => `<span class="${w === 0 || w === 6 ? 'we' : ''}" style="transform:translate3d(${((geo.pad + geo.c * (i + 0.5)) * view.k + view.tx).toFixed(1)}px, 0, 0)">${WD_SHORT[w]}</span>`).join('')}</div>
+    <div class="bubbles f-${f}${view.k > 1.01 ? ' zoomed' : ''}${view.k > 1.6 ? ' still' : ''}" id="bubbleStage" style="height:${geo.H}px" aria-label="Дни месяца"><div class="bub-layer" id="bubLayer" style="--k:${view.k.toFixed(4)};transform:translate3d(${view.tx.toFixed(2)}px, ${view.ty.toFixed(2)}px, 0)"><i class="wk-band" aria-hidden="true" style="--x:${geo.band.x};--y:${geo.band.y};--w:${geo.band.w};--h:${geo.band.h}"></i>${bubs}</div></div>
+    <div class="bubbles-foot"><span><span id="bubSum" data-c='${JSON.stringify(counts)}' data-done="${done}" data-all="${all.length}">${planSum(f, counts, done, all.length)}</span><span class="zoom-hint">${zoomHint(view.k)}</span></span><div class="zoom-btns"><button class="icon-btn" data-act="bub-zoom" data-d="-1" aria-label="Отдалить" ${view.k <= 1.001 ? 'disabled' : ''}>${I.minus}</button><button class="icon-btn" data-act="bub-zoom" data-d="1" aria-label="Приблизить" ${view.k >= BUB.kMax - 0.001 ? 'disabled' : ''}>${I.plus}</button></div></div>${all.length ? `<div class="bar" style="margin:0 14px 14px"><i style="width:${Math.round(done / all.length * 100)}%"></i></div>` : ''}</div>`;
   html += `<div class="section-label"><span>Цели на ${MONTH_NOM[m.getMonth()]}</span></div>`;
   html += goals.length ? `<div class="list">${goals.map(planRow).join('')}</div>` : '';
   html += `<button class="btn sm" data-act="new-plan" data-goal="1" style="justify-self:start">${I.plus}Цель на месяц</button>`;
@@ -1551,110 +1565,175 @@ RENDER.plans = function () {
     const byDay = {}; upcoming.forEach((p) => { (byDay[p.date] = byDay[p.date] || []).push(p); });
     Object.keys(byDay).forEach((d) => { const dt = toDate(d); html += `<div class="day-head"><button class="link" data-act="plan-day" data-day="${d}">${cap(relDay(dt))}${Math.abs(dayDiff(dt, new Date())) > 1 ? ', ' + WD_SHORT[dt.getDay()] : ''}</button></div><div class="list">${byDay[d].map(planRow).join('')}</div>`; });
   } else if (!all.length) html += `<div class="card empty"><b>Месяц пока пустой</b>Нажмите на любой пузырь-день или на «+», чтобы добавить план.</div>`;
-  ui.mounts.push(layoutBubbles);
+  ui.mounts.push(() => mountBubbles(mk, m, W, geo, view));
   return html;
 };
 
-/* Пузыри. Раскладка считается один раз, плавание делает CSS (на видеочипе, без нагрузки на телефон).
-   Зум: щипок двумя пальцами или кнопки ±, три уровня; на 2 и 3 внутри пузыря видны планы. */
-const BUB = { suppress: 0 };
+/* Пузыри-календарь. Неделя — строка, день недели — столбец, выходные подсвечены.
+   Масштаб плавный, как у карты: щипок двумя пальцами, сдвиг одним, кнопки ±.
+   Во время жеста двигается один слой (видеочип), после жеста пузыри перерисовываются в новом размере,
+   поэтому текст остаётся чётким, а содержимое пузыря подстраивается под его размер (container queries). */
+const BUB = { suppress: 0, kMax: 5 };
 const seeded = (n) => { const x = Math.sin(n * 9301 + 49297) * 233280; return x - Math.floor(x); };
-function bubRadius(el, z, W) {
-  const n = +el.dataset.n || 0;
-  if (el.dataset.goal) return z === 1 ? Math.min(W / 6 * 0.78, 50) : z === 2 ? 62 : Math.min(W / 2 - 10, 92);
-  if (z === 1) { const base = Math.min(W / 6 * 0.36, 25); return base + Math.min(n, 4) * base * 0.16 + (el.classList.contains('today') ? 3 : 0); }
-  if (z === 2) return n ? Math.min(W / 3 - 8, 50 + Math.min(n, 3) * 6) : 21 + (el.classList.contains('today') ? 3 : 0);
-  return n ? Math.min(W / 2 - 10, 70 + Math.min(n, 8) * 9) : 23 + (el.classList.contains('today') ? 3 : 0);
+const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+/* Ширина карточки известна заранее: колонка приложения минус поля экрана */
+function bubW() { const app = $('#app'); const cs = app && getComputedStyle(document.body); const padL = cs ? parseFloat(cs.paddingLeft) || 16 : 16, padR = cs ? parseFloat(cs.paddingRight) || 16 : 16; return Math.max(240, Math.min(window.innerWidth - padL - padR, 560)); }
+function bubGeo(W, off, dayInfo, goalsN) {
+  const pad = 6, top = 4; const c = (W - pad * 2) / 7; const rows = Math.ceil((off + dayInfo.length) / 7);
+  const days = dayInfo.map((di, i) => {
+    const slot = off + i, col = slot % 7, row = Math.floor(slot / 7);
+    const r = c * (di.n ? 0.43 + Math.min(di.n, 3) * 0.028 : 0.335) + (di.today ? c * 0.03 : 0);
+    const cx = pad + c * (col + 0.5) + (seeded(i + 99) - 0.5) * c * 0.08, cy = top + c * (row + 0.5) + (seeded(i + 50) - 0.5) * c * 0.08;
+    return { x: cx - r, y: cy - r, d: r * 2 };
+  });
+  let y = top + rows * c + 8; const goals = [];
+  if (goalsN) {
+    const r = Math.min(c * 0.92, 50); const per = Math.max(1, Math.floor((W - pad * 2) / (r * 2 + 8)));
+    for (let i = 0; i < goalsN; i += per) {
+      const n = Math.min(per, goalsN - i); const used = n * r * 2 + (n - 1) * 8; let x = (W - used) / 2;
+      for (let j = 0; j < n; j++) { goals.push({ x, y, d: r * 2 }); x += r * 2 + 8; }
+      y += r * 2 + 8;
+    }
+  }
+  return { W, c, pad, days, goals, H: Math.round(y + pad), band: { x: (pad + c * 5).toFixed(1), y: top - 2, w: (c * 2).toFixed(1), h: (rows * c + 4).toFixed(1) } };
 }
-function layoutBubbles() {
-  const stage = $('#bubbleStage'), layer = $('#bubLayer'); if (!stage || !layer) return;
-  const W = stage.clientWidth || 340; const z = S.settings.planZoom || 1; const pad = 8, gap = z === 1 ? 4 : 6;
-  const els = $$('.bub', layer); const rows = []; let row = [], x = pad;
-  els.forEach((el) => {
-    const r = bubRadius(el, z, W); const d = r * 2;
-    if ((row.length && x + d > W - pad) || (el.dataset.goal && row.length && !row[row.length - 1].el.dataset.goal)) { rows.push(row); row = []; x = pad; }
-    row.push({ el, r }); x += d + gap;
-  });
-  if (row.length) rows.push(row);
-  let y = pad; const reduce = reduceMotion();
-  rows.forEach((rw, ri) => {
-    const h = Math.max(...rw.map((b) => b.r * 2));
-    const used = rw.reduce((s2, b) => s2 + b.r * 2, 0) + gap * (rw.length - 1); const extra = Math.max(0, W - pad * 2 - used) / (rw.length + 1);
-    let cx = pad + extra;
-    rw.forEach((b, i) => {
-      const n = ri * 7 + i + 1; const slack = h - b.r * 2;
-      const by = y + slack / 2 + (seeded(n) - 0.5) * Math.min(slack, 18) * 0.9 + (z === 1 ? (seeded(n + 50) - 0.5) * 6 : 0);
-      const bx = cx + (z === 1 ? (seeded(n + 99) - 0.5) * Math.min(extra, 6) : 0);
-      b.el.style.width = b.el.style.height = (b.r * 2).toFixed(1) + 'px';
-      b.el.style.transform = `translate3d(${bx.toFixed(1)}px, ${by.toFixed(1)}px, 0)`;
-      b.el.dataset.x = bx.toFixed(1); b.el.dataset.y = by.toFixed(1);
-      b.el.style.setProperty('--fs', Math.round(b.r * (z === 1 ? 0.66 : 0.34) + (z === 1 ? 0 : 6)) + 'px');
-      const amp = z === 1 ? 3.5 : 2;
-      const inn = b.el.firstElementChild;
-      inn.style.setProperty('--fx', ((seeded(n + 7) - 0.5) * 2 * amp).toFixed(1) + 'px');
-      inn.style.setProperty('--fy', ((seeded(n + 13) - 0.5) * 2 * amp).toFixed(1) + 'px');
-      inn.style.setProperty('--dur', (4.5 + seeded(n + 21) * 3.5).toFixed(2) + 's');
-      inn.style.setProperty('--dl', (-seeded(n + 31) * 6).toFixed(2) + 's');
-      b.el.style.setProperty('--d', reduce ? '0ms' : Math.min(500, (ri * rw.length + i) * 14) + 'ms');
-      cx += b.r * 2 + gap + extra;
-    });
-    y += h + gap + (z === 1 ? 2 : 4);
-  });
-  stage.style.height = Math.round(y + pad) + 'px';
-  if (!stage.dataset.bound) { stage.dataset.bound = '1'; bindBubbleGestures(stage); }
+const bubStyle = (g, n) => `--x:${g.x.toFixed(1)};--y:${g.y.toFixed(1)};--d:${g.d.toFixed(1)};--dd:${reduceMotion() ? 0 : Math.min(420, n * 12)}ms`;
+const floatStyle = (n) => `--fx:${((seeded(n + 7) - 0.5) * 5).toFixed(1)}px;--fy:${((seeded(n + 13) - 0.5) * 5).toFixed(1)}px;--dur:${(4.5 + seeded(n + 21) * 3.5).toFixed(2)}s;--dl:${(-seeded(n + 31) * 6).toFixed(2)}s`;
+const zoomHint = (k) => k > 1.01 ? 'Двигайте одним пальцем, сведите — весь месяц' : 'Разведите пальцы, чтобы приблизить';
+function mountBubbles(mk, m, W, geo, view) {
+  const stage = $('#bubbleStage'), layer = $('#bubLayer'), headEl = $('#wdHead'); if (!stage || !layer) return;
+  const V = { stage, layer, headEl, W, H: geo.H, c: geo.c, pad: geo.pad, k: view.k, kc: view.k, tx: view.tx, ty: view.ty, anim: 0 };
+  const real = stage.clientWidth;
+  if (real && Math.abs(real - W) > 1) { // редкий случай: ширина другая (поворот экрана, вырез)
+    const g2 = bubGeo(real, (m.getDay() + 6) % 7, geo.days.map((_, i) => { const el = $(`.bub[data-day="${mk}-${pad(i + 1)}"]`); return { n: +(el && el.dataset.n) || 0, today: !!(el && el.classList.contains('today')) }; }), geo.goals.length);
+    const els = $$('.bub', layer); const dEls = els.filter((e) => !e.dataset.goal), gEls = els.filter((e) => e.dataset.goal);
+    dEls.forEach((el, i) => { el.style.cssText = bubStyle(g2.days[i], i); }); gEls.forEach((el, i) => { el.style.cssText = bubStyle(g2.goals[i], 40 + i); });
+    stage.style.height = g2.H + 'px'; $('.wk-band', layer).style.cssText = `--x:${g2.band.x};--y:${g2.band.y};--w:${g2.band.w};--h:${g2.band.h}`;
+    Object.assign(V, { W: real, H: g2.H, c: g2.c, k: 1, kc: 1, tx: 0, ty: 0 }); commitView(V);
+  } else ui.planView = { mk, k: V.k, tx: V.tx, ty: V.ty, W: V.W };
+  stage._v = V;
+  bindBubbleGestures(V, mk);
   requestAnimationFrame(() => stage.classList.add('ready'));
 }
-function setPlanZoom(z, anchor) {
-  z = Math.max(1, Math.min(3, z)); const old = S.settings.planZoom || 1; if (z === old) return false;
-  let anchorDay = null, anchorTop = 0;
-  if (anchor) { const el = document.elementFromPoint(anchor.x, anchor.y); const b = el && el.closest && el.closest('.bub'); if (b) { anchorDay = b.dataset.day; anchorTop = b.getBoundingClientRect().top; } }
-  S.settings.planZoom = z; save(); render();
-  if (anchorDay) { const nb = $(`.bub[data-day="${anchorDay}"]`); if (nb) window.scrollBy(0, nb.getBoundingClientRect().top - anchorTop); }
-  const layer = $('#bubLayer'); if (layer) { layer.classList.add(z > old ? 'zin' : 'zout'); setTimeout(() => layer.classList.remove('zin', 'zout'), 420); }
-  return true;
+function clampView(V, soft) {
+  V.k = Math.max(soft ? 0.85 : 1, Math.min(soft ? BUB.kMax * 1.15 : BUB.kMax, V.k));
+  const minX = V.W - V.W * V.k, minY = V.H - V.H * V.k;
+  if (soft) { // резиновый край, как в iOS
+    const rb = (v, lo, hi) => v > hi ? hi + (v - hi) * 0.35 : v < lo ? lo + (v - lo) * 0.35 : v;
+    V.tx = rb(V.tx, Math.min(0, minX), 0); V.ty = rb(V.ty, Math.min(0, minY), 0);
+  } else { V.tx = Math.min(0, Math.max(minX, V.tx)); V.ty = Math.min(0, Math.max(minY, V.ty)); }
 }
-function bindBubbleGestures(stage) {
-  const layer = $('#bubLayer', stage);
-  let pinch = null, drag = null;
-  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-  stage.addEventListener('gesturestart', (e) => e.preventDefault());
-  stage.addEventListener('gesturechange', (e) => e.preventDefault());
-  stage.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) {
-      const r = layer.getBoundingClientRect(); const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2, my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      pinch = { d0: dist(e.touches), s: 1, mx, my }; layer.style.transformOrigin = `${mx - r.left}px ${my - r.top}px`; layer.style.transition = 'none';
-      if (drag) { drag.el.classList.remove('drag'); drag.el.style.transform = `translate3d(${drag.el.dataset.x}px, ${drag.el.dataset.y}px, 0)`; drag = null; }
-    }
-  }, { passive: true });
-  stage.addEventListener('touchmove', (e) => {
-    if (!pinch || e.touches.length < 2) return;
-    if (e.cancelable) e.preventDefault();
-    pinch.s = Math.max(0.5, Math.min(2.6, dist(e.touches) / pinch.d0)); layer.style.transform = `scale(${pinch.s.toFixed(3)})`;
-  }, { passive: false });
-  const pinchEnd = () => {
-    if (!pinch) return; const p = pinch; pinch = null;
-    const z = S.settings.planZoom || 1; const step = p.s > 1.85 ? 2 : p.s > 1.15 ? 1 : p.s < 0.6 ? -2 : p.s < 0.87 ? -1 : 0;
-    layer.style.transition = 'transform .25s ease'; layer.style.transform = '';
-    if (step) setTimeout(() => setPlanZoom(z + step, { x: p.mx, y: p.my }), 60);
-    BUB.suppress = Date.now() + 400;
+/* Быстрый кадр во время жеста: только transform слоя и подписи дней недели */
+function frameView(V) {
+  V.layer.style.transform = `translate3d(${V.tx.toFixed(2)}px, ${V.ty.toFixed(2)}px, 0) scale(${(V.k / V.kc).toFixed(4)})`;
+  if (V.headEl) { const sp = V.headEl.children; for (let i = 0; i < 7; i++) sp[i].style.transform = `translate3d(${((V.pad + V.c * (i + 0.5)) * V.k + V.tx).toFixed(1)}px, 0, 0)`; }
+}
+/* После жеста: пузыри получают настоящий размер, текст снова чёткий */
+function commitView(V) {
+  V.kc = V.k; V.layer.style.setProperty('--k', V.k.toFixed(4));
+  frameView(V);
+  V.stage.classList.toggle('zoomed', V.k > 1.01); V.stage.classList.toggle('still', V.k > 1.6);
+  const mk = monthKey(planMonth()); ui.planView = { mk, k: V.k, tx: V.tx, ty: V.ty, W: V.W };
+  const zb = $$('.bubbles-card .zoom-btns button'); if (zb.length) { zb[0].disabled = V.k <= 1.001; zb[1].disabled = V.k >= BUB.kMax - 0.001; }
+  const hint = $('.bubbles-card .zoom-hint'); if (hint) hint.textContent = zoomHint(V.k);
+}
+function animateView(V, k, tx, ty, dur = 320) {
+  cancelAnimationFrame(V.anim);
+  const k0 = V.k, x0 = V.tx, y0 = V.ty; const t0 = performance.now(); dur = reduceMotion() ? 0 : dur;
+  const step = (now) => {
+    const p = dur ? Math.min(1, (now - t0) / dur) : 1; const e = easeOut(p);
+    V.k = k0 + (k - k0) * e; V.tx = x0 + (tx - x0) * e; V.ty = y0 + (ty - y0) * e; frameView(V);
+    if (p < 1) V.anim = requestAnimationFrame(step); else { V.k = k; V.tx = tx; V.ty = ty; commitView(V); }
   };
-  stage.addEventListener('touchend', (e) => { if (e.touches.length < 2) pinchEnd(); });
-  stage.addEventListener('touchcancel', pinchEnd);
-  stage.addEventListener('wheel', (e) => { if (!e.ctrlKey) return; e.preventDefault(); clearTimeout(stage._wt); stage._ws = (stage._ws || 0) - e.deltaY; stage._wt = setTimeout(() => { const st2 = stage._ws; stage._ws = 0; if (Math.abs(st2) > 20) setPlanZoom((S.settings.planZoom || 1) + (st2 > 0 ? 1 : -1), { x: e.clientX, y: e.clientY }); }, 120); }, { passive: false });
-  // Пузырь можно потянуть пальцем: он мягко вернётся на место
-  stage.addEventListener('pointerdown', (e) => {
-    if (pinch || reduceMotion()) return; const el = e.target.closest('.bub'); if (!el) return;
-    drag = { el, sx: e.clientX, sy: e.clientY, id: e.pointerId, moved: false };
-  });
-  stage.addEventListener('pointermove', (e) => {
-    if (!drag || e.pointerId !== drag.id || pinch) return; const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
-    if (!drag.moved) { if (Math.abs(dx) < 9 || Math.abs(dy) > Math.abs(dx)) return; drag.moved = true; drag.el.classList.add('drag'); try { stage.setPointerCapture(e.pointerId); } catch (er) { /* без захвата */ } }
-    drag.el.style.transform = `translate3d(${(+drag.el.dataset.x + dx).toFixed(1)}px, ${(+drag.el.dataset.y + dy).toFixed(1)}px, 0)`;
-  });
-  const dragEnd = () => { if (!drag) return; if (drag.moved) { BUB.suppress = Date.now() + 350; drag.el.classList.remove('drag'); drag.el.style.transform = `translate3d(${drag.el.dataset.x}px, ${drag.el.dataset.y}px, 0)`; } drag = null; };
-  stage.addEventListener('pointerup', dragEnd); stage.addEventListener('pointercancel', dragEnd);
+  V.anim = requestAnimationFrame(step);
 }
-ACT['plan-zoom'] = (el) => setPlanZoom((S.settings.planZoom || 1) + (+el.dataset.d));
+/* Приблизить к точке (px, py внутри карточки) */
+function zoomViewTo(V, k, px, py, dur) {
+  k = Math.max(1, Math.min(BUB.kMax, k)); if (k < 1.04) k = 1;
+  const wx = (px - V.tx) / V.k, wy = (py - V.ty) / V.k;
+  const T = { W: V.W, H: V.H, k, tx: px - wx * k, ty: py - wy * k }; clampView(T);
+  animateView(V, T.k, T.tx, T.ty, dur);
+}
+function settleView(V, vx = 0, vy = 0, a) {
+  const T = { W: V.W, H: V.H, k: Math.max(1, Math.min(BUB.kMax, V.k)), tx: V.tx + vx * 260, ty: V.ty + vy * 260 };
+  if (T.k < 1.04) T.k = 1;
+  if (T.k !== V.k) { const ax = a ? a.x : V.W / 2, ay = a ? a.y : V.H / 2; T.tx = ax - (ax - V.tx) / V.k * T.k; T.ty = ay - (ay - V.ty) / V.k * T.k; }
+  clampView(T);
+  const far = Math.hypot(T.tx - V.tx, T.ty - V.ty);
+  animateView(V, T.k, T.tx, T.ty, Math.min(620, 280 + far * 1.2));
+}
+function bindBubbleGestures(V) {
+  const st = V.stage; let g = null;
+  const rect = () => st.getBoundingClientRect();
+  const mid = (t, r) => ({ x: (t[0].clientX + t[1].clientX) / 2 - r.left, y: (t[0].clientY + t[1].clientY) / 2 - r.top });
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
+  st.addEventListener('gesturestart', (e) => e.preventDefault());
+  st.addEventListener('gesturechange', (e) => e.preventDefault());
+  const startPinch = (e) => {
+    const r = rect(); const m0 = mid(e.touches, r);
+    g = { pinch: true, r, d0: dist(e.touches), k0: V.k, wx: (m0.x - V.tx) / V.k, wy: (m0.y - V.ty) / V.k, moved: true };
+  };
+  st.addEventListener('touchstart', (e) => {
+    cancelAnimationFrame(V.anim);
+    if (V.kc !== V.k) commitView(V);
+    if (e.touches.length >= 2) { startPinch(e); return; }
+    const t = e.touches[0]; g = { pinch: false, r: rect(), sx: t.clientX, sy: t.clientY, tx0: V.tx, ty0: V.ty, moved: false, hist: [{ t: performance.now(), x: t.clientX, y: t.clientY }] };
+  }, { passive: true });
+  st.addEventListener('touchmove', (e) => {
+    if (!g) return;
+    if (e.touches.length >= 2) {
+      if (!g.pinch) startPinch(e);
+      if (e.cancelable) e.preventDefault();
+      const m1 = mid(e.touches, g.r); g.last = m1; V.k = g.k0 * dist(e.touches) / g.d0;
+      clampView(V, true); V.tx = m1.x - g.wx * V.k; V.ty = m1.y - g.wy * V.k; clampView(V, true); frameView(V); return;
+    }
+    if (g.pinch || V.k <= 1.001) return; // при обычном масштабе палец листает страницу
+    const t = e.touches[0]; const dx = t.clientX - g.sx, dy = t.clientY - g.sy;
+    if (!g.moved && Math.hypot(dx, dy) < 7) return;
+    g.moved = true; if (e.cancelable) e.preventDefault();
+    V.tx = g.tx0 + dx; V.ty = g.ty0 + dy; clampView(V, true); frameView(V);
+    g.hist.push({ t: performance.now(), x: t.clientX, y: t.clientY }); if (g.hist.length > 6) g.hist.shift();
+  }, { passive: false });
+  const end = (e) => {
+    if (!g) return;
+    if (e.touches && e.touches.length === 1 && g.pinch) { // остался один палец: продолжаем как сдвиг
+      const t = e.touches[0]; g = { pinch: false, r: rect(), sx: t.clientX, sy: t.clientY, tx0: V.tx, ty0: V.ty, moved: true, hist: [{ t: performance.now(), x: t.clientX, y: t.clientY }] }; return;
+    }
+    if (e.touches && e.touches.length) return;
+    const moved = g.moved, anchor = g.last; let vx = 0, vy = 0;
+    if (!g.pinch && g.hist && g.hist.length > 1) { const a = g.hist[0], b = g.hist[g.hist.length - 1]; const dt = b.t - a.t; if (dt > 0 && performance.now() - b.t < 90) { vx = (b.x - a.x) / dt; vy = (b.y - a.y) / dt; } }
+    g = null;
+    if (moved) { BUB.suppress = Date.now() + 350; settleView(V, vx, vy, anchor); }
+  };
+  st.addEventListener('touchend', end); st.addEventListener('touchcancel', end);
+  // Компьютер: Ctrl + колесо или щипок на тачпаде, перетаскивание мышью
+  st.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && V.k <= 1.001) return; e.preventDefault(); cancelAnimationFrame(V.anim);
+    const r = rect(); const px = e.clientX - r.left, py = e.clientY - r.top;
+    if (e.ctrlKey) { const wx = (px - V.tx) / V.k, wy = (py - V.ty) / V.k; V.k *= Math.exp(-e.deltaY * 0.01); clampView(V, true); V.tx = px - wx * V.k; V.ty = py - wy * V.k; }
+    else { V.tx -= e.deltaX; V.ty -= e.deltaY; }
+    clampView(V, true); frameView(V); clearTimeout(st._wt); st._wt = setTimeout(() => settleView(V, 0, 0, { x: px, y: py }), 140);
+  }, { passive: false });
+  st.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || V.k <= 1.001 || e.button !== 0) return;
+    const m = { sx: e.clientX, sy: e.clientY, tx0: V.tx, ty0: V.ty, moved: false };
+    const mv = (ev) => { const dx = ev.clientX - m.sx, dy = ev.clientY - m.sy; if (!m.moved && Math.hypot(dx, dy) < 5) return; m.moved = true; V.tx = m.tx0 + dx; V.ty = m.ty0 + dy; clampView(V, true); frameView(V); };
+    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); if (m.moved) { BUB.suppress = Date.now() + 300; settleView(V); } };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  });
+}
+ACT['bub-zoom'] = (el) => { const st = $('#bubbleStage'); const V = st && st._v; if (!V) return; zoomViewTo(V, el.dataset.d === '1' ? V.k * 1.8 : V.k / 1.8, V.W / 2, Math.min(V.H, st.clientHeight) / 2, 380); };
+ACT['plan-filter'] = (el) => {
+  const f = el.dataset.f; if (!PLAN_FILTERS[f]) return; S.settings.planFilter = f; save();
+  const st = $('#bubbleStage'); if (st) { Object.keys(PLAN_FILTERS).forEach((k) => st.classList.toggle('f-' + k, k === f)); }
+  $$('.plan-filter button').forEach((b) => { b.classList.toggle('on', b === el); b.setAttribute('aria-selected', b === el); });
+  const sum = $('#bubSum'); if (sum) sum.textContent = planSum(f, JSON.parse(sum.dataset.c || '{}'), +sum.dataset.done, +sum.dataset.all);
+};
+function planSum(f, c, done, all) {
+  if (f === 'free') return c.free ? `Свободных дней: ${c.free}` : 'Свободных дней не осталось';
+  if (f === 'busy') return c.busy ? `Дней с планами: ${c.busy}` : 'Дней с планами пока нет';
+  return all ? `Выполнено ${done} из ${all}` : 'Планов пока нет';
+}
 
 /* Лист дня */
 function dayTitle(iso) { const d = toDate(iso); return `${cap(WD_LONG[d.getDay()])}, ${d.getDate()} ${MONTH_GEN[d.getMonth()]}`; }
@@ -3001,7 +3080,7 @@ RENDER.sport = function () {
 };
 function exRow(e, act) {
   return `<div class="row ex-row" ${act ? `data-act="${act}" data-ex="${esc(e.id)}" role="button" tabindex="0"` : ''}><button class="mthumb-btn" data-act="ex-info" data-ex="${esc(e.id)}" aria-label="Какие мышцы работают">${muscleThumb(e)}</button>
-    <span class="grow"><span class="t">${esc(e.name)}</span><span class="m">${esc(musclesText(e))}</span></span><span class="chev">${act ? I.plus : I.right}</span></div>`;
+    <span class="grow"><span class="t">${esc(e.name)}</span><span class="m">${esc(musclesText(e))}</span></span><span class="chev">${act === 'pick-ex' ? I.plus : I.right}</span></div>`;
 }
 function exFilter(q, g) {
   const toks = normq(q).split(' ').filter(Boolean);
@@ -3012,7 +3091,7 @@ function drawLib() {
   const list = exFilter(ui.libQ || '', ui.libG || '');
   el.innerHTML = list.length ? `<div class="list">${list.map((e) => exRow(e, 'ex-info')).join('')}</div>` : `<div class="card empty"><b>Не нашлось</b>Попробуйте другое слово.</div>`;
 }
-function exInfoSheet(id, backFn) {
+function exInfoSheet(id, backFn, opts = {}) {
   const ex = exById(id); if (!ex) return;
   const A = S.workoutActive; const inW = A && A.items.some((x) => x.exId === id);
   openSheet(ex.name, `<div class="form ex-info">
@@ -3021,9 +3100,9 @@ function exInfoSheet(id, backFn) {
     ${(ex.pri || []).length ? `<div class="field"><span>Главные мышцы</span><div class="chips wrap">${ex.pri.map((m) => `<span class="chip mchip pri">${MUSCLE_NAMES[m]}</span>`).join('')}</div></div>` : ''}
     ${(ex.sec || []).length ? `<div class="field"><span>Помогают</span><div class="chips wrap">${ex.sec.map((m) => `<span class="chip mchip">${MUSCLE_NAMES[m]}</span>`).join('')}</div></div>` : ''}
     ${ex.cue ? `<div class="card cue"><b>Как делать</b><p>${esc(ex.cue)}</p></div>` : ''}
-    <div class="sticky-save"><button class="btn primary" type="button" id="exGo">${A ? (inW ? 'Уже в тренировке' : `${I.plus}Добавить в тренировку`) : `${I.play}Начать тренировку с этим упражнением`}</button></div>
+    ${opts.preview ? '' : `<div class="sticky-save"><button class="btn primary" type="button" id="exGo">${A ? (inW ? 'Уже в тренировке' : `${I.plus}Добавить в тренировку`) : `${I.play}Начать тренировку с этим упражнением`}</button></div>`}
   </div>`, (body) => {
-    const go = $('#exGo', body); if (inW) go.disabled = true;
+    const go = $('#exGo', body); if (!go) return; if (inW) go.disabled = true;
     go.onclick = () => { if (A) addExercise(id); else { closeSheet(); startWorkout(ex.name, [id]); } };
   }, { back: backFn });
 }
@@ -3187,18 +3266,34 @@ DETAIL.wview = function (d) {
 ACT['start-workout'] = () => { if (S.workoutActive) { if (ui.tab !== 'sport') { ui.tab = 'sport'; ui.stack = []; } push({ type: 'workout' }); } else startSheet(); };
 ACT['w-empty'] = () => { closeSheet(); startWorkout(); };
 ACT['w-open'] = () => push({ type: 'workout' });
-ACT['prog-start'] = (el) => { const t = BUILTIN_PROGRAMS.find((x) => x.id === el.dataset.id) || S.wTemplates.find((x) => x.id === el.dataset.id); if (!t) return; closeSheet(); startWorkout(t.name, t.items); };
-ACT['prog-open'] = (el) => {
-  const t = S.wTemplates.find((x) => x.id === el.dataset.id); if (!t) return;
-  openSheet(t.name, `<div class="form"><div class="list">${t.items.map((id) => `<div class="row"><span class="grow"><span class="t">${esc((exById(id) || { name: '?' }).name)}</span></span></div>`).join('')}</div>
-    <label class="field"><span>Название</span><input type="text" id="tName" value="${esc(t.name)}" maxlength="60"></label>
-    <button class="btn danger" type="button" id="tDel">${I.trash}Удалить программу</button>
-    <div class="sticky-save two-btn"><button class="btn" type="button" id="tSave">Сохранить</button><button class="btn primary" type="button" id="tGo">Начать</button></div></div>`, (body) => {
-    $('#tSave', body).onclick = () => { t.name = $('#tName', body).value.trim() || t.name; save(); closeSheet(); render(); toast('Программа сохранена'); };
+/* Программа: сначала смотрим упражнения и мышцы, тренировка начинается только по кнопке */
+function progUnion(exs) {
+  const pri = new Set(), sec = new Set();
+  exs.forEach((e) => { (e.pri || []).forEach((m) => pri.add(m)); (e.sec || []).forEach((m) => sec.add(m)); });
+  pri.forEach((m) => sec.delete(m)); return { pri: [...pri], sec: [...sec] };
+}
+function progSheet(id, backFn) {
+  const t = BUILTIN_PROGRAMS.find((x) => x.id === id) || S.wTemplates.find((x) => x.id === id); if (!t) return;
+  const mine = !String(t.id).startsWith('b:'); const exs = t.items.map(exById).filter(Boolean); const A = S.workoutActive;
+  const u = progUnion(exs);
+  openSheet(t.name, `<div class="form prog-sheet">
+    <div class="prog-fig">${muscleFigure(u)}<div class="mlegend"><span><i class="pri"></i>Работают</span><span><i class="sec"></i>Помогают</span></div></div>
+    <div class="section-label"><span>${exs.length} ${plural(exs.length, 'упражнение', 'упражнения', 'упражнений')}</span></div>
+    <div class="list" id="progList">${exs.map((e) => exRow(e, 'prog-ex')).join('')}</div>
+    ${mine ? `<label class="field"><span>Название</span><input type="text" id="tName" value="${esc(t.name)}" maxlength="60"></label>
+    <div class="btn-row"><button class="btn" type="button" id="tSave">Сохранить название</button><button class="btn danger" type="button" id="tDel">${I.trash}Удалить</button></div>` : ''}
+    <div class="sticky-save"><button class="btn primary" type="button" id="tGo">${I.play}${A ? 'Тренировка уже идёт: открыть' : 'Начать тренировку'}</button></div>
+  </div>`, (body) => {
+    $('#progList', body).addEventListener('click', (e) => { const r = e.target.closest('[data-ex]'); if (!r) return; e.stopPropagation(); exInfoSheet(r.dataset.ex, () => progSheet(id, backFn), { preview: true }); });
     $('#tGo', body).onclick = () => { closeSheet(); startWorkout(t.name, t.items); };
-    $('#tDel', body).onclick = () => { const idx = S.wTemplates.indexOf(t); closeSheet(); removeWithUndo('Программа удалена', () => S.wTemplates.splice(idx, 1), () => S.wTemplates.splice(idx, 0, t)); };
-  });
-};
+    if (mine) {
+      $('#tSave', body).onclick = () => { t.name = $('#tName', body).value.trim() || t.name; save(); render(); toast('Программа сохранена'); progSheet(id, backFn); };
+      $('#tDel', body).onclick = () => { const idx = S.wTemplates.indexOf(t); closeSheet(); removeWithUndo('Программа удалена', () => S.wTemplates.splice(idx, 1), () => S.wTemplates.splice(idx, 0, t)); };
+    }
+  }, { back: backFn });
+}
+ACT['prog-start'] = (el) => { const inStart = el.closest('#sheet'); progSheet(el.dataset.id, inStart ? () => startSheet() : null); };
+ACT['prog-open'] = ACT['prog-start'];
 ACT['sport-sec'] = (el) => { ui.sportSec = el.dataset.sec; render(); };
 ACT['ex-info'] = (el) => exInfoSheet(el.dataset.ex);
 ACT['pick-ex'] = (el) => addExercise(el.dataset.ex);
@@ -3250,9 +3345,29 @@ const D_STICKERS = [
 const D_LABELS = [['Лучший день', '#F4C430'], ['Запомнить', '#7EC8E3'], ['Ура!', '#FF8FA3'], ['Люблю', '#FF6B6B'], ['Отпуск', '#6BCB77'], ['Мечта', '#B39DDB'], ['Важно', '#FFA94D'], ['Спасибо', '#80CBC4'], ['Впервые', '#F48FB1'], ['Мы', '#90CAF9']];
 const D_COLORS = ['#1F2328', '#5B6270', '#FFFFFF', '#E5484D', '#FF8A3D', '#F5C518', '#3DBB6E', '#18A0A8', '#3A6FF0', '#7B5CF0', '#E86FB4', '#8B5A2B'];
 const D_TOOLS = [['pen', 'Ручка'], ['marker', 'Маркер'], ['brush', 'Кисть'], ['glow', 'Неон'], ['eraser', 'Ластик']];
+/* Шрифты: ключ, название, семейство, поправка размера (у шрифтов разный рост букв) */
+const D_FONTS = [
+  ['hand', 'От руки', "'Caveat', cursive", 1],
+  ['script', 'Пропись', "'Marck Script', cursive", 0.96],
+  ['calli', 'Каллиграфия', "'Bad Script', cursive", 0.9],
+  ['marker', 'Фломастер', "'Neucha', cursive", 0.92],
+  ['narrow', 'Узкий', "'Amatic SC', cursive", 1.22],
+  ['round', 'Круглый', "'Comfortaa', sans-serif", 0.76],
+  ['retro', 'Ретро', "'Lobster', cursive", 0.86],
+  ['book', 'Книжный', "'Playfair Display', serif", 0.8],
+  ['plain', 'Обычный', 'var(--font-body)', 0.8],
+  ['display', 'Строгий', 'var(--font-display)', 0.7],
+  ['pixel', 'Пиксели', "'Press Start 2P', monospace", 0.5]
+];
+const D_INKS = [['', 'Как обычно'], ['#1E3A8A', 'Синие чернила'], ['#7F1D1D', 'Бордо'], ['#14532D', 'Зелёный'], ['#581C87', 'Фиолетовый'], ['#9A3412', 'Терракота']];
+const D_SIZES = [['s', 'Мелкий', 0.86], ['m', 'Обычный', 1], ['l', 'Крупный', 1.2]];
+const dFont = (k) => D_FONTS.find((f) => f[0] === k) || D_FONTS[0];
+const dFontVars = (k, mul = 1) => { const f = dFont(k); return `--pf:${f[2]};--pfs:${(f[3] * mul).toFixed(3)}`; };
+const fontPicker = (id, cur) => `<div class="font-pick" id="${id}">${D_FONTS.map(([k, n, fam, f]) => `<button type="button" data-font="${k}" class="${cur === k ? 'on' : ''}" style="font-family:${fam};font-size:${Math.round(19 * f + 2)}px">${n}</button>`).join('')}</div>`;
+const isLight = (hex) => { const n = parseInt(hex.slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 170; };
 const dPages = () => S.diary.pages;
 const dIdx = () => Math.max(-1, Math.min(ui.dIdx ?? -1, dPages().length - 1));
-const dPageW = () => Math.min(Math.max(window.innerWidth - 32, 260), 440);
+const dPageW = () => ui.dPW || Math.min(Math.max(window.innerWidth - 32, 260), 440);
 
 /* ---------- Медиа: видео и рисунки в той же базе, что и фото ---------- */
 async function addVideoFile(f) {
@@ -3317,12 +3432,15 @@ function itemHTML(it, edit) {
   if (it.kind === 'photo') return `<div ${common}><span class="tape"></span><img data-media="${it.ref}" alt="" draggable="false"></div>`;
   if (it.kind === 'video') return `<div ${common}><span class="tape"></span><img data-media="${it.ref}" data-kind="thumb" alt="" draggable="false"><span class="play">${I.play}</span></div>`;
   if (it.kind === 'label') return `<div ${common}><span class="dlbl" style="--c:${it.c}">${esc(it.text)}</span></div>`;
+  if (it.kind === 'text') return `<div class="d-item text${edit ? ' ed' : ''}" data-item="${it.id}" style="left:${it.x}%;top:${it.y}%;--iw:${it.w};--rot:${it.rot || 0}deg;z-index:${(it.z || 1) + 2};${dFontVars(it.font)};--tc:${it.c}"><span class="dtxt">${esc(it.text)}</span></div>`;
   return `<div ${common}><span class="stk">${it.e}</span></div>`;
 }
 function paperStyle(p) { return `--paper:${p.tone || '#FFFDF7'};--ink-p:${p.tone === '#23252B' ? '#ECEFF4' : '#2B2F3A'};--line-p:${p.tone === '#23252B' ? 'rgba(255,255,255,.12)' : 'rgba(70,110,170,.22)'}`; }
 function pageHTML(p, n, opts = {}) {
   const d = toDate(p.date);
-  return `<div class="dpage paper-${p.paper || 'lined'}" style="${paperStyle(p)}" data-page="${p.id}">
+  const sz = (D_SIZES.find((x) => x[0] === p.fsz) || D_SIZES[1])[2];
+  const ink = p.ink && p.tone !== '#23252B' ? `;--ink-p:${p.ink}` : '';
+  return `<div class="dpage paper-${p.paper || 'lined'}" style="${paperStyle(p)};${dFontVars(p.font, sz)}${ink}" data-page="${p.id}">
     <div class="dp-head"><span class="dp-date">${d ? `${d.getDate()} ${MONTH_GEN[d.getMonth()]} ${d.getFullYear()}, ${WD_LONG[d.getDay()]}` : ''}</span>${p.title ? `<span class="dp-title">${esc(p.title)}</span>` : ''}</div>
     ${p.text ? `<div class="dp-text">${esc(p.text)}</div>` : (opts.edit ? '' : (!p.items.length && !p.drawing ? '<div class="dp-text dp-empty">Пустая страница. Нажмите «Изменить», чтобы написать, вклеить фото или порисовать.</div>' : ''))}
     ${p.drawing ? `<div class="d-draw-wrap"><img class="d-draw" data-media="${p.drawing}" alt="" draggable="false"></div>` : ''}
@@ -3333,7 +3451,7 @@ function coverHTML(c, opts = {}) {
   return `<div class="dcover tex-${c.texture || 'leather'}" style="--cv:${c.color}">
     <span class="dc-spine"></span>
     ${c.drawing ? `<div class="d-draw-wrap"><img class="d-draw" data-media="${c.drawing}" alt="" draggable="false"></div>` : ''}
-    <div class="dc-title ${c.font === 'hand' ? 'hand' : ''}" style="color:${c.titleColor || '#fff'}">${esc(c.title || 'Мой дневник')}</div>
+    <div class="dc-title" style="color:${c.titleColor || '#fff'};${dFontVars(c.font || 'display')}">${esc(c.title || 'Мой дневник')}</div>
     ${c.items.map((it) => itemHTML(it, opts.edit)).join('')}
     <span class="dc-band"></span></div>`;
 }
@@ -3350,13 +3468,31 @@ RENDER.diary = function () {
     <button class="icon-btn" data-act="d-flip" data-dir="1" aria-label="Вперёд" ${idx >= pages.length - 1 ? 'disabled' : ''}>${I.right}</button></div>`;
   html += `<div class="btn-row">${idx < 0 ? `<button class="btn" data-act="d-cover">${I.edit}Оформить обложку</button>${pages.length ? `<button class="btn primary" data-act="d-flip" data-dir="1">Открыть</button>` : `<button class="btn primary" data-act="d-new">${I.plus}Первая запись</button>`}`
     : `<button class="btn" data-act="d-edit">${I.edit}Изменить</button><button class="btn" data-act="d-save-media">${I.down}В галерею</button>`}</div>`;
-  html += `<p class="note-small">Листайте свайпом или нажатием на край страницы. Разведите два пальца, чтобы приблизить, дважды нажмите, чтобы вернуть.</p>`;
   ui.mounts.push(mountBook);
   return html;
 };
 function mountBook() {
-  const stage = $('#dstage'); if (!stage) return; hydrateMedia(stage);
+  const stage = $('#dstage'); if (!stage) return;
+  fitBook(stage); hydrateMedia(stage); guardFixedScroll();
   bindBook(stage);
+}
+/* Страница целиком помещается на экран: ширина считается от свободной высоты */
+function fitBook(stage) {
+  const h = stage.clientHeight; if (!h) return;
+  const pw = Math.floor(Math.max(200, Math.min(window.innerWidth - 32, 440, (h - 14) / 1.4)));
+  ui.dPW = pw; stage.style.setProperty('--pw', pw + 'px');
+}
+/* На экранах дневника страница не ездит вверх-вниз: палец листает, рисует и двигает наклейки */
+let fixedGuard = false;
+function guardFixedScroll() {
+  if (fixedGuard) return; fixedGuard = true;
+  const view = $('#view');
+  view.addEventListener('touchmove', (e) => {
+    if (!document.documentElement.classList.contains('fixed-screen') || !e.cancelable) return;
+    if (e.target.closest('input, textarea, .de-colors, .scroll-ok')) return;
+    e.preventDefault();
+  }, { passive: false });
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { const st = $('#dstage'); if (st) fitBook(st); if ($('#deWrap')) fitEditorPage(true); }, 150); });
 }
 let DZ = { s: 1, x: 0, y: 0 };
 function applyZoom() { const z = $('#dzoom'); if (z) { z.style.transform = DZ.s === 1 ? '' : `translate3d(${DZ.x}px, ${DZ.y}px, 0) scale(${DZ.s})`; z.classList.toggle('zoomed', DZ.s > 1); } }
@@ -3465,30 +3601,42 @@ function openEditor(kind, target) {
 DETAIL.deditor = function () {
   const t = DE.target; if (!t) { ui.stack.pop(); return currentHTML(); }
   const isCover = DE.kind === 'cover';
-  const W = Math.min(window.innerWidth - 24, 420);
   ui.mounts.push(mountEditor);
   return `<div class="deditor">
-    <div class="de-top">${backBtn('Готово')}<span class="de-title">${isCover ? 'Обложка' : 'Страница ' + (dPages().indexOf(t) + 1)}</span>${isCover ? '<span style="width:44px"></span>' : `<button class="icon-btn" data-act="d-page-menu" aria-label="Ещё">${I.more}</button>`}</div>
-    <div class="de-selbar" id="deSel" hidden>
-      <button class="icon-btn" data-de="smaller" aria-label="Меньше">${I.minus}</button><button class="icon-btn" data-de="bigger" aria-label="Больше">${I.plus}</button>
-      <button class="icon-btn" data-de="rotl" aria-label="Повернуть влево">↺</button><button class="icon-btn" data-de="rotr" aria-label="Повернуть вправо">↻</button>
-      <button class="icon-btn" data-de="front" aria-label="На передний план">${I.up}</button><button class="icon-btn" data-de="gallery" aria-label="В галерею" id="deGal">${I.down}</button>
-      <button class="icon-btn del" data-de="del" aria-label="Удалить">${I.trash}</button></div>
-    <div class="de-canvas-wrap" style="--pw:${W}px"><div class="de-page" id="dePage">${isCover ? coverHTML(t, { edit: true }) : pageHTML(t, 0, { edit: true })}<canvas id="deCanvas"></canvas></div></div>
-    <div class="de-brush" id="deBrush" hidden>
-      <div class="de-tools">${D_TOOLS.map(([k, n]) => `<button type="button" class="de-tool ${DE.tool === k ? 'on' : ''}" data-tool="${k}"><span class="tl tl-${k}"></span>${n}</button>`).join('')}</div>
-      <div class="de-colors">${D_COLORS.map((c) => `<button type="button" class="swatch sm ${DE.color === c ? 'on' : ''}" data-color="${c}" style="background:${c}" aria-label="Цвет"></button>`).join('')}</div>
-      <div class="de-size"><span>Толщина</span><input type="range" id="deSize" min="1" max="40" value="${DE.size}"><span class="de-dot" id="deDot"></span></div>
-      <div class="btn-row"><button type="button" class="btn sm" id="deUndo">↶ Отменить</button><button type="button" class="btn sm" id="deClear">Стереть рисунок</button><button type="button" class="btn sm primary" id="deDrawDone">Готово</button></div>
+    <div class="de-top">
+      <div class="de-top-n">${backBtn('Готово')}<span class="de-title">${isCover ? 'Обложка' : 'Страница ' + (dPages().indexOf(t) + 1)}</span>${isCover ? '<span style="width:44px"></span>' : `<button class="icon-btn" data-act="d-page-menu" aria-label="Ещё">${I.more}</button>`}</div>
+      <div class="de-top-d"><button type="button" class="btn sm" id="deUndo">↶ Отменить</button><span class="de-title">Рисование</span><button type="button" class="btn sm primary" id="deDrawDone">Готово</button></div>
     </div>
-    <div class="de-bar" id="deBar">
-      ${isCover ? '<button type="button" data-de="cover-style"><span class="dei">🎨</span>Обложка</button>' : '<button type="button" data-de="text"><span class="dei">✍️</span>Текст</button>'}
-      <label class="de-file"><span class="dei">🖼️</span>Фото и видео<input type="file" accept="image/*,video/*" multiple hidden id="deFile"></label>
-      <button type="button" data-de="stickers"><span class="dei">⭐</span>Стикеры</button>
-      <button type="button" data-de="draw"><span class="dei">🖌️</span>Кисти</button>
-      ${isCover ? '' : '<button type="button" data-de="paper"><span class="dei">📄</span>Бумага</button>'}
+    <div class="de-canvas-wrap" id="deWrap"><div class="de-page" id="dePage">${isCover ? coverHTML(t, { edit: true }) : pageHTML(t, 0, { edit: true })}<canvas id="deCanvas"></canvas></div></div>
+    <div class="de-bottom">
+      <div class="de-selbar" id="deSel" hidden>
+        <button class="icon-btn" data-de="smaller" aria-label="Меньше">${I.minus}</button><button class="icon-btn" data-de="bigger" aria-label="Больше">${I.plus}</button>
+        <button class="icon-btn" data-de="rotl" aria-label="Повернуть влево">↺</button><button class="icon-btn" data-de="rotr" aria-label="Повернуть вправо">↻</button>
+        <button class="icon-btn" data-de="edit-text" aria-label="Изменить надпись" id="deTxt">${I.edit}</button>
+        <button class="icon-btn" data-de="front" aria-label="На передний план">${I.up}</button><button class="icon-btn" data-de="gallery" aria-label="В галерею" id="deGal">${I.down}</button>
+        <button class="icon-btn del" data-de="del" aria-label="Удалить">${I.trash}</button><button class="icon-btn ok" data-de="deselect" aria-label="Готово">${I.tick}</button></div>
+      <div class="de-brush" id="deBrush" hidden>
+        <div class="de-tools">${D_TOOLS.map(([k, n]) => `<button type="button" class="de-tool ${DE.tool === k ? 'on' : ''}" data-tool="${k}"><span class="tl tl-${k}"></span>${n}</button>`).join('')}</div>
+        <div class="de-colors">${D_COLORS.map((c) => `<button type="button" class="swatch sm ${DE.color === c ? 'on' : ''}" data-color="${c}" style="background:${c}" aria-label="Цвет"></button>`).join('')}</div>
+        <div class="de-size"><span>Толщина</span><input type="range" id="deSize" min="1" max="40" value="${DE.size}"><span class="de-dot" id="deDot"></span><button type="button" class="btn sm" id="deClear">Стереть всё</button></div>
+      </div>
+      <div class="de-bar" id="deBar">
+        ${isCover ? '<button type="button" data-de="cover-style"><span class="dei">🎨</span>Обложка</button>' : '<button type="button" data-de="text"><span class="dei">✍️</span>Текст</button>'}
+        <button type="button" data-de="label"><span class="dei">🔤</span>Надпись</button>
+        <label class="de-file"><span class="dei">🖼️</span>Фото<input type="file" accept="image/*,video/*" multiple hidden id="deFile"></label>
+        <button type="button" data-de="stickers"><span class="dei">⭐</span>Стикеры</button>
+        <button type="button" data-de="draw"><span class="dei">🖌️</span>Кисти</button>
+        ${isCover ? '' : '<button type="button" data-de="paper"><span class="dei">📄</span>Бумага</button>'}
+      </div>
     </div></div>`;
 };
+/* Лист подгоняется под свободное место: с панелью кистей он чуть меньше, но всегда целиком на экране */
+function fitEditorPage(instant) {
+  const wrap = $('#deWrap'); if (!wrap) return;
+  const pw = Math.floor(Math.max(180, Math.min(wrap.clientWidth, 440, (wrap.clientHeight - 6) / 1.4)));
+  if (instant) { wrap.classList.add('no-tr'); requestAnimationFrame(() => wrap.classList.remove('no-tr')); }
+  wrap.style.setProperty('--pw', pw + 'px');
+}
 function deTouch() { const t = DE.target; if (DE.kind === 'page') t.updated = Date.now(); save(); }
 function deRerenderPage() {
   const pg = $('#dePage'); if (!pg) return; const t = DE.target; const cv = $('#deCanvas', pg);
@@ -3498,8 +3646,10 @@ function deRerenderPage() {
 }
 function deSelect(id) {
   DE.sel = id; $$('#dePage .d-item').forEach((el) => el.classList.toggle('sel', el.dataset.item === id));
-  const bar = $('#deSel'); if (bar) bar.hidden = !id;
+  const bar = $('#deSel'); if (bar) bar.hidden = !id || DE.draw;
+  const main = $('#deBar'); if (main) main.hidden = !!id || DE.draw;
   const it = id && DE.target.items.find((x) => x.id === id); const g = $('#deGal'); if (g) g.hidden = !(it && (it.kind === 'photo' || it.kind === 'video'));
+  const tx = $('#deTxt'); if (tx) tx.hidden = !(it && it.kind === 'text');
 }
 function deAddItem(item) {
   const t = DE.target; const z = t.items.reduce((m, x) => Math.max(m, x.z || 1), 0) + 1;
@@ -3507,10 +3657,10 @@ function deAddItem(item) {
   deTouch(); deRerenderPage(); deSelect(t.items[t.items.length - 1].id);
 }
 function mountEditor() {
-  const pg = $('#dePage'); if (!pg) return; hydrateMedia(pg);
+  const pg = $('#dePage'); if (!pg) return; fitEditorPage(true); hydrateMedia(pg); guardFixedScroll();
   const cv = $('#deCanvas', pg);
   const fit = () => { const r = pg.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; };
-  fit();
+  fit(); ui.deFit = fit;
   // Перетаскивание и щипок по элементам
   let drag = null, pinch = null;
   pg.addEventListener('pointerdown', (e) => {
@@ -3540,7 +3690,7 @@ function mountEditor() {
     if (e.cancelable) e.preventDefault();
     const [a, b] = e.touches; const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); const ang = Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
     pinch.it.w = Math.max(6, Math.min(140, pinch.w0 * d / pinch.d0)); pinch.it.rot = Math.round(pinch.r0 + (ang - pinch.a0) * 180 / Math.PI);
-    const el = $(`.d-item[data-item="${pinch.it.id}"]`, pg); if (el) { el.style.width = pinch.it.w + '%'; el.style.setProperty('--rot', pinch.it.rot + 'deg'); }
+    const el = $(`.d-item[data-item="${pinch.it.id}"]`, pg); if (el) { if (pinch.it.kind === 'text') el.style.setProperty('--iw', pinch.it.w); else el.style.width = pinch.it.w + '%'; el.style.setProperty('--rot', pinch.it.rot + 'deg'); }
   }, { passive: false });
   pg.addEventListener('touchend', (e) => { if (pinch && e.touches.length < 2) { pinch = null; deTouch(); } });
   // Рисование
@@ -3550,22 +3700,26 @@ function mountEditor() {
     const u = await mediaURL(id, 'full'); if (!u) return;
     await new Promise((res) => { const im = new Image(); im.onload = () => { DE.base = im; res(); }; im.onerror = res; im.src = u; });
   };
-  const redraw = () => { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); if (DE.base) ctx.drawImage(DE.base, 0, 0, cv.width, cv.height); DE.strokes.forEach((s) => drawStroke(ctx, s, cv)); };
-  ui.deRedraw = redraw;
+  // Готовые штрихи лежат на отдельном слое, во время рисования перерисовывается только текущий
+  const layer = document.createElement('canvas'); const lctx = layer.getContext('2d');
+  const commit = () => { layer.width = cv.width; layer.height = cv.height; lctx.clearRect(0, 0, layer.width, layer.height); if (DE.base) lctx.drawImage(DE.base, 0, 0, layer.width, layer.height); DE.strokes.forEach((s) => drawStroke(lctx, s, layer)); };
   let cur = null;
+  const redraw = () => { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(layer, 0, 0); if (cur) drawStroke(ctx, cur, cv); };
+  ui.deRedraw = () => { commit(); redraw(); };
   cv.addEventListener('pointerdown', (e) => {
     if (!DE.draw) return; e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (er) { /* без захвата */ }
     const r = cv.getBoundingClientRect();
     cur = { tool: DE.tool, color: DE.color, size: DE.size / r.width, pts: [[(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.pressure || 0.5, Date.now()]] };
-    DE.strokes.push(cur); DE.dirtyDraw = true;
+    DE.strokes.push(cur); DE.dirtyDraw = true; redraw();
   });
   cv.addEventListener('pointermove', (e) => {
     if (!cur) return; const r = cv.getBoundingClientRect();
     const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     evs.forEach((ev) => cur.pts.push([(ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height, ev.pressure || 0.5, Date.now()]));
-    redraw();
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; redraw(); });
   });
-  const stop = () => { cur = null; };
+  let raf = 0;
+  const stop = () => { if (cur) { drawStroke(lctx, cur, layer); cur = null; redraw(); } };
   cv.addEventListener('pointerup', stop); cv.addEventListener('pointercancel', stop);
   ui.deLoadBase = loadBase;
   bindEditorBar();
@@ -3577,7 +3731,6 @@ function drawStroke(ctx, s, cv) {
   ctx.globalCompositeOperation = s.tool === 'eraser' ? 'destination-out' : 'source-over';
   ctx.strokeStyle = s.tool === 'eraser' ? '#000' : s.color;
   if (s.tool === 'marker') { ctx.globalAlpha = 0.38; ctx.lineCap = 'square'; }
-  if (s.tool === 'glow') { ctx.shadowColor = s.color; ctx.shadowBlur = base * 2.2; }
   if (s.tool === 'brush') {
     // Кисть: толщина зависит от скорости — медленно толще, быстро тоньше
     for (let i = 1; i < pts.length; i++) {
@@ -3587,18 +3740,24 @@ function drawStroke(ctx, s, cv) {
     }
     ctx.restore(); return;
   }
-  ctx.lineWidth = s.tool === 'marker' ? base * 2.4 : s.tool === 'eraser' ? base * 2 : base;
   ctx.beginPath(); ctx.moveTo(pts[0][0] * W, pts[0][1] * H);
   if (pts.length === 1) ctx.lineTo(pts[0][0] * W + 0.1, pts[0][1] * H);
   for (let i = 1; i < pts.length - 1; i++) { const mx = (pts[i][0] + pts[i + 1][0]) / 2, my = (pts[i][1] + pts[i + 1][1]) / 2; ctx.quadraticCurveTo(pts[i][0] * W, pts[i][1] * H, mx * W, my * H); }
   if (pts.length > 1) { const l = pts[pts.length - 1]; ctx.lineTo(l[0] * W, l[1] * H); }
-  ctx.stroke(); if (s.tool === 'glow') { ctx.shadowBlur = 0; ctx.globalAlpha = 0.9; ctx.strokeStyle = '#fff'; ctx.lineWidth = base * 0.35; ctx.stroke(); }
+  if (s.tool === 'glow') {
+    // Неон: широкое свечение, яркая трубка и светлая сердцевина
+    ctx.shadowColor = s.color; ctx.strokeStyle = s.color;
+    ctx.globalAlpha = 0.5; ctx.shadowBlur = base * 3.2; ctx.lineWidth = base * 1.7; ctx.stroke();
+    ctx.globalAlpha = 1; ctx.shadowBlur = base * 1.4; ctx.lineWidth = base; ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,255,255,.88)'; ctx.lineWidth = Math.max(1, base * 0.36); ctx.stroke();
+  } else { ctx.lineWidth = s.tool === 'marker' ? base * 2.4 : s.tool === 'eraser' ? base * 2 : base; ctx.stroke(); }
   ctx.restore();
 }
 async function enterDraw() {
   DE.draw = true; deSelect(null); DE.strokes = []; DE.dirtyDraw = false;
-  $('#deBrush').hidden = false; $('#deBar').hidden = true; $('#dePage').classList.add('drawing');
-  await ui.deLoadBase(); ui.deRedraw();
+  $('#deBrush').hidden = false; $('#deBar').hidden = true; $('#dePage').classList.add('drawing'); $('.deditor').classList.add('drawing-mode');
+  fitEditorPage(); await new Promise((r) => setTimeout(r, 240)); if (!DE.draw) return;
+  ui.deFit(); await ui.deLoadBase(); ui.deRedraw();
   const dw = $('#dePage .d-draw-wrap'); if (dw) dw.style.visibility = 'hidden';
   paintDot();
 }
@@ -3613,8 +3772,8 @@ async function exitDraw(saveIt) {
     }
   }
   DE.draw = false; DE.strokes = []; const ctx = cv && cv.getContext('2d'); if (ctx) ctx.clearRect(0, 0, cv.width, cv.height);
-  $('#deBrush').hidden = true; $('#deBar').hidden = false; $('#dePage').classList.remove('drawing');
-  deRerenderPage();
+  $('#deBrush').hidden = true; $('#deBar').hidden = false; $('#dePage').classList.remove('drawing'); $('.deditor').classList.remove('drawing-mode');
+  deRerenderPage(); fitEditorPage();
 }
 function paintDot() { const d = $('#deDot'); if (d) { const px = Math.max(3, DE.size * ($('#dePage').getBoundingClientRect().width / 360)); d.style.width = d.style.height = px + 'px'; d.style.background = DE.tool === 'eraser' ? 'var(--ink-3)' : DE.color; } }
 function bindEditorBar() {
@@ -3622,7 +3781,9 @@ function bindEditorBar() {
   root.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-de]'); if (b) {
       const a = b.dataset.de; const it = DE.sel && DE.target.items.find((x) => x.id === DE.sel);
-      if (a === 'text') textSheet(); else if (a === 'stickers') stickerSheet(); else if (a === 'draw') enterDraw(); else if (a === 'paper') paperSheet(); else if (a === 'cover-style') coverSheet();
+      if (a === 'text') textSheet(); else if (a === 'label') textItemSheet(null); else if (a === 'stickers') stickerSheet(); else if (a === 'draw') enterDraw(); else if (a === 'paper') paperSheet(); else if (a === 'cover-style') coverSheet();
+      else if (a === 'deselect') deSelect(null);
+      else if (a === 'edit-text' && it) textItemSheet(it);
       else if (it) {
         if (a === 'smaller') it.w = Math.max(6, it.w * 0.85); if (a === 'bigger') it.w = Math.min(140, it.w * 1.15);
         if (a === 'rotl') it.rot = (it.rot || 0) - 10; if (a === 'rotr') it.rot = (it.rot || 0) + 10;
@@ -3633,11 +3794,16 @@ function bindEditorBar() {
       }
       return;
     }
-    const tl = e.target.closest('[data-tool]'); if (tl) { DE.tool = tl.dataset.tool; $$('.de-tool', root).forEach((x) => x.classList.toggle('on', x === tl)); paintDot(); return; }
+    const tl = e.target.closest('[data-tool]'); if (tl) {
+      DE.tool = tl.dataset.tool; $$('.de-tool', root).forEach((x) => x.classList.toggle('on', x === tl));
+      // неон тёмным цветом не светится: сразу берём яркий
+      if (DE.tool === 'glow' && ['#1F2328', '#5B6270', '#8B5A2B'].includes(DE.color)) { DE.color = '#E86FB4'; $$('.de-colors .swatch', root).forEach((x) => x.classList.toggle('on', x.dataset.color === DE.color)); }
+      paintDot(); return;
+    }
     const sw = e.target.closest('[data-color]'); if (sw) { DE.color = sw.dataset.color; $$('.de-colors .swatch', root).forEach((x) => x.classList.toggle('on', x === sw)); if (DE.tool === 'eraser') { DE.tool = 'pen'; $$('.de-tool', root).forEach((x) => x.classList.toggle('on', x.dataset.tool === 'pen')); } paintDot(); return; }
-    if (e.target.id === 'deUndo') { DE.strokes.pop(); ui.deRedraw(); return; }
-    if (e.target.id === 'deClear') { DE.base = null; DE.strokes = []; DE.dirtyDraw = true; ui.deRedraw(); if (DE.target.drawing) { const old = DE.target.drawing; DE.target.drawing = null; phDel(old); deTouch(); } return; }
-    if (e.target.id === 'deDrawDone') { exitDraw(true); }
+    if (e.target.closest('#deUndo')) { if (DE.strokes.length) { DE.strokes.pop(); ui.deRedraw(); } else toast('Отменять нечего'); return; }
+    if (e.target.closest('#deClear')) { DE.base = null; DE.strokes = []; DE.dirtyDraw = true; ui.deRedraw(); if (DE.target.drawing) { const old = DE.target.drawing; DE.target.drawing = null; phDel(old); deTouch(); } return; }
+    if (e.target.closest('#deDrawDone')) { exitDraw(true); }
   });
   $('#deSize', root).addEventListener('input', (e) => { DE.size = +e.target.value; paintDot(); });
   $('#deFile', root).addEventListener('change', async (e) => {
@@ -3652,14 +3818,47 @@ function bindEditorBar() {
   });
 }
 function textSheet() {
-  const p = DE.target;
+  const p = DE.target; let font = p.font || 'hand', fsz = p.fsz || 'm', ink = p.ink || '';
+  const preview = () => { const f = dFont(font); const k = f[3] * (D_SIZES.find((x) => x[0] === fsz) || D_SIZES[1])[2]; return `font-family:${f[2]};font-size:${Math.round(22 * k)}px;line-height:1.35;${ink ? 'color:' + ink : ''}`; };
   openSheet('Текст страницы', `<form id="f" class="form">
     <label class="field"><span>Дата</span><input type="date" id="dtDate" value="${p.date}"></label>
     <input type="text" id="dtTitle" value="${esc(p.title)}" placeholder="Заголовок, например «Поездка в Холдоми»" maxlength="80">
-    <textarea id="dtText" placeholder="Что сегодня случилось? Что почувствовали, что хочется запомнить…" style="min-height:220px">${esc(p.text)}</textarea>
+    <textarea id="dtText" placeholder="Что сегодня случилось? Что почувствовали, что хочется запомнить…" style="min-height:200px;${preview()}">${esc(p.text)}</textarea>
+    <div class="field"><span>Шрифт</span>${fontPicker('dtFont', font)}</div>
+    <div class="field"><span>Размер</span><div class="seg col3" id="dtSize">${D_SIZES.map(([k, n]) => `<button type="button" data-v="${k}" class="${fsz === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+    <div class="field"><span>Цвет чернил</span><div class="swatches" id="dtInk">${D_INKS.map(([c, n]) => `<button type="button" class="swatch ${ink === c ? 'on' : ''} ${c ? '' : 'auto'}" data-ink="${c}" style="background:${c || 'var(--surface)'}" aria-label="${n}"></button>`).join('')}</div></div>
     <div class="sticky-save"><button class="btn primary" type="submit">Готово</button></div></form>`, (body) => {
-    $('#f', body).addEventListener('submit', (e) => { e.preventDefault(); p.date = $('#dtDate', body).value || p.date; p.title = $('#dtTitle', body).value.trim(); p.text = $('#dtText', body).value.replace(/\s+$/, ''); deTouch(); closeSheet(); deRerenderPage(); });
-    setTimeout(() => { const t = $('#dtText', body); if (t && !p.text) t.focus(); }, 320);
+    const ta = $('#dtText', body); const upd = () => { ta.setAttribute('style', 'min-height:200px;' + preview()); };
+    body.addEventListener('click', (e) => {
+      const f = e.target.closest('[data-font]'); if (f) { font = f.dataset.font; $$('#dtFont button', body).forEach((x) => x.classList.toggle('on', x === f)); upd(); return; }
+      const z = e.target.closest('#dtSize [data-v]'); if (z) { fsz = z.dataset.v; $$('#dtSize button', body).forEach((x) => x.classList.toggle('on', x === z)); upd(); return; }
+      const k = e.target.closest('[data-ink]'); if (k) { ink = k.dataset.ink; $$('#dtInk button', body).forEach((x) => x.classList.toggle('on', x === k)); upd(); }
+    });
+    $('#f', body).addEventListener('submit', (e) => { e.preventDefault(); p.date = $('#dtDate', body).value || p.date; p.title = $('#dtTitle', body).value.trim(); p.text = ta.value.replace(/\s+$/, ''); p.font = font; p.fsz = fsz; p.ink = ink; deTouch(); closeSheet(); deRerenderPage(); });
+    setTimeout(() => { if (!p.text) ta.focus(); }, 320);
+  });
+}
+/* Своя надпись: любой текст любым шрифтом, двигается и крутится как наклейка */
+function textItemSheet(it) {
+  const d = it ? { text: it.text, font: it.font, c: it.c } : { text: '', font: 'hand', c: DE.kind === 'cover' ? '#FFFFFF' : '#1F2328' };
+  const preview = () => { const f = dFont(d.font); return `min-height:96px;font-family:${f[2]};font-size:${Math.round(26 * f[3])}px;line-height:1.2;color:${d.c};background:${isLight(d.c) ? '#2B2D33' : 'var(--surface)'}`; };
+  openSheet(it ? 'Надпись' : 'Своя надпись', `<form id="f" class="form">
+    <textarea id="tiText" maxlength="200" placeholder="Например: «Лучшее лето»" style="${preview()}">${esc(d.text)}</textarea>
+    <div class="field"><span>Шрифт</span>${fontPicker('tiFont', d.font)}</div>
+    <div class="field"><span>Цвет</span><div class="swatches" id="tiColor">${D_COLORS.map((c) => `<button type="button" class="swatch ${d.c === c ? 'on' : ''}" data-tc="${c}" style="background:${c}" aria-label="Цвет"></button>`).join('')}</div></div>
+    <div class="sticky-save"><button class="btn primary" type="submit">${it ? 'Сохранить' : 'Добавить на страницу'}</button></div></form>`, (body) => {
+    const ta = $('#tiText', body); const upd = () => ta.setAttribute('style', preview());
+    body.addEventListener('click', (e) => {
+      const f = e.target.closest('[data-font]'); if (f) { d.font = f.dataset.font; $$('#tiFont button', body).forEach((x) => x.classList.toggle('on', x === f)); upd(); return; }
+      const c = e.target.closest('[data-tc]'); if (c) { d.c = c.dataset.tc; $$('#tiColor button', body).forEach((x) => x.classList.toggle('on', x === c)); upd(); }
+    });
+    $('#f', body).addEventListener('submit', (e) => {
+      e.preventDefault(); const text = ta.value.replace(/\s+$/, ''); if (!text.trim()) { toast('Напишите надпись'); ta.focus(); return; }
+      closeSheet();
+      if (it) { Object.assign(it, { text, font: d.font, c: d.c }); deTouch(); deRerenderPage(); }
+      else deAddItem({ kind: 'text', text, font: d.font, c: d.c, w: 24, rot: 0 });
+    });
+    setTimeout(() => { if (!d.text) ta.focus(); }, 320);
   });
 }
 function stickerSheet() {
@@ -3689,14 +3888,14 @@ function coverSheet() {
   const c = DE.target;
   openSheet('Обложка', `<div class="form">
     <label class="field"><span>Название</span><input type="text" id="cvTitle" value="${esc(c.title)}" maxlength="40"></label>
-    <div class="field"><span>Шрифт названия</span><div class="seg" id="cvFont"><button type="button" data-v="display" class="${c.font !== 'hand' ? 'on' : ''}">Строгий</button><button type="button" data-v="hand" class="${c.font === 'hand' ? 'on' : ''}" style="font-family:var(--font-hand);font-size:19px">От руки</button></div></div>
+    <div class="field"><span>Шрифт названия</span>${fontPicker('cvFont', c.font || 'display')}</div>
     <div class="field"><span>Цвет названия</span><div class="swatches" id="cvTc">${['#FFFFFF', '#1F2328', '#E8C66A', '#F4B6C2'].map((x) => `<button type="button" class="swatch ${c.titleColor === x ? 'on' : ''}" data-tc="${x}" style="background:${x}" aria-label="Цвет"></button>`).join('')}</div></div>
     <div class="field"><span>Цвет обложки</span><div class="swatches" id="cvColor">${D_COVERS.map(([x, n]) => `<button type="button" class="swatch ${c.color === x ? 'on' : ''}" data-cv="${x}" style="background:${x}" aria-label="${n}"></button>`).join('')}</div></div>
     <div class="field"><span>Фактура</span><div class="seg" id="cvTex">${D_TEXTURES.map(([k, n]) => `<button type="button" data-v="${k}" class="${(c.texture || 'leather') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <p class="note-small" style="margin:0">Порисовать и наклеить стикеры можно кнопками внизу редактора.</p></div>`, (body) => {
     $('#cvTitle', body).addEventListener('input', (e) => { c.title = e.target.value; deTouch(); deRerenderPage(); });
     body.addEventListener('click', (e) => {
-      const f = e.target.closest('#cvFont [data-v]'); if (f) { c.font = f.dataset.v; $$('#cvFont button', body).forEach((x) => x.classList.toggle('on', x === f)); }
+      const f = e.target.closest('#cvFont [data-font]'); if (f) { c.font = f.dataset.font; $$('#cvFont button', body).forEach((x) => x.classList.toggle('on', x === f)); }
       const tc = e.target.closest('[data-tc]'); if (tc) { c.titleColor = tc.dataset.tc; $$('[data-tc]', body).forEach((x) => x.classList.toggle('on', x === tc)); }
       const cv = e.target.closest('[data-cv]'); if (cv) { c.color = cv.dataset.cv; $$('[data-cv]', body).forEach((x) => x.classList.toggle('on', x === cv)); }
       const tx = e.target.closest('#cvTex [data-v]'); if (tx) { c.texture = tx.dataset.v; $$('#cvTex button', body).forEach((x) => x.classList.toggle('on', x === tx)); }
@@ -4107,6 +4306,7 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
 /* ================= Запуск ================= */
 function start() {
   S = load();
+  if (/[?&]selftest\b/.test(location.search)) window.__life = { ACT, DETAIL, RENDER, get S() { return S; }, ui, DE };
   document.body.insertAdjacentHTML('afterbegin', muscleSprite());
   $('#sheetClose').innerHTML = I.close; $('#sheetBack').innerHTML = I.back; $('#sheetDel').innerHTML = I.trash;
   $('#vwClose').innerHTML = I.close; $('#vwPrev').innerHTML = I.left; $('#vwNext').innerHTML = I.right;
