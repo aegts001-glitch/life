@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.2';
+const LIFE_VERSION = '1.2.1';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -375,12 +375,17 @@ function openSheet(title, html, mount, opts = {}) {
   sheetBack = opts.back || null; $('#sheetBack').hidden = !sheetBack;
   sheetOnClose = opts.onClose || null;
   body.innerHTML = html; body.scrollTop = 0;
+  // Панель «Сохранить» всегда последняя, чтобы ничего не перекрывала (кнопка «Удалить» стоит над ней)
+  $$('.sticky-save', body).forEach((ss) => ss.parentElement.appendChild(ss));
   if (wasOpen) { body.classList.remove('swap'); void body.offsetWidth; body.classList.add('swap'); }
   scrim.hidden = false; sh.hidden = false; sheetOpen = true;
   document.documentElement.classList.add('no-scroll');
   if (!wasOpen) requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('show'); sh.classList.add('show'); }));
   hydratePhotos(body);
   if (mount) mount(body);
+  // Корзина в шапке листа: удаление видно сразу, без прокрутки
+  const del = $('.btn.danger', body); const hd = $('#sheetDel');
+  hd.hidden = !del; hd.onclick = del ? () => { del.click(); const box = $('#delBox', body); if (box && !box.hidden) box.scrollIntoView({ block: 'center', behavior: 'smooth' }); } : null;
 }
 function closeSheet() {
   if (!sheetOpen) return; sheetOpen = false;
@@ -2089,7 +2094,7 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
 /* ================= Запуск ================= */
 function start() {
   S = load();
-  $('#sheetClose').innerHTML = I.close; $('#sheetBack').innerHTML = I.back;
+  $('#sheetClose').innerHTML = I.close; $('#sheetBack').innerHTML = I.back; $('#sheetDel').innerHTML = I.trash;
   $('#vwClose').innerHTML = I.close; $('#vwPrev').innerHTML = I.left; $('#vwNext').innerHTML = I.right;
   $('#keypad').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map((k) => k === '' ? '<span></span>' : `<button type="button" data-k="${k}" aria-label="${k === 'del' ? 'Стереть' : k}">${k === 'del' ? I.left : k}</button>`).join('');
   $('#scrim').addEventListener('click', closeSheet);
