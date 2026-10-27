@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.2.1';
+const LIFE_VERSION = '1.3';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -139,70 +139,33 @@ const QUICK_DEFS = {
 /* ================= Данные ================= */
 const KEY = 'life.v1';
 let S;
+const DEFAULT_SERVICES = [
+  ['Моторное масло и фильтр', 7500, 6], ['Воздушный фильтр', 15000, 12], ['Салонный фильтр', 15000, 12],
+  ['Жидкость коробки передач', 40000, 24], ['Свечи зажигания', 30000, 36], ['Тормозная жидкость', 40000, 24],
+  ['Антифриз', 40000, 36], ['Ремень навесного оборудования', 60000, 48], ['Тормозные колодки, проверка', 15000, 12]
+];
+/* Чистое приложение без чужих данных: так его видит каждый новый человек */
 function seed() {
-  const now = new Date();
-  const at = (days, h, m) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, h, m).toISOString();
-  const dISO = (days) => isoOf(addDays(now, days));
-  const contractors = [
-    ['АСК', 'Окна, стяжка и пол на лоджиях, стены в кладовых', 'окн, стеклопакет, подоконник, штапик, балконн, рам, стяжк, кладов'],
-    ['ТНК Восток', 'Витражи', 'витраж'],
-    ['Вирджиния', 'Стены, замятые люки и короба', 'стен, штукатур, люк, короб, ящик'],
-    ['ИП Орлова', 'Электрика', 'электр, розетк, подрозетник, автомат, кабель, выключател, свет, освещен'],
-    ['СМК Интеллект', 'Сантехника и отопление', 'сантех, отоплен, радиатор, разводк, труб, канализац'],
-    ['Дальспецком', 'Слаботочные системы', 'слаботоч, домофон, интернет, видеонаблюд'],
-    ['Промлайн', 'Вентиляция', 'вентил, решётк, решетк'],
-    ['СнабДВ', 'Входные двери', 'входн'],
-    ['Технолегион', 'Фасад: отливы, наружные откосы, декоративная штукатурка, отверстия под кондиционер', 'отлив, фасад, наружн, снаружи, декоратив, кондиционер']
-  ].map(([name, scope, keys]) => ({ id: uid(), name, scope, keys, contact: '' }));
   return {
     v: 2,
     settings: {
-      name: 'Сергей', theme: 'auto', accent: 'blue', wallpaper: 'dots', icon: 'light', budget: null,
-      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: true },
-      order: ['notes', 'plans', 'bank', 'objects', 'car', 'reminders'],
+      name: '', theme: 'auto', accent: 'blue', wallpaper: 'dots', icon: 'light', budget: null,
+      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false },
+      order: ['notes', 'plans', 'bank', 'car', 'reminders', 'objects'],
       features: { income: true, recurring: true, piggy: true, fuel: true, photos: true },
-      quick: ['new-note', 'new-plan', 'new-exp', 'new-fuel', 'new-remark'],
+      quick: ['new-note', 'new-plan', 'new-exp', 'new-rem', 'new-fuel'],
       widgets: Object.keys(WIDGETS).map((id) => ({ id, on: true })),
-      pin: null, lockAfter: 1
+      pin: null, lockAfter: 1, onboarded: false
     },
-    notes: [
-      { id: uid(), cat: 'work', title: 'Обход по стеклопакетам', body: 'Взять ведомость обмера, рулетку и маркер.\nНачать с 24 этажа.', pinned: true, updated: now.toISOString(), photos: [], example: true },
-      { id: uid(), cat: 'study', title: 'Продуктовый маркетинг', body: 'Разобрать кейс и выписать метрики воронки.', pinned: false, updated: at(-1, 20, 0), photos: [], example: true }
-    ],
-    reminders: [{ id: uid(), title: 'Записать пробег машины', note: '', at: at(1, 9, 0), repeat: 'none', done: false, example: true }],
-    plans: [
-      { id: uid(), title: 'Сдать ведомость по стеклопакетам', date: dISO(2), month: monthKey(addDays(now, 2)), time: '', cat: 'work', done: false, note: '', example: true },
-      { id: uid(), title: 'Тренировка', date: dISO(1), month: monthKey(addDays(now, 1)), time: '19:00', cat: 'life', done: false, note: '', example: true },
-      { id: uid(), title: 'Пройти модуль по маркетингу', date: null, month: monthKey(now), time: '', cat: 'study', done: false, note: '', example: true }
-    ],
-    expenses: [
-      { id: uid(), amount: 2350, cat: 'groceries', date: todayISO(), note: '', pay: 'card', example: true },
-      { id: uid(), amount: 450, cat: 'coffee', date: dISO(-1), note: '', pay: 'cash', example: true }
-    ],
-    incomes: [{ id: uid(), amount: 60000, cat: 'salary', date: dISO(-3), note: 'Пример', example: true }],
-    recurring: [{ id: uid(), kind: 'exp', name: 'Интернет', amount: 600, cat: 'internet', freq: 'month', start: dISO(5), last: null, auto: true, pay: 'card', example: true }],
-    customCats: [],
-    goals: [{ id: uid(), name: 'Отпуск', target: 60000, deadline: null, color: '#3550E6', example: true, ops: [{ id: uid(), amount: 12000, date: todayISO(), note: 'Пример пополнения' }] }],
-    car: { name: 'Honda Fit', body: 'GD1', year: 2001, engine: '1,3 л, вариатор', color: '#C9CDD3', mileage: null, mileageDate: null },
-    services: [
-      ['Моторное масло и фильтр', 7500, 6], ['Воздушный фильтр', 15000, 12], ['Салонный фильтр', 15000, 12],
-      ['Жидкость вариатора', 30000, 24], ['Свечи зажигания (8 шт.)', 30000, 36], ['Регулировка клапанов', 40000, 0],
-      ['Тормозная жидкость', 40000, 24], ['Антифриз', 40000, 36], ['Ремень навесного оборудования', 60000, 48], ['Тормозные колодки, проверка', 15000, 12]
-    ].map(([name, km, months]) => ({ id: uid(), name, km, months, lastKm: null, lastDate: null, rec: true })),
-    carLog: [], carTodo: [],
-    fuel: [
-      { id: uid(), date: dISO(-12), km: 185600, liters: 32, price: 64.5, total: 2064, full: true, station: 'Роснефть', example: true },
-      { id: uid(), date: dISO(-4), km: 186010, liters: 29.5, price: 64.9, total: 1915, full: true, station: 'Роснефть', example: true }
-    ],
-    objects: [{
-      id: uid(), name: 'Сердце Востока', days: 20, contractors,
-      remarks: [{ id: uid(), text: 'Трещина стеклопакета на кухне', section: '5', floor: '12', unit: 'кв. 5', contractorId: contractors[0].id, issued: todayISO(), due: isoOf(addDays(now, 20)), status: 'open', doneDate: null, photos: [], walkId: null, example: true }],
-      walks: []
-    }]
+    notes: [], reminders: [], plans: [], expenses: [], incomes: [], recurring: [], customCats: [], goals: [],
+    car: { name: '', body: '', year: '', engine: '', color: '#C9CDD3', mileage: null, mileageDate: null },
+    services: DEFAULT_SERVICES.map(([name, km, months]) => ({ id: uid(), name, km, months, lastKm: null, lastDate: null, rec: true })),
+    carLog: [], carTodo: [], fuel: [], objects: []
   };
 }
 function normalize(s) {
   const d = seed();
+  const legacy = !s.settings || s.settings.onboarded === undefined;
   const st = s.settings = Object.assign({}, d.settings, s.settings || {});
   st.sections = Object.assign({}, d.settings.sections, st.sections || {});
   st.features = Object.assign({}, d.settings.features, st.features || {});
@@ -214,8 +177,9 @@ function normalize(s) {
   Object.keys(WIDGETS).forEach((id) => { if (!wids.some((w) => w.id === id)) wids.push({ id, on: true }); });
   st.widgets = wids;
   ['notes', 'reminders', 'plans', 'expenses', 'incomes', 'recurring', 'customCats', 'goals', 'services', 'carLog', 'carTodo', 'fuel', 'objects'].forEach((k) => {
-    if (!Array.isArray(s[k])) s[k] = (s.v === 2 || !d[k]) ? [] : d[k];
+    if (!Array.isArray(s[k])) s[k] = k === 'services' ? d.services : [];
   });
+  if (legacy) { st.onboarded = false; st.freshOffer = true; }
   s.car = Object.assign({}, d.car, s.car || {});
   s.notes.forEach((n) => { if (!Array.isArray(n.photos)) n.photos = []; });
   s.goals.forEach((g) => { if (!Array.isArray(g.ops)) g.ops = []; });
@@ -226,6 +190,19 @@ function normalize(s) {
 function load() {
   try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v) return normalize(s); } } catch (e) { /* нет хранилища */ }
   return seed();
+}
+/* Стереть записи. keepSetup — оставить машину (без пробега и отметок) и объекты с подрядчиками */
+async function wipeAll(keepSetup) {
+  try { (await phAll() || []).forEach((p) => phDel(p.id)); } catch (e) { /* нет фото */ }
+  const old = S; const fresh = seed();
+  fresh.settings = Object.assign({}, old.settings, { pin: keepSetup ? old.settings.pin : null, budget: null });
+  if (keepSetup) {
+    fresh.car = Object.assign({}, old.car, { mileage: null, mileageDate: null });
+    fresh.services = old.services.map((x) => Object.assign({}, x, { lastKm: null, lastDate: null }));
+    fresh.objects = old.objects.map((o) => Object.assign({}, o, { remarks: [], walks: [] }));
+    fresh.customCats = old.customCats;
+  }
+  S = fresh; save();
 }
 let saveFailed = false;
 function save() {
@@ -582,7 +559,7 @@ const WIDGET = {
     const c = S.car; const next = nextService(); const fs = fuelStats();
     return `<button class="card" style="border:0;text-align:left;width:100%;display:block" data-act="tab" data-tab="car">
       <h2>Машина</h2><div class="mini-car">${carSVG(c.color)}<div>
-      <div style="font-weight:700;font-size:17px">${esc(c.name)}</div>
+      <div style="font-weight:700;font-size:17px">${esc(c.name) || 'Машина не указана'}</div>
       <div style="color:var(--ink-2);font-size:14px">${c.mileage != null ? kmf(c.mileage) : 'Пробег не указан'}${feat('fuel') && fs.avg ? `, ${nf1.format(fs.avg)} л/100 км` : ''}</div>
       ${next ? `<div style="margin-top:6px"><span class="pill ${next.st.cls}">${esc(next.s.name)}: ${esc(next.st.short)}</span></div>` : ''}
       </div></div></button>`;
@@ -1394,7 +1371,7 @@ RENDER.car = function () {
   if (!secs.some((s) => s[0] === ui.carSec)) ui.carSec = 'service';
   let html = head('Авто', '', plusBtn('car-add', 'Добавить'));
   html += `<div class="card car-hero"><button class="icon-btn edit" data-act="car-edit" aria-label="Изменить данные машины">${I.edit}</button>
-    <div class="name">${esc(c.name)}</div><div class="meta">${[c.body && 'кузов ' + esc(c.body), c.year && esc(c.year) + ' год', esc(c.engine)].filter(Boolean).join(', ')}</div>
+    <div class="name">${esc(c.name) || 'Ваша машина'}</div><div class="meta">${c.name ? [c.body && 'кузов ' + esc(c.body), c.year && esc(c.year) + ' год', esc(c.engine)].filter(Boolean).join(', ') : '<button class="btn sm" data-act="car-edit" style="margin-top:6px">Указать марку, год и цвет</button>'}</div>
     ${carSVG(c.color)}
     <div class="odo"><div><div class="lbl">Пробег${c.mileageDate ? ' на ' + fmtD(toDate(c.mileageDate)) : ''}</div><div class="big-num">${c.mileage != null ? nf.format(c.mileage) + '<small> км</small>' : '—'}</div></div>
     <button class="btn sm primary" data-act="mileage">${I.odo}Обновить</button></div></div>`;
@@ -1407,7 +1384,7 @@ RENDER.car = function () {
       ${st.cls !== 'none' ? `<div class="bar ${st.cls}"><i style="width:${Math.round(st.frac * 100)}%"></i></div>` : ''}
       <div class="svc-meta"><span>${intervalText(s)}</span><span>${st.parts && st.parts.length ? st.parts.join(', ') : 'нажмите, чтобы отметить замену'}</span></div></div></button>`).join('')}</div>`
       : `<div class="card empty"><b>Регламент пуст</b>Нажмите «+», чтобы добавить пункт.</div>`;
-    html += `<p class="note-small">Интервалы заполнены как ориентир для мотора 1,3 л с вариатором. Поменяйте их под свои условия: нажмите на пункт.</p>`;
+    html += `<p class="note-small">Интервалы заполнены как типовой ориентир. Поменяйте их под свою машину: нажмите на пункт. Лишнее можно удалить, своё добавить через «+».</p>`;
   } else if (ui.carSec === 'fuel') {
     const fs = fuelStats(); const list = [...S.fuel].sort((a, b) => b.date.localeCompare(a.date) || (b.km || 0) - (a.km || 0));
     const chart = list.filter((f) => fs.cons[f.id]).slice(0, 8).reverse();
@@ -1855,7 +1832,11 @@ DETAIL.settings = function () {
     <div class="field"><span>Резервная копия</span><div class="btn-row"><button type="button" class="btn sm" data-act="export">Сохранить копию</button><button type="button" class="btn sm" data-act="import">Восстановить</button></div>
       <input type="file" id="impFile" accept="application/json,.json" hidden>
       <p class="note-small" style="margin:0">Данные и фото хранятся только на этом телефоне. Сохраняйте копию в «Файлы» хотя бы раз в месяц.</p></div>
-    <div class="field"><span>Сброс</span>${confirmBox('Стереть все данные', 'Стереть все записи и фото? Восстановить можно только из резервной копии.', 'Стереть')}</div>
+    <div class="field"><span>Сброс</span><button class="btn danger" type="button" data-act="ask-del">Стереть данные</button>
+      <div class="confirm" id="delBox" hidden><p>Что стереть? Восстановить можно только из резервной копии.</p>
+        <button type="button" class="btn sm danger" data-act="wipe" data-keep="1">Записи и фото, машину и объекты оставить</button>
+        <button type="button" class="btn sm danger" data-act="wipe">Всё полностью</button>
+        <button type="button" class="btn sm" data-act="cancel-del">Отмена</button></div></div>
     <p class="note-small" style="text-align:center">Life, версия ${LIFE_VERSION}</p>`;
 };
 DETAIL.sections = function () {
@@ -1931,13 +1912,7 @@ async function importData(f) {
   for (const [id, u] of Object.entries(data.photos || {})) {
     try { const full = await (await fetch(u)).blob(); const thumb = await scaleImage(full, 360, 0.75); await phPut({ id, full, thumb, created: Date.now() }); } catch (e) { /* пропускаем битое фото */ }
   }
-  S = normalize(st); save(); applyTheme(); applyIcon(); ui.stack = []; render('anim-fade'); toast('Данные восстановлены');
-}
-async function wipeAll() {
-  try { (await phAll() || []).forEach((p) => phDel(p.id)); } catch (e) { /* нет фото */ }
-  const keep = { ...S.settings, pin: null };
-  S = seed(); ['notes', 'reminders', 'plans', 'expenses', 'incomes', 'recurring', 'goals', 'fuel', 'carLog', 'carTodo', 'customCats'].forEach((k) => { S[k] = []; });
-  S.objects.forEach((o) => { o.remarks = []; }); S.settings = keep; save();
+  S = normalize(st); S.settings.onboarded = true; delete S.settings.freshOffer; save(); applyTheme(); applyIcon(); ui.stack = []; render('anim-fade'); toast('Данные восстановлены');
 }
 ACT.settings = () => push({ type: 'settings' });
 ACT['settings-sections'] = () => { if (sheetOpen) closeSheet(); if (ui.stack.length && ui.stack[ui.stack.length - 1].type === 'sections') return; if (!ui.stack.length || ui.stack[0].type !== 'settings') { ui.tab = 'home'; ui.stack = [{ type: 'settings' }]; } push({ type: 'sections' }); };
@@ -1967,6 +1942,39 @@ function installBanner() {
 }
 ACT['install-dismiss'] = () => { S.settings.installDismissed = true; save(); render(); };
 
+ACT.wipe = (el) => { const keep = !!el.dataset.keep; wipeAll(keep).then(() => { ui.stack = []; applyTheme(); render('anim-back'); toast(keep ? 'Записи стёрты, машина и объекты остались' : 'Все данные стёрты'); }); };
+
+/* ================= Первый запуск ================= */
+function showWelcome(mode) {
+  const w = $('#welcome'); const st = S.settings;
+  const secsHTML = () => S.settings.order.map((id) => { const d = SECTION_DEFS[id]; const on = st.sections[id]; return `<button type="button" class="wl-sec ${on ? 'on' : ''}" data-wsec="${id}"><span class="sec-ic">${I[d.icon]}</span><span class="t">${d.name}</span><span class="m">${d.desc}</span><span class="wl-tick">${I.tick}</span></button>`; }).join('');
+  if (mode === 'offer') {
+    w.innerHTML = `<div class="wl-in"><img data-logo src="icons/logo.png" alt=""><h2>Начать с чистого листа?</h2>
+      <p>Сейчас в Life примеры и тестовые записи. Можно стереть их и начать вести свои.</p>
+      <label class="feat wl-keep"><input type="checkbox" id="wlKeep" checked><span>Оставить машину и объекты с подрядчиками</span></label>
+      <button class="btn primary" type="button" id="wlWipe">Стереть и начать</button>
+      <button class="btn ghost" type="button" id="wlKeepAll">Оставить как есть</button></div>`;
+    $('#wlWipe', w).onclick = async () => { await wipeAll($('#wlKeep', w).checked); applyTheme(); render(); showWelcome('setup'); };
+    $('#wlKeepAll', w).onclick = () => { st.onboarded = true; delete st.freshOffer; save(); hideWelcome(); };
+  } else {
+    w.innerHTML = `<div class="wl-in"><img data-logo src="icons/logo.png" alt=""><h2>Добро пожаловать в Life</h2>
+      <p>Всё хранится только на этом телефоне. Настроить можно потом в любой момент.</p>
+      <label class="field"><span>Как к вам обращаться</span><input type="text" id="wlName" value="${esc(st.name)}" placeholder="Имя" maxlength="30" autocomplete="given-name"></label>
+      <div class="field"><span>Что будете вести</span><div class="wl-secs" id="wlSecs">${secsHTML()}</div></div>
+      <label class="field" id="wlCarF" ${st.sections.car ? '' : 'hidden'}><span>Ваша машина, если есть</span><input type="text" id="wlCar" value="${esc(S.car.name)}" placeholder="Например, Toyota Corolla" maxlength="60"></label>
+      <button class="btn primary" type="button" id="wlGo">Начать</button></div>`;
+    $('#wlSecs', w).onclick = (e) => { const b = e.target.closest('[data-wsec]'); if (!b) return; const id = b.dataset.wsec; st.sections[id] = !st.sections[id]; b.classList.toggle('on', st.sections[id]); $('#wlCarF', w).hidden = !st.sections.car; };
+    $('#wlGo', w).onclick = () => {
+      if (!Object.values(st.sections).some(Boolean)) { toast('Выберите хотя бы один раздел'); return; }
+      st.name = $('#wlName', w).value.trim(); const car = $('#wlCar', w).value.trim(); if (car) S.car.name = car;
+      st.onboarded = true; delete st.freshOffer; save(); ui.stack = []; ui.tab = 'home'; hideWelcome(); render('anim-fade');
+      toast(st.name ? `Готово, ${st.name}. Life ваш` : 'Готово. Life ваш');
+    };
+  }
+  w.hidden = false; applyIcon(); requestAnimationFrame(() => w.classList.add('show'));
+}
+function hideWelcome() { const w = $('#welcome'); w.classList.remove('show'); setTimeout(() => { w.hidden = true; w.innerHTML = ''; }, 250); }
+
 /* ================= События ================= */
 ACT.tab = (el) => go(el.dataset.tab);
 ACT.more = () => moreSheet();
@@ -1976,9 +1984,6 @@ ACT['ask-del'] = (el) => { const scope = el.parentElement; const b = $('#delBox'
 ACT['cancel-del'] = (el) => { const b = el.closest('#delBox'); if (!b) return; b.hidden = true; const a = b.parentElement.querySelector('[data-act="ask-del"]'); if (a) a.hidden = false; };
 
 document.addEventListener('click', (e) => {
-  if (e.target.id === 'delYes' && !sheetOpen && ui.stack.length && ui.stack[ui.stack.length - 1].type === 'settings') {
-    wipeAll().then(() => { ui.stack = []; render('anim-back'); toast('Все данные стёрты'); }); return;
-  }
   const setEl = e.target.closest('[data-set]');
   if (setEl) {
     const k = setEl.dataset.set; let v = setEl.dataset.v; if (k === 'lockAfter') v = +v;
@@ -2075,7 +2080,7 @@ document.addEventListener('keydown', (e) => {
   $('#lockCancel').addEventListener('click', () => hideLock());
   $('#lockForgot').addEventListener('click', () => { $('#forgotBox').hidden = false; $('#lockForgot').hidden = true; });
   $('#forgotNo').addEventListener('click', () => { $('#forgotBox').hidden = true; $('#lockForgot').hidden = false; });
-  $('#forgotYes').addEventListener('click', async () => { await wipeAll(); hideLock(); ui.stack = []; go('home'); toast('Данные стёрты, код сброшен'); });
+  $('#forgotYes').addEventListener('click', async () => { await wipeAll(false); hideLock(); ui.stack = []; go('home'); toast('Данные стёрты, код сброшен'); });
 })();
 
 let lastVisible = Date.now();
@@ -2104,6 +2109,7 @@ function start() {
   runRecurring(true);
   if (S.settings.pin) showLock('unlock');
   render(); applyIcon(); save();
+  if (!S.settings.onboarded) showWelcome(S.settings.freshOffer ? 'offer' : 'setup');
   checkDue(); setInterval(checkDue, 30000);
   if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
