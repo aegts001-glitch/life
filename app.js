@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.3';
+const LIFE_VERSION = '1.4';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -35,7 +35,10 @@ const I = {
   walk: svg('<circle cx="13" cy="4.5" r="1.8"/><path d="m9 21 2.5-6.5L14 17v4M8 11l2.5-3.5 3.5.5 2.5 3.5 2.5 1M11.5 14.5 12.8 8"/>'),
   user: svg('<circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>'),
   pin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 3 21 8.5l-2.2.7-3.4 3.4.4 4.6-1.7 1.7-3.8-3.8L5 20.4 3.6 19l5.3-5.3-3.8-3.8 1.7-1.7 4.6.4 3.4-3.4z"/></svg>',
-  back: svg('<path d="M15 5 8 12l7 7"/>', 2.4)
+  back: svg('<path d="M15 5 8 12l7 7"/>', 2.4),
+  food: svg('<path d="M4 13h16a8 8 0 0 1-16 0z"/><path d="M8 9c0-2 1.5-2.5 1.5-4.5M12 9c0-2 1.5-2.5 1.5-4.5M16 9c0-2 1.5-2.5 1.5-4.5"/>'),
+  dumbbell: svg('<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>', 2),
+  scale: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0L13 12"/>')
 };
 
 /* ================= Утилиты ================= */
@@ -117,14 +120,16 @@ const SECTION_DEFS = {
   plans: { name: 'Планы', icon: 'plans', desc: 'Месяц в пузырях дней' },
   bank: { name: 'Деньги', icon: 'bank', desc: 'Расходы, доходы, платежи, копилка' },
   car: { name: 'Авто', icon: 'car', desc: 'Регламент, заправки, история' },
-  objects: { name: 'Объекты', icon: 'building', desc: 'Замечания, обходы, подрядчики' }
+  objects: { name: 'Объекты', icon: 'building', desc: 'Замечания, обходы, подрядчики' },
+  food: { name: 'Питание', icon: 'food', desc: 'Еда, калории и БЖУ, вода, вес' },
+  sport: { name: 'Тренировки', icon: 'dumbbell', desc: 'Турник, бег, бокс, зал, рекорды' }
 };
 const FEATURE_DEFS = {
   income: { sec: 'bank', name: 'Доходы' }, recurring: { sec: 'bank', name: 'Регулярные платежи' }, piggy: { sec: 'bank', name: 'Копилка' },
   fuel: { sec: 'car', name: 'Заправки' }, photos: { sec: 'notes', name: 'Фото в заметках' }
 };
 const WIDGETS = {
-  quick: { name: 'Быстрые кнопки' }, reminders: { name: 'Ближайшие напоминания', sec: 'reminders' }, plans: { name: 'Планы на сегодня', sec: 'plans' },
+  quick: { name: 'Быстрые кнопки' }, food: { name: 'Питание сегодня', sec: 'food' }, sport: { name: 'Тренировки', sec: 'sport' }, reminders: { name: 'Ближайшие напоминания', sec: 'reminders' }, plans: { name: 'Планы на сегодня', sec: 'plans' },
   expenses: { name: 'Деньги за месяц', sec: 'bank' }, objects: { name: 'Объекты: сроки', sec: 'objects' }, car: { name: 'Машина', sec: 'car' },
   bank: { name: 'Копилка', sec: 'bank', feat: 'piggy' }, notes: { name: 'Последние заметки', sec: 'notes' }
 };
@@ -133,7 +138,9 @@ const QUICK_DEFS = {
   'new-plan': { name: 'План', icon: 'plans', sec: 'plans' }, 'new-exp': { name: 'Расход', icon: 'receipt', sec: 'bank' },
   'new-inc': { name: 'Доход', icon: 'income', sec: 'bank', feat: 'income' }, 'new-fuel': { name: 'Заправка', icon: 'fuel', sec: 'car', feat: 'fuel' },
   mileage: { name: 'Пробег', icon: 'odo', sec: 'car' }, 'new-remark': { name: 'Замечание', icon: 'building', sec: 'objects' },
-  'quick-deposit': { name: 'В копилку', icon: 'bank', sec: 'bank', feat: 'piggy' }
+  'quick-deposit': { name: 'В копилку', icon: 'bank', sec: 'bank', feat: 'piggy' },
+  'add-food': { name: 'Еда', icon: 'food', sec: 'food' }, 'start-workout': { name: 'Тренировка', icon: 'dumbbell', sec: 'sport' },
+  'add-weight': { name: 'Вес', icon: 'scale', sec: 'food' }
 };
 
 /* ================= Данные ================= */
@@ -150,17 +157,19 @@ function seed() {
     v: 2,
     settings: {
       name: '', theme: 'auto', accent: 'blue', wallpaper: 'dots', icon: 'light', budget: null,
-      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false },
-      order: ['notes', 'plans', 'bank', 'car', 'reminders', 'objects'],
+      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false, food: true, sport: true },
+      order: ['plans', 'food', 'bank', 'sport', 'notes', 'car', 'reminders', 'objects'],
       features: { income: true, recurring: true, piggy: true, fuel: true, photos: true },
-      quick: ['new-note', 'new-plan', 'new-exp', 'new-rem', 'new-fuel'],
+      quick: ['add-food', 'start-workout', 'new-exp', 'new-plan', 'new-note'],
       widgets: Object.keys(WIDGETS).map((id) => ({ id, on: true })),
       pin: null, lockAfter: 1, onboarded: false
     },
     notes: [], reminders: [], plans: [], expenses: [], incomes: [], recurring: [], customCats: [], goals: [],
     car: { name: '', body: '', year: '', engine: '', color: '#C9CDD3', mileage: null, mileageDate: null },
     services: DEFAULT_SERVICES.map(([name, km, months]) => ({ id: uid(), name, km, months, lastKm: null, lastDate: null, rec: true })),
-    carLog: [], carTodo: [], fuel: [], objects: []
+    carLog: [], carTodo: [], fuel: [], objects: [],
+    food: { entries: [], my: [], recent: [], water: {}, weights: [], goals: { mode: 'loss', sex: 'm', age: '', height: '', weight: '', activity: 1.55, manual: false, set: false } },
+    workouts: [], wTemplates: [], workoutActive: null, myExercises: []
   };
 }
 function normalize(s) {
@@ -181,6 +190,9 @@ function normalize(s) {
   });
   if (legacy) { st.onboarded = false; st.freshOffer = true; }
   s.car = Object.assign({}, d.car, s.car || {});
+  s.food = Object.assign({}, d.food, s.food || {}); ['entries', 'my', 'recent', 'weights'].forEach((k) => { if (!Array.isArray(s.food[k])) s.food[k] = []; });
+  if (!s.food.water || typeof s.food.water !== 'object') s.food.water = {}; s.food.goals = Object.assign({}, d.food.goals, s.food.goals || {});
+  ['workouts', 'wTemplates', 'myExercises'].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; }); if (s.workoutActive === undefined) s.workoutActive = null;
   s.notes.forEach((n) => { if (!Array.isArray(n.photos)) n.photos = []; });
   s.goals.forEach((g) => { if (!Array.isArray(g.ops)) g.ops = []; });
   s.objects.forEach((o) => { ['contractors', 'remarks', 'walks'].forEach((k) => { if (!Array.isArray(o[k])) o[k] = []; }); o.remarks.forEach((r) => { if (!Array.isArray(r.photos)) r.photos = []; }); if (!o.days) o.days = 20; });
@@ -201,6 +213,7 @@ async function wipeAll(keepSetup) {
     fresh.services = old.services.map((x) => Object.assign({}, x, { lastKm: null, lastDate: null }));
     fresh.objects = old.objects.map((o) => Object.assign({}, o, { remarks: [], walks: [] }));
     fresh.customCats = old.customCats;
+    fresh.food.my = old.food.my; fresh.food.goals = old.food.goals; fresh.wTemplates = old.wTemplates; fresh.myExercises = old.myExercises;
   }
   S = fresh; save();
 }
@@ -346,7 +359,9 @@ function removeWithUndo(msg, remove, restore, finalize) {
 /* ================= Лист снизу ================= */
 let sheetOpen = false, sheetOnClose = null, sheetBack = null;
 function openSheet(title, html, mount, opts = {}) {
-  const scrim = $('#scrim'), sh = $('#sheet'), body = $('#sheetBody');
+  const scrim = $('#scrim'), sh = $('#sheet');
+  // Новый контейнер на каждую карточку: обработчики прошлых карточек не доживают до новых
+  const old = $('#sheetBody'); const body = old.cloneNode(false); old.replaceWith(body);
   const wasOpen = sheetOpen;
   $('#sheetTitle').textContent = title;
   sheetBack = opts.back || null; $('#sheetBack').hidden = !sheetBack;
@@ -503,6 +518,447 @@ function shakeLock(msg) {
   const d = $('#lockDots'); d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
 }
 
+/* ================= База продуктов =================
+   Формат строки: название|ккал|белки|жиры|углеводы|порция, г|единица:граммы|слова для поиска
+   Значения на 100 г. Строки со звёздочкой — магазинные товары: значения ориентировочные, на упаковке могут отличаться. */
+const FOOD_RAW = `
+#Крупы и гарниры|🥣
+Гречка варёная|110|4.2|1.1|21.3|200||греча гарнир крупа
+Гречка сухая|313|12.6|3.3|62.1|70||греча крупа
+Рис белый варёный|116|2.2|0.5|24.9|200||гарнир крупа
+Рис белый сухой|344|6.7|0.7|78.9|70||крупа
+Рис бурый варёный|111|2.6|0.9|23|200||коричневый крупа
+Овсянка на воде|88|3|1.7|15|250||каша геркулес
+Овсянка на молоке|116|4|3.3|17.5|250||каша геркулес
+Овсяные хлопья сухие|352|12.3|6.2|61.8|50||геркулес крупа
+Пшённая каша на воде|90|3|0.7|17|250||пшено каша
+Перловка варёная|109|3.1|0.4|22.2|200||перловая крупа
+Булгур варёный|83|3.1|0.2|18.6|200||крупа
+Киноа варёная|120|4.4|1.9|21.3|200||крупа
+Кускус варёный|112|3.8|0.2|23.2|200||крупа
+Манная каша на молоке|98|3|3.2|15.3|250||манка каша
+Рисовая каша на молоке|97|2.9|1.4|18|250||каша
+Макароны варёные|112|3.6|0.4|23|200||паста гарнир рожки
+Макароны сухие|344|11|1.3|71|80||паста
+Спагетти варёные|158|5.8|0.9|30.9|200||паста
+Картофель варёный|82|2|0.4|16.7|200||картошка гарнир
+Картофельное пюре|106|2.5|4.2|14.7|200||картошка пюре гарнир
+Картофель жареный|192|2.8|9.5|23.4|200||картошка
+Картофель запечённый|93|2.5|0.1|21|200||картошка
+Картофель фри|312|3.4|15|41|150||картошка фастфуд
+Лапша гречневая соба|99|5|0.1|21|200||гарнир
+Фасоль варёная|123|7.8|0.5|21.5|150||бобовые
+Чечевица варёная|116|9|0.4|20|200||бобовые
+Нут варёный|164|8.9|2.6|27.4|150||бобовые
+Гороховое пюре|98|6.7|0.4|17.3|200||горох
+
+#Каши и лапша быстрого приготовления|⏱️
+*Каша овсяная быстрого приготовления с фруктами|360|9|5|67|40|пакет:40|минутка каша пакетик
+*Каша «Быстров» овсяная|370|9|6|67|40|пакет:40|быстров минутка каша
+*Каша «Увелка» овсяная минутка|350|11|6|62|35|пакет:35|увелка минутка каша
+*Каша гречневая быстрого приготовления|340|10|3|68|40|пакет:40|минутка каша
+*Каша рисовая быстрого приготовления|380|7|5|76|40|пакет:40|минутка каша
+*Лапша «Роллтон» с курицей|440|9|19|58|60|упаковка:60|роллтон лапша бомжпакет
+*Лапша «Доширак» говядина|440|9|19|58|90|упаковка:90|доширак лапша
+*Лапша «Бигбон» с курицей|450|9|21|56|75|упаковка:75|бигбон лапша
+*Вермишель быстрого приготовления в стакане|450|9|20|58|70|стакан:70|лапша стакан
+*Пюре картофельное «Роллтон»|390|7|11|65|40|пакет:40|роллтон пюре быстрое
+*Суп быстрого приготовления в кружке|400|7|13|63|15|пакет:15|горячая кружка суп
+*Хлопья кукурузные|370|7|1|83|30||завтрак хлопья
+*Мюсли с фруктами|350|9|6|65|50||завтрак гранола
+*Гранола запечённая|450|10|15|65|50||завтрак мюсли
+
+#Мясо и птица|🍗
+Куриная грудка варёная|137|29.8|1.8|0.5|150||курица филе
+Куриная грудка запечённая|165|31|3.6|0|150||курица филе
+Куриная грудка сырая|113|23.6|1.9|0.4|150||курица филе
+Куриное филе жареное|197|30|8|1|150||курица
+Куриное бедро без кожи запечённое|185|24|9.5|0|150||курица бедро
+Куриные голени запечённые|214|26|12|0|150||курица ножки
+Куриные крылья запечённые|245|24|16|0|120||курица крылышки
+Курица гриль|210|21|14|0|200||курица
+Фарш куриный|143|17.4|8.1|0|150||курица фарш
+Индейка филе варёное|130|25|3|0|150||индейка
+Фарш из индейки|150|19|8|0|150||индейка
+Говядина варёная|254|25.8|16.8|0|150||мясо
+Говядина тушёная|232|16.8|18.3|0|150||мясо
+Говяжья вырезка жареная|180|28|7|0|150||мясо стейк
+Фарш говяжий|254|17.2|20|0|150||мясо фарш
+Фарш домашний свинина и говядина|263|17|21.5|0|150||мясо фарш
+Свинина нежирная жареная|260|26|17|0|150||мясо
+Свиная шея запечённая|300|22|24|0|150||мясо
+Шашлык из свинины|324|20|27|0|200||мясо мангал
+Шашлык из курицы|160|22|7.5|1|200||мангал
+Котлета говяжья|220|16|14|8|100|шт:100|котлеты
+Котлета куриная|190|17|10|7|100|шт:100|котлеты
+Тефтели в соусе|160|9|10|9|200||мясо
+Печень куриная тушёная|165|20|9|1|150||субпродукты
+Печень говяжья жареная|199|22.9|10.2|3.9|150||субпродукты
+Сосиски молочные|266|11|23.9|0.4|50|шт:50|сосиска
+Сардельки|330|10|31.6|1.9|100|шт:100|сарделька
+Колбаса варёная докторская|257|12.8|22.2|1.5|30|ломтик:15|колбаса
+Колбаса сервелат|461|24|40.5|0|30|ломтик:10|колбаса копчёная
+Ветчина|270|14|23|1|30|ломтик:15|колбаса
+Бекон|500|23|45|0|20||свинина
+Гуляш из говядины|145|14|8|4|200||мясо подлива
+
+#Рыба и морепродукты|🐟
+Минтай отварной|79|17.6|1|0|150||рыба
+Треска отварная|78|17.8|0.7|0|150||рыба
+Хек отварной|95|16.6|2.2|0|150||рыба
+Горбуша запечённая|170|24|8|0|150||рыба красная
+Кета запечённая|155|22|7|0|150||рыба красная
+Лосось запечённый|206|22|13|0|150||рыба красная сёмга
+Сёмга слабосолёная|202|22|12.5|0|50||рыба красная
+Селёдка солёная|217|19.8|15.4|0|60||рыба сельдь
+Скумбрия холодного копчения|221|23.4|14.4|0|100||рыба
+*Тунец в собственном соку|96|21|1|0|100|банка:185|рыба консервы
+*Сардины в масле|220|24|14|0|100||рыба консервы
+*Шпроты в масле|363|17.4|32.4|0.4|50||рыба консервы
+*Горбуша консервированная|142|20.9|5|0|100|банка:245|рыба консервы
+Кальмар варёный|110|18|2.2|2|100||морепродукты
+Креветки варёные|95|18.9|2.2|0|100||морепродукты
+*Крабовые палочки|73|6|1|10|100|упаковка:200|снежный краб
+Икра красная|263|31.6|13.8|0|20||
+Рыбные котлеты|168|12.5|6.5|14|100|шт:100|котлеты
+Роллы «Филадельфия»|150|7|5|19|240|шт:30|суши ролл
+Роллы «Калифорния»|170|6|7|21|240|шт:30|суши ролл
+Суши с лососем|160|8|4|22|80|шт:40|суши
+
+#Яйца и молочное|🥚
+Яйцо куриное варёное|160|12.9|11.6|0.8|55|шт:55|яйца
+Яичница|196|12.9|15.3|0.9|110|из 2 яиц:110|яйца жареные
+Омлет|184|9.6|15.4|1.9|150||яйца
+Яичный белок|52|10.9|0.2|0.7|33|шт:33|яйца
+Творог 0%|71|16.5|0.2|1.3|180|пачка:180|творог обезжиренный
+Творог 5%|121|17.2|5|1.8|180|пачка:180|творог
+Творог 9%|159|16.7|9|2|180|пачка:180|творог
+Зернёный творог|105|12|5|2|150||творог в сливках
+Сырники|220|13|11|17|120|шт:60|творог
+Йогурт натуральный|66|4.3|2.5|6.5|150||йогурт
+Кефир 1%|40|3|1|4|250|стакан:250|кефир
+Кефир 2,5%|53|3|2.5|4|250|стакан:250|кефир
+Молоко 2,5%|52|2.8|2.5|4.7|250|стакан:250|молоко
+Молоко 3,2%|59|2.9|3.2|4.7|250|стакан:250|молоко
+Ряженка 4%|76|2.9|4|4.2|250|стакан:250|ряженка
+Сметана 15%|158|2.6|15|3|20|ст. ложка:20|сметана
+Сметана 20%|206|2.8|20|3.2|20|ст. ложка:20|сметана
+Сыр твёрдый|360|23|29|0|30|ломтик:15|сыр российский голландский
+Сыр моцарелла|280|18|22|1|30||сыр
+Брынза|260|17.9|20.1|0|30||сыр
+Сыр плавленый|250|16|19|5|20||сыр
+Масло сливочное 82%|748|0.5|82.5|0.8|10||масло
+Мороженое пломбир|232|3.2|15|20.8|80|стаканчик:80|мороженое
+Сгущённое молоко|320|7.2|8.5|56|20|ст. ложка:20|сгущёнка
+*Сырок глазированный|407|8.5|27.8|32|45|шт:45|сырок творожный б.ю. александров
+*Творожок «Даниссимо»|140|6|5|18|130|шт:130|даниссимо творожок
+*Йогурт питьевой с фруктами|80|2.9|2.5|11.6|270|бутылка:270|йогурт активиа чудо
+*Йогурт «Активиа»|76|2.8|2.4|10.7|130|шт:130|активиа
+*Протеиновый йогурт|60|10|0.5|4|130|шт:130|высокобелковый
+*Пудинг творожный|110|6|5|11|125|шт:125|творожный десерт
+
+#Овощи и салаты|🥦
+Огурец|15|0.8|0.1|2.8|100|шт:100|овощи
+Помидор|20|0.6|0.2|4.2|120|шт:120|томат овощи
+Перец болгарский|26|1.3|0.1|5.3|150|шт:150|овощи
+Капуста белокочанная|27|1.8|0.1|4.7|100||овощи
+Капуста тушёная|75|2|3.3|9.6|200||овощи гарнир
+Брокколи варёная|35|2.4|0.4|7.2|150||овощи
+Цветная капуста варёная|29|1.8|0.3|4|150||овощи
+Морковь|35|1.3|0.1|6.9|80|шт:80|овощи
+Свёкла варёная|49|1.8|0|10.8|100||овощи
+Лук репчатый|41|1.4|0|10.4|50|шт:80|овощи
+Кабачок жареный|88|1.2|6|7|150||овощи
+Баклажан запечённый|35|1.2|0.1|8|150||овощи
+Листья салата|14|1.5|0.1|2|50||зелень
+Шампиньоны жареные|108|3.7|9|1|100||грибы
+Зелёный горошек консервированный|55|3.6|0.2|9.8|80||горошек
+Кукуруза консервированная|119|3.9|1.2|22.7|80||кукуруза
+Квашеная капуста|23|1.8|0.1|3|100||соленья
+Огурцы солёные|13|0.8|0.1|1.7|100||соленья
+Авокадо|160|2|14.7|8.5|100|шт:150|
+Овощной салат с маслом|90|1|7|5|200||салат огурцы помидоры
+Салат «Цезарь» с курицей|200|10|14|8|200||салат цезарь
+Салат «Греческий»|85|2.5|7|3|200||салат
+Салат «Оливье»|198|5.5|16.5|6.9|200||салат оливье
+Винегрет|130|1.7|10.3|8|200||салат
+Рагу овощное|70|1.8|3.4|8|250||овощи
+
+#Фрукты и ягоды|🍎
+Банан|95|1.5|0.2|21.8|120|шт:120|фрукты
+Яблоко|47|0.4|0.4|9.8|180|шт:180|фрукты
+Груша|47|0.4|0.3|10.3|180|шт:180|фрукты
+Апельсин|43|0.9|0.2|8.1|200|шт:200|фрукты цитрус
+Мандарин|38|0.8|0.2|7.5|80|шт:80|фрукты цитрус
+Грейпфрут|35|0.7|0.2|6.5|250|шт:350|фрукты цитрус
+Киви|47|0.8|0.4|8.1|75|шт:75|фрукты
+Виноград|72|0.6|0.6|15.4|150||фрукты
+Арбуз|27|0.6|0.1|5.8|300||ягода
+Дыня|35|0.6|0.3|7.4|300||
+Клубника|41|0.8|0.4|7.5|150||ягоды
+Голубика|39|1|0.5|6.6|100||ягоды черника
+Малина|46|0.8|0.5|8.3|100||ягоды
+Хурма|67|0.5|0.4|15.3|200|шт:200|фрукты
+Персик|45|0.9|0.1|9.5|150|шт:150|фрукты
+Ананас|52|0.4|0.2|11.5|150||фрукты
+Финики|282|2.5|0.4|69|30|шт:8|сухофрукты
+Курага|241|3.4|0.5|62.6|30||сухофрукты
+Изюм|299|3.1|0.5|66|30||сухофрукты
+
+#Хлеб и выпечка|🥖
+Хлеб белый|262|7.5|2.9|51.4|30|ломтик:30|батон хлеб
+Хлеб бородинский|208|6.8|1.3|40.7|30|ломтик:30|чёрный хлеб
+Хлеб цельнозерновой|245|9|3.5|45|30|ломтик:30|хлеб
+Лаваш тонкий|236|7.9|1|47.6|50|лист:80|
+*Хлебцы цельнозерновые|330|11|3|63|20|шт:10|хлебцы dr korner
+Блины|233|6.1|12.3|26|100|шт:50|блинчики
+Оладьи|233|6.3|7.3|34|120|шт:40|
+Булочка сдобная|339|7.9|9.4|55.5|70|шт:70|выпечка
+Круассан|406|8.2|21|45.8|60|шт:60|выпечка
+Пирожок с капустой|240|5|10|33|80|шт:80|выпечка
+Пирожок с мясом жареный|290|9|14|33|90|шт:90|выпечка
+Беляш|260|11|14|23|120|шт:120|выпечка
+Чебурек|300|9|17|28|120|шт:120|выпечка
+Самса с курицей|310|10|17|30|120|шт:120|выпечка
+*Печенье овсяное|437|6.5|14.4|71.8|30|шт:15|печенье
+*Печенье «Юбилейное»|469|7.6|19.4|68|30|шт:10|печенье
+Пряник|364|4.8|2.8|77.7|30|шт:30|
+Вафли с начинкой|530|3.4|30|62|20||сладкое
+Сушки|336|10|1.1|72|20|шт:10|
+
+#Готовые блюда|🍲
+Гречка с курицей|124|17|1.5|11|300||ужин гречка курица
+Рис с курицей|140|12|3|16|300||
+Макароны по-флотски|190|9|8|20|250||макароны фарш
+Плов с курицей|165|8|6|20|250||плов
+Плов со свининой|210|7|10|22|250||плов
+Пельмени варёные|248|11.9|12.4|22|250|шт:12|пельмени
+Пельмени куриные варёные|210|12|8|23|250|шт:12|пельмени
+Вареники с картошкой|148|4.4|3.5|25|250|шт:25|вареники
+Манты|220|10|11|21|250|шт:50|
+Голубцы|104|7|4|10|250|шт:120|
+Жаркое с мясом|140|7|7|12|250||картошка мясо
+Котлета с пюре|150|8|8|12|300||котлета пюре обед
+Борщ|57|2.6|2.8|5.7|300|тарелка:300|суп
+Щи|31|1|2|2.8|300|тарелка:300|суп
+Солянка|69|5|4|3|300|тарелка:300|суп
+Суп куриный с лапшой|40|2.5|1.2|5|300|тарелка:300|суп
+Суп гороховый|66|4.4|2.4|7.2|300|тарелка:300|суп
+Уха|46|5|1.6|3|300|тарелка:300|суп
+Окрошка на кефире|52|2.7|2.9|4|300|тарелка:300|суп
+Рассольник|42|1.3|2|5|300|тарелка:300|суп
+Лапша удон с курицей|160|9|5|20|300||вок лапша
+Сэндвич с курицей|220|12|9|22|150|шт:150|бутерброд
+Бутерброд с сыром|300|11|15|30|60|шт:60|бутерброд
+Бутерброд с колбасой|290|10|16|27|60|шт:60|бутерброд
+
+#Полуфабрикаты и магазин|🛒
+*Чебупели с мясом «Горячая штучка»|280|7.7|15|27.6|150|шт:50|чебупели горячая штучка
+*Чебупели «Курочка» «Горячая штучка»|260|8|12|29|150|шт:50|чебупели горячая штучка
+*Бульмени «Горячая штучка»|250|11|13|23|250||бульмени пельмени горячая штучка
+*Наггетсы куриные замороженные|260|13|15|18|150|шт:20|наггетсы
+*Пельмени «Сибирская коллекция»|260|12|13|23|250||пельмени
+*Блинчики с мясом замороженные|210|9|9|22|160|шт:80|блинчики
+*Пицца замороженная|250|10|10|30|150||пицца
+*Сосиски «Вязанка» молочные|240|10|21|2|50|шт:50|сосиски вязанка
+*Котлеты замороженные «По-домашнему»|240|13|16|11|150|шт:75|котлеты
+*Сырники замороженные|220|13|9|21|150|шт:50|сырники
+*Вареники с картошкой замороженные|150|4.5|3|26|250||вареники
+*Чипсы картофельные|536|6.2|35.6|49|30|пачка:140|чипсы lays лейс
+*Сухарики «Кириешки»|380|11|2.5|77|40|пачка:40|кириешки сухарики
+*Попкорн солёный|480|8|28|50|30||попкорн
+*Шоколад молочный|534|7.6|30|58|20|плитка:90|шоколад alpen gold милка
+*Шоколад горький 70%|580|7.8|43|33|20|плитка:90|шоколад тёмный
+*Батончик «Snickers»|510|8.5|27|58|50|шт:50|сникерс батончик
+*Батончик «Mars»|450|4|17|70|50|шт:50|марс батончик
+*Батончик «Twix»|495|4.7|24|65|55|шт:55|твикс батончик
+*Батончик «Bounty»|485|4|26|58|55|шт:55|баунти батончик
+*Батончик «KitKat»|510|7|26|61|40|шт:40|киткат батончик
+*Мороженое эскимо|300|3.5|20|27|70|шт:70|мороженое
+*Мороженое «48 копеек»|230|3.5|14|22|80|шт:80|мороженое
+*Сникерс-мороженое|360|6|22|35|48|шт:48|мороженое
+
+#Фастфуд|🍔
+Шаурма с курицей|230|11|12|20|300|шт:300|шаверма
+Бургер|260|13|11|28|200|шт:200|гамбургер
+Чизбургер|265|14|12|27|120|шт:120|бургер
+Хот-дог|270|10|15|24|150|шт:150|
+Пицца пепперони|280|12|12|30|120|кусок:120|пицца
+Пицца «Маргарита»|240|10|9|30|120|кусок:120|пицца
+Наггетсы из кафе|290|15|18|17|100|шт:17|
+Картофель по-деревенски|200|3|9|27|150||картошка
+
+#Сладкое|🍬
+Конфеты шоколадные|500|5|25|62|20|шт:10|конфеты
+Мармелад|321|0.1|0|79.4|30||сладкое
+Зефир|326|0.8|0.1|79.8|35|шт:35|сладкое
+Халва подсолнечная|516|11.6|29.7|54|30||сладкое
+Мёд|329|0.8|0|80.3|15|ч. ложка:8|сладкое
+Сахар|399|0|0|99.8|5|ч. ложка:5|сладкое
+Варенье|270|0.5|0.3|66|20|ст. ложка:20|сладкое
+Шоколадная паста|540|6|31|57|15|ч. ложка:15|нутелла сладкое
+Торт «Наполеон»|400|6|25|38|100|кусок:100|торт
+Пирожное «Картошка»|430|6|22|53|50|шт:50|пирожное
+
+#Напитки|🥤
+Вода|0|0|0|0|250|стакан:250|
+Кофе чёрный без сахара|2|0.2|0|0.3|200|чашка:200|кофе американо эспрессо
+Капучино|45|2.4|2.3|3.7|300|стакан:300|кофе
+Латте|54|2.8|2.8|4.3|350|стакан:350|кофе
+Чай без сахара|1|0|0|0.2|250|чашка:250|чай
+*Кока-кола|42|0|0|10.6|330|банка:330|газировка кола
+*Кока-кола без сахара|0.3|0|0|0|330|банка:330|газировка зеро
+*Энергетик|45|0|0|11|250|банка:250|адреналин ред булл
+Сок апельсиновый|45|0.7|0.1|10|250|стакан:250|сок
+Морс клюквенный|41|0.1|0|10.7|250|стакан:250|морс
+Компот|60|0.2|0|14|250|стакан:250|
+Квас|27|0.2|0|5.2|500|бутылка:500|
+Пиво светлое|43|0.5|0|3.6|500|бутылка:500|пиво
+
+#Орехи, соусы и масла|🥜
+Грецкий орех|654|15.2|65.2|7|30||орехи
+Миндаль|609|18.6|53.7|13|30||орехи
+Арахис|552|26.3|45.2|9.9|30||орехи
+Кешью|600|18.5|48.5|22.5|30||орехи
+Семечки подсолнуха|578|20.7|52.9|10.5|30||семечки
+Арахисовая паста|588|25|50|20|15|ст. ложка:15|
+Майонез|627|0.3|67|2.6|15|ст. ложка:15|соус
+Кетчуп|100|1.8|0.2|23|15|ст. ложка:15|соус
+Соевый соус|50|6|0|6.8|15|ст. ложка:15|соус
+Масло подсолнечное|899|0|99.9|0|10|ст. ложка:17|масло растительное
+Масло оливковое|898|0|99.8|0|10|ст. ложка:17|масло
+Горчица|162|9.9|12.7|5.3|10||соус
+Хумус|166|7.9|9.6|14.3|50||
+
+#Спортивное питание|💪
+Протеин сывороточный|380|75|5|8|30|мерная ложка:30|протеин спортпит
+Гейнер|380|20|3|68|100|порция:100|спортпит
+*Протеиновый батончик|330|30|10|33|60|шт:60|bombbar батончик спортпит
+*Протеиновое печенье|400|20|15|45|60|шт:60|спортпит
+`;
+const STORE_TAGS = 'магазин пятерочка самбери раз два магнит';
+const FOOD_DB = []; const FOOD_CATS = [];
+(() => {
+  let cat = '';
+  FOOD_RAW.split('\n').forEach((ln) => {
+    ln = ln.trim(); if (!ln) return;
+    if (ln[0] === '#') { const [n, e] = ln.slice(1).split('|'); cat = n; FOOD_CATS.push({ id: n, e }); return; }
+    const store = ln[0] === '*'; if (store) ln = ln.slice(1);
+    const [name, kcal, p, f, c, portion, unit, tags] = ln.split('|');
+    const [uName, uG] = (unit || '').split(':');
+    FOOD_DB.push({ key: 'db:' + name, name, kcal: +kcal, p: +p, f: +f, c: +c, portion: +portion || 100, unit: uName || '', unitG: +uG || 0, cat, store,
+      tags: ((tags || '') + ' ' + cat + (store ? ' ' + STORE_TAGS : '')).toLowerCase() });
+  });
+})();
+
+/* ================= База упражнений =================
+   тип: w — вес и повторы, bw — повторы (можно с доп. весом), time — время, cardio — минуты и км, rounds — раунды
+   met — затраты для оценки калорий */
+const EX_RAW = `
+#Турник и брусья
+Подтягивания|bw|8|турник спина широкий хват
+Подтягивания обратным хватом|bw|8|турник бицепс
+Подтягивания узким хватом|bw|8|турник
+Австралийские подтягивания|bw|5|турник низкая перекладина
+Негативные подтягивания|bw|6|турник
+Отжимания на брусьях|bw|8|брусья трицепс грудь
+Подъём ног в висе|bw|5|турник пресс
+Подъём коленей в висе|bw|4|турник пресс
+Выход силой|bw|8|турник
+Вис на турнике|time|3|турник хват
+#Отжимания и вес тела
+Отжимания от пола|bw|8|грудь трицепс
+Отжимания узким хватом|bw|8|трицепс
+Отжимания на кулаках|bw|8|бокс грудь
+Отжимания с хлопком|bw|8|взрывные
+Отжимания с ног на возвышении|bw|8|грудь
+Приседания без веса|bw|5|ноги
+Выпрыгивания из приседа|bw|8|ноги прыжки
+Выпады|bw|5|ноги
+Болгарские выпады|bw|5|ноги
+Пистолетик|bw|6|ноги
+Берпи|bw|8|кардио
+Ягодичный мост|bw|4|ноги ягодицы
+#Грудь
+Жим штанги лёжа|w|6|грудь зал
+Жим гантелей лёжа|w|6|грудь зал
+Жим на наклонной скамье|w|6|грудь зал
+Разводка гантелей|w|5|грудь зал
+Кроссовер|w|5|грудь зал
+Жим в тренажёре|w|5|грудь зал
+#Спина
+Становая тяга|w|6|спина ноги зал
+Тяга штанги в наклоне|w|6|спина зал
+Тяга гантели одной рукой|w|5|спина зал
+Тяга верхнего блока|w|5|спина зал
+Тяга горизонтального блока|w|5|спина зал
+Гиперэкстензия|bw|4|поясница
+Шраги|w|4|трапеция
+#Ноги
+Приседания со штангой|w|6|ноги зал
+Жим ногами|w|6|ноги зал
+Румынская тяга|w|6|ноги зал
+Разгибание ног в тренажёре|w|5|ноги зал
+Сгибание ног в тренажёре|w|5|ноги зал
+Подъём на носки|w|4|икры
+Выпады с гантелями|w|6|ноги зал
+#Плечи и руки
+Жим штанги стоя|w|6|плечи зал
+Жим гантелей сидя|w|5|плечи зал
+Махи гантелями в стороны|w|4|плечи
+Разведения в наклоне|w|4|плечи
+Подъём штанги на бицепс|w|4|бицепс руки
+Молотки|w|4|бицепс руки
+Французский жим|w|4|трицепс руки
+Разгибания на блоке|w|4|трицепс руки
+Обратные отжимания от скамьи|bw|5|трицепс
+#Пресс
+Скручивания|bw|4|пресс
+Планка|time|4|пресс
+Боковая планка|time|4|пресс
+Велосипед|bw|5|пресс
+Русский твист|bw|5|пресс
+Подъём ног лёжа|bw|4|пресс
+Ролик для пресса|bw|6|пресс
+#Бег и кардио
+Бег|cardio|9.8|пробежка улица
+Бег на дорожке|cardio|9|пробежка зал
+Интервальный бег|cardio|11|спринт
+Ходьба|cardio|3.5|прогулка шаги
+Велосипед (езда)|cardio|7.5|вело
+Велотренажёр|cardio|7|вело зал
+Скакалка|cardio|11|кардио бокс
+Плавание|cardio|7|бассейн
+Эллипс|cardio|5|зал
+Гребной тренажёр|cardio|7|зал
+Лестница|cardio|8|ступени
+#Бокс
+Бой с тенью|rounds|6|бокс
+Работа на мешке|rounds|7|бокс груша
+Работа на лапах|rounds|8|бокс лапы
+Спарринг|rounds|9|бокс
+Работа ног|rounds|6|бокс
+#Растяжка и игры
+Разминка|cardio|3|суставы
+Растяжка|cardio|2.3|заминка
+Йога|cardio|2.5|
+Футбол|cardio|7|игра
+Баскетбол|cardio|6.5|игра
+Волейбол|cardio|4|игра
+Лыжи|cardio|7|зима
+Коньки|cardio|5.5|зима
+`;
+const EX_DB = []; const EX_GROUPS = [];
+(() => {
+  let g = '';
+  EX_RAW.split('\n').forEach((ln) => {
+    ln = ln.trim(); if (!ln) return;
+    if (ln[0] === '#') { g = ln.slice(1); EX_GROUPS.push(g); return; }
+    const [name, type, met, tags] = ln.split('|');
+    EX_DB.push({ id: 'ex:' + name, name, type, met: +met, group: g, tags: ((tags || '') + ' ' + g).toLowerCase() });
+  });
+})();
+
 /* ================= Главная ================= */
 const exampleCount = () => ['notes', 'reminders', 'plans', 'expenses', 'incomes', 'recurring', 'goals', 'fuel'].reduce((s, k) => s + S[k].filter((x) => x.example).length, 0)
   + S.objects.reduce((s, o) => s + o.remarks.filter((r) => r.example).length, 0);
@@ -518,10 +974,24 @@ RENDER.home = function () {
   if (exampleCount()) html += `<div class="banner"><div class="grow"><b>Это примеры</b>Записи с пометкой «пример» показывают, как всё выглядит. Удалите их, когда начнёте вести свои.</div><button class="btn sm" data-act="clear-examples">Удалить</button></div>`;
   const ws = S.settings.widgets.filter((w) => w.on && widgetAvailable(w.id));
   ws.forEach((w) => { html += WIDGET[w.id] ? WIDGET[w.id]() : ''; });
+  if (S.workoutActive) ui.mounts.push(tickElapsed);
   if (!ws.length) html += `<div class="card empty"><b>Главный экран пуст</b>Включите виджеты в настройках.<button class="btn primary sm" data-act="settings">Открыть настройки</button></div>`;
   return html;
 };
 const WIDGET = {
+  food() {
+    const d = todayISO(); const g = goals(); const t = dayTotals(d); const left = g.kcal - t.kcal;
+    return `<div class="card"><h2>Питание сегодня <button class="link" data-act="tab" data-tab="food">Открыть</button></h2>
+      <div class="food-mini"><div class="ring-wrap sm">${kcalRing(t.kcal, g.kcal, 76)}<div class="ring-txt"><b>${nf.format(Math.round(t.kcal))}</b><span>ккал</span></div></div>
+      <div class="macros">${macroBar('Белки', t.p, g.p, 'p')}<div class="left-line ${left < 0 ? 'neg' : ''}">${left >= 0 ? `Осталось ${nf.format(Math.round(left))} из ${nf.format(g.kcal)}` : `Больше нормы на ${nf.format(Math.round(-left))}`}</div></div></div>
+      <div class="btn-row" style="margin-top:12px"><button class="btn sm primary" data-act="add-food">${I.plus}Еда</button><button class="btn sm" data-act="water" data-n="${(S.food.water[d] || 0) + 1}">+ стакан воды</button></div></div>`;
+  },
+  sport() {
+    const A = S.workoutActive; const last = [...S.workouts].sort((a, b) => b.start - a.start)[0];
+    return `<div class="card"><h2>Тренировки <button class="link" data-act="tab" data-tab="sport">Все</button></h2>${weekStrip()}
+      ${last ? `<p class="note-small" style="margin:10px 0 0;padding:0">Последняя: ${esc(last.title)}, ${relDay(new Date(last.start))}</p>` : ''}
+      <button class="btn sm ${A ? '' : 'primary'}" data-act="start-workout" style="margin-top:12px">${A ? `Продолжить <span data-elapsed="${A.start}">${fmtDur(Date.now() - A.start)}</span>` : I.plus + 'Начать тренировку'}</button></div>`;
+  },
   quick() {
     const qs = S.settings.quick.filter(quickAvailable).slice(0, 5);
     if (!qs.length) return '';
@@ -1808,6 +2278,599 @@ ACT['walk-open'] = (el) => push({ type: 'walk', obj: el.dataset.obj, id: el.data
 ACT['ctr-new'] = (el) => ctrSheet(el.dataset.obj);
 ACT['ctr-open'] = (el) => ctrSheet(el.dataset.obj, el.dataset.id);
 
+/* ================= Питание ================= */
+const MEALS = [['breakfast', 'Завтрак'], ['lunch', 'Обед'], ['dinner', 'Ужин'], ['snack', 'Перекус']];
+const MEAL_NAME = Object.fromEntries(MEALS);
+const stem = (t) => t.length <= 3 ? t : t.slice(0, Math.max(3, t.length - 2));
+const normq = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[«»"'.,()%\-–—/]/g, ' ').replace(/\s+/g, ' ').trim();
+const foodDay = () => ui.foodDate || todayISO();
+function mealByTime() { const h = new Date().getHours(); return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : h < 21 ? 'dinner' : 'snack'; }
+const myFoodObj = (f) => ({ ...f, key: 'my:' + f.id, mine: true, tags: normq((f.tags || '') + ' ' + (f.brand || '') + ' мои') });
+function allFoods() { return S.food.my.map(myFoodObj).concat(FOOD_DB); }
+function findFood(key) { return allFoods().find((f) => f.key === key) || OFF_CACHE.get(key) || null; }
+const OFF_CACHE = new Map();
+const r1 = (n) => Math.round(n * 10) / 10;
+const fmtG = (n) => nf1.format(r1(n)).replace(/,0$/, '');
+function entryVals(e) { const k = e.grams / 100; return { kcal: e.kcal100 * k, p: e.p100 * k, f: e.f100 * k, c: e.c100 * k }; }
+function dayTotals(date) {
+  const t = { kcal: 0, p: 0, f: 0, c: 0 };
+  S.food.entries.filter((e) => e.date === date).forEach((e) => { const v = entryVals(e); t.kcal += v.kcal; t.p += v.p; t.f += v.f; t.c += v.c; });
+  return t;
+}
+const latestWeight = () => { const w = [...S.food.weights].sort((a, b) => b.date.localeCompare(a.date))[0]; return w ? w.kg : null; };
+function calcGoals(g) {
+  if (g.manual) return { kcal: g.kcal, p: g.p, f: g.f, c: g.c };
+  const w = num(g.weight) || latestWeight() || 75, h = num(g.height) || 178, a = num(g.age) || 30;
+  const bmr = 10 * w + 6.25 * h - 5 * a + (g.sex === 'f' ? -161 : 5);
+  let kcal = bmr * (num(g.activity) || 1.55) * (g.mode === 'loss' ? 0.85 : g.mode === 'gain' ? 1.1 : 1);
+  kcal = Math.max(kcal, g.sex === 'f' ? 1200 : 1500);
+  const p = w * (g.mode === 'maintain' ? 1.6 : 1.8), f = w * 0.9, c = Math.max(50, (kcal - p * 4 - f * 9) / 4);
+  return { kcal: Math.round(kcal / 10) * 10, p: Math.round(p), f: Math.round(f), c: Math.round(c) };
+}
+const goals = () => calcGoals(S.food.goals);
+const burnedOn = (date) => S.workouts.filter((w) => isoOf(new Date(w.start)) === date).reduce((s, w) => s + (w.kcal || 0), 0);
+function kcalRing(val, goal, size) {
+  const p = goal ? Math.min(1, val / goal) : 0; const over = goal && val > goal; const r = 42, C = 2 * Math.PI * r;
+  return `<svg class="kring" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true"><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="9"/>
+    <circle cx="50" cy="50" r="${r}" fill="none" stroke="${over ? 'var(--warn)' : 'var(--accent)'}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(C * p).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 50 50)"/></svg>`;
+}
+function macroBar(label, val, goal, cls) {
+  return `<div class="macro"><div class="mh"><span>${label}</span><span><b>${Math.round(val)}</b> / ${goal} г</span></div><div class="bar ${cls}"><i style="width:${Math.min(100, goal ? val / goal * 100 : 0)}%"></i></div></div>`;
+}
+RENDER.food = function () {
+  const d = foodDay(); const dt = toDate(d); const isToday = d === todayISO(); const g = goals(); const t = dayTotals(d); const burned = burnedOn(d);
+  const left = g.kcal - t.kcal;
+  let html = head('Питание', '', `<button class="icon-btn" data-act="food-goals" aria-label="Норма">${I.gear}</button>${plusBtn('add-food', 'Добавить еду')}`);
+  html += `<div class="month-nav"><button class="icon-btn" data-act="food-day" data-dir="-1" aria-label="Предыдущий день">${I.left}</button><b>${isToday ? 'Сегодня' : cap(relDay(dt))}${isToday ? '' : ', ' + WD_SHORT[dt.getDay()]}</b><button class="icon-btn" data-act="food-day" data-dir="1" aria-label="Следующий день" ${isToday ? 'disabled' : ''}>${I.right}</button></div>`;
+  html += `<div class="card food-sum"><div class="ring-wrap">${kcalRing(t.kcal, g.kcal, 118)}<div class="ring-txt"><b>${nf.format(Math.round(t.kcal))}</b><span>из ${nf.format(g.kcal)} ккал</span></div></div>
+    <div class="macros">${macroBar('Белки', t.p, g.p, 'p')}${macroBar('Жиры', t.f, g.f, 'f')}${macroBar('Углеводы', t.c, g.c, 'c')}
+    <div class="left-line ${left < 0 ? 'neg' : ''}">${left >= 0 ? `Осталось ${nf.format(Math.round(left))} ккал` : `Больше нормы на ${nf.format(Math.round(-left))} ккал`}${burned ? `<span>Тренировки: −${nf.format(Math.round(burned))}</span>` : ''}</div></div></div>`;
+  if (!S.food.goals.set) html += `<div class="banner"><div class="grow"><b>Посчитайте свою норму</b>Сейчас стоит средняя. Укажите рост, вес и цель, и Life посчитает калории и белок под вас.</div><button class="btn sm primary" data-act="food-goals">Посчитать</button></div>`;
+  const water = S.food.water[d] || 0;
+  html += `<div class="card water"><h2>Вода <span class="m">${nf1.format(water * 0.25).replace(',0', '')} из 2 л</span></h2><div class="cups">${Array.from({ length: 8 }, (_, i) => `<button class="cup ${i < water ? 'on' : ''}" data-act="water" data-n="${i + 1}" aria-label="${i + 1} стакан"><i></i></button>`).join('')}</div></div>`;
+  MEALS.forEach(([id, name]) => {
+    const es = S.food.entries.filter((e) => e.date === d && e.meal === id);
+    const sum = es.reduce((s, e) => s + entryVals(e).kcal, 0);
+    html += `<div class="card meal"><h2><span>${name}</span><span class="m">${es.length ? nf.format(Math.round(sum)) + ' ккал' : ''}</span></h2>
+      ${es.length ? `<div class="ops">${es.map((e) => { const v = entryVals(e); return `<button class="row" data-act="food-entry" data-id="${e.id}"><span class="grow"><span class="t">${esc(e.name)}</span><span class="m">${fmtG(e.grams)} г, Б ${fmtG(v.p)} Ж ${fmtG(v.f)} У ${fmtG(v.c)}</span></span><span class="r amt">${nf.format(Math.round(v.kcal))}</span></button>`; }).join('')}</div>` : ''}
+      <button class="btn sm meal-add" data-act="add-food" data-meal="${id}">${I.plus}Добавить</button></div>`;
+  });
+  // Неделя
+  const days = Array.from({ length: 7 }, (_, i) => isoOf(addDays(dt, i - 6)));
+  const vals = days.map((x) => dayTotals(x).kcal); const mx = Math.max(g.kcal * 1.2, ...vals, 1);
+  html += `<div class="card"><h2>Неделя <span class="m">норма ${nf.format(g.kcal)}</span></h2><div class="week-chart" style="--goalpx:${(g.kcal / mx * 110).toFixed(1)}px">${days.map((x, i) => `<button class="wc ${x === d ? 'on' : ''}" data-act="food-goto" data-d="${x}"><span class="b ${vals[i] > g.kcal ? 'over' : ''}" style="height:${Math.round(vals[i] / mx * 100)}%"></span><span class="d">${WD_SHORT[toDate(x).getDay()]}</span></button>`).join('')}<i class="goal-line"></i></div></div>`;
+  // Вес
+  const ws = [...S.food.weights].sort((a, b) => a.date.localeCompare(b.date)); const last = ws[ws.length - 1];
+  const month = ws.filter((w) => w.date >= isoOf(addDays(new Date(), -30))); const delta = last && month.length > 1 ? last.kg - month[0].kg : null;
+  html += `<div class="card"><h2>Вес <button class="link" data-act="add-weight">${I.plus.replace('<svg', '<svg width="14" height="14"')} Записать</button></h2>
+    ${last ? `<div class="money-row"><div class="big-num">${nf1.format(last.kg)}<small> кг</small></div>${delta != null ? `<div class="svc-meta"><span class="${delta < 0 ? 't-ok' : delta > 0 ? 't-warn' : ''}">${delta > 0 ? '+' : delta < 0 ? '−' : ''}${nf1.format(Math.abs(delta))} кг за месяц</span></div>` : ''}</div>${ws.length > 1 ? sparkline(ws.slice(-20).map((w) => w.kg)) : ''}<button class="btn ghost sm" data-act="weights" style="justify-self:start;padding:0">Все записи</button>`
+    : '<p class="note-small" style="margin:0;padding:0">Записывайте вес раз в неделю, утром натощак. Life покажет, как он меняется.</p>'}</div>`;
+  return html;
+};
+function sparkline(arr) {
+  const w = 300, h = 54, mn = Math.min(...arr), mx = Math.max(...arr), span = mx - mn || 1;
+  const pts = arr.map((v, i) => [i / (arr.length - 1) * (w - 8) + 4, h - 6 - (v - mn) / span * (h - 12)]);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="4" fill="var(--accent)"/></svg>`;
+}
+
+/* ---------- Поиск продуктов ---------- */
+function foodSearch(q, cat) {
+  const qq = normq(q); const toks = qq ? qq.split(' ') : [];
+  let list = allFoods();
+  if (cat === 'recent') { const rec = S.food.recent; return rec.map(findFood).filter(Boolean); }
+  if (cat === 'my') list = list.filter((f) => f.mine);
+  else if (cat) list = list.filter((f) => f.cat === cat);
+  if (!toks.length) return list;
+  const scored = [];
+  list.forEach((f) => {
+    const name = normq(f.name), hay = name + ' ' + normq(f.brand || '') + ' ' + f.tags;
+    if (!toks.every((t) => hay.includes(stem(t)))) return;
+    let sc = 0; if (name.startsWith(stem(toks[0]))) sc += 5; if (toks.every((t) => name.includes(stem(t)))) sc += 3; sc += toks.filter((t) => hay.includes(t)).length * 2; if (f.mine) sc += 2; if (S.food.recent.includes(f.key)) sc += 2;
+    scored.push([sc, f]);
+  });
+  return scored.sort((a, b) => b[0] - a[0]).map((x) => x[1]);
+}
+function foodRow(f) {
+  const sub = [f.brand && esc(f.brand), f.mine ? (f.src === 'off' ? 'из интернета' : 'мой продукт') : '', f.store ? 'магазинный' : ''].filter(Boolean).join(', ');
+  return `<button class="row food-row" data-food="${esc(f.key)}"><span class="grow"><span class="t">${esc(f.name)}</span><span class="m">${nf.format(Math.round(f.kcal))} ккал, Б ${fmtG(f.p)} Ж ${fmtG(f.f)} У ${fmtG(f.c)}${sub ? ' — ' + sub : ''}</span></span><span class="chev">${I.right}</span></button>`;
+}
+function foodSearchSheet(meal, state) {
+  const st = state || { q: '', cat: S.food.recent.length ? 'recent' : '' };
+  openSheet(`Добавить: ${MEAL_NAME[meal].toLowerCase()}`, `<div class="form">
+    <label class="search">${I.search}<input type="search" id="fq" placeholder="Гречка, чебупели, пятёрочка…" value="${esc(st.q)}" autocomplete="off"></label>
+    <div class="chips" id="fcats">${[S.food.recent.length && ['recent', 'Недавние', '🕘'], ['', 'Все', ''], S.food.my.length && ['my', 'Мои', '⭐'], ...FOOD_CATS.map((c) => [c.id, c.id, c.e])].filter(Boolean).map(([id, n, e]) => `<button type="button" class="chip ${st.cat === id ? 'on' : ''}" data-fcat="${esc(id)}">${e ? e + ' ' : ''}${n}</button>`).join('')}</div>
+    <div id="fres"></div>
+    <div class="btn-row"><button type="button" class="btn sm" id="fOnline">${I.search}Найти в интернете</button><button type="button" class="btn sm" id="fMine">${I.plus}Своё блюдо</button></div>
+    <p class="note-small" style="margin:0">Значения на 100 г — типовые. У магазинных товаров сверяйтесь с упаковкой, любое значение можно поправить.</p>
+  </div>`, (body) => {
+    const res = $('#fres', body); let shown = 40;
+    const draw = () => {
+      const list = foodSearch(st.q, st.q ? (st.cat === 'recent' ? '' : st.cat) : st.cat);
+      const online = [...OFF_CACHE.values()].filter((f) => f.q === normq(st.q));
+      res.innerHTML = (list.length || online.length) ? `<div class="list">${list.slice(0, shown).map(foodRow).join('')}${online.map(foodRow).join('')}</div>${list.length > shown ? `<button type="button" class="btn sm ghost" id="fMore">Показать ещё ${list.length - shown}</button>` : ''}`
+        : `<div class="card empty" style="padding:18px"><b>Ничего не нашлось</b>Попробуйте другое слово, поиск в интернете или добавьте своё блюдо.</div>`;
+      const more = $('#fMore', body); if (more) more.onclick = () => { shown += 60; draw(); };
+    };
+    $('#fq', body).addEventListener('input', (e) => { st.q = e.target.value; shown = 40; draw(); });
+    $('#fcats', body).addEventListener('click', (e) => { const b = e.target.closest('[data-fcat]'); if (!b) return; st.cat = b.dataset.fcat; $$('#fcats .chip', body).forEach((x) => x.classList.toggle('on', x === b)); shown = 40; draw(); });
+    res.addEventListener('click', (e) => { const b = e.target.closest('[data-food]'); if (!b) return; const f = findFood(b.dataset.food); if (f) portionSheet({ food: f, meal, back: () => foodSearchSheet(meal, st) }); });
+    $('#fMine', body).onclick = () => myFoodSheet(null, { name: st.q }, (f) => portionSheet({ food: myFoodObj(f), meal, back: () => foodSearchSheet(meal, st) }), () => foodSearchSheet(meal, st));
+    $('#fOnline', body).onclick = async () => {
+      if (normq(st.q).length < 2) { toast('Напишите название, например «чебупели»'); $('#fq', body).focus(); return; }
+      const btn = $('#fOnline', body); btn.disabled = true; btn.textContent = 'Ищу…';
+      try { const n = await offSearch(st.q); toast(n ? `Найдено в интернете: ${n}` : 'В интернете ничего не нашлось'); }
+      catch (err) { toast(window.LIFE_PREVIEW ? 'Поиск в интернете работает в установленном Life' : 'Нет связи с базой продуктов. Проверьте интернет'); }
+      btn.disabled = false; btn.innerHTML = `${I.search}Найти в интернете`; draw();
+    };
+    draw();
+    setTimeout(() => { const i = $('#fq', body); if (i && !st.q) i.focus(); }, 320);
+  });
+}
+/* Open Food Facts — открытая база продуктов со всего мира, в том числе российских */
+async function offSearch(q) {
+  const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 12000);
+  const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=30&fields=code,product_name,product_name_ru,brands,nutriments,serving_quantity&search_terms=' + encodeURIComponent(q);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal }); if (!r.ok) throw new Error('http');
+    const data = await r.json(); let n = 0; const qn = normq(q);
+    (data.products || []).forEach((p) => {
+      const nu = p.nutriments || {}; let kcal = nu['energy-kcal_100g']; if (kcal == null && nu.energy_100g != null) kcal = nu.energy_100g / 4.184;
+      const name = (p.product_name_ru || p.product_name || '').trim(); if (!name || kcal == null) return;
+      const key = 'off:' + p.code; if (OFF_CACHE.has(key)) return;
+      OFF_CACHE.set(key, { key, name, brand: (p.brands || '').split(',')[0].trim(), kcal: +kcal, p: +(nu.proteins_100g || 0), f: +(nu.fat_100g || 0), c: +(nu.carbohydrates_100g || 0), portion: Math.round(+p.serving_quantity) || 100, unit: '', unitG: 0, tags: '', off: true, code: p.code, q: qn });
+      n++;
+    });
+    return n;
+  } finally { clearTimeout(tm); }
+}
+
+/* ---------- Ползунок ---------- */
+function sliderHTML(id, min, max, step, value) {
+  return `<div class="slider" id="${id}" role="slider" tabindex="0" aria-label="Граммы" aria-valuemin="${min}" aria-valuemax="${max}" aria-valuenow="${value}" data-min="${min}" data-max="${max}" data-step="${step}"><div class="sl-track"><div class="sl-fill"></div></div><div class="sl-thumb"></div></div>`;
+}
+function bindSlider(el, onInput) {
+  const min = +el.dataset.min, step = +el.dataset.step; let max = +el.dataset.max; let val = +el.getAttribute('aria-valuenow');
+  const paint = () => { const k = Math.max(0, Math.min(1, (val - min) / (max - min))); el.style.setProperty('--p', (k * 100).toFixed(2) + '%'); el.style.setProperty('--p-num', k.toFixed(4)); el.setAttribute('aria-valuenow', val); };
+  const fromX = (x) => { const r = el.getBoundingClientRect(); const k = Math.max(0, Math.min(1, (x - r.left - 14) / (r.width - 28))); const v = Math.round((min + k * (max - min)) / step) * step; if (v !== val) { val = v; paint(); onInput(val); } };
+  let st = null;
+  el.addEventListener('pointerdown', (e) => { st = { x: e.clientX, y: e.clientY, id: e.pointerId, go: e.pointerType === 'mouse' }; if (st.go) { el.setPointerCapture(e.pointerId); el.classList.add('active'); fromX(e.clientX); } });
+  el.addEventListener('pointermove', (e) => {
+    if (!st) return;
+    if (!st.go) { const dx = Math.abs(e.clientX - st.x), dy = Math.abs(e.clientY - st.y); if (dx < 5 && dy < 5) return; if (dy > dx) { st = null; return; } st.go = true; el.classList.add('active'); try { el.setPointerCapture(st.id); } catch (er) { /* без захвата */ } }
+    fromX(e.clientX);
+  });
+  el.addEventListener('pointerup', (e) => { if (st && !st.go) fromX(e.clientX); st = null; el.classList.remove('active'); });
+  el.addEventListener('pointercancel', () => { st = null; el.classList.remove('active'); });
+  el.addEventListener('keydown', (e) => { const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key]; if (!d) return; e.preventDefault(); val = Math.max(min, Math.min(max, val + d * step)); paint(); onInput(val); });
+  paint();
+  return { set(v) { val = v; if (v > max) { max = Math.ceil(v / 100) * 100; el.dataset.max = max; el.setAttribute('aria-valuemax', max); } paint(); } };
+}
+
+/* ---------- Порция ---------- */
+function portionSheet({ food, meal, entry, back }) {
+  const f = food; let grams = entry ? entry.grams : (f.unitG || f.portion || 100); let ml = entry ? entry.meal : meal;
+  const max = Math.max(500, Math.ceil(Math.max(f.portion * 4, f.unitG * 6, grams * 1.5) / 100) * 100); const step = max <= 300 ? 1 : 5;
+  const presets = f.unitG ? [0.5, 1, 2, 3].map((k) => [k * f.unitG, `${k === 0.5 ? '½' : k} ${f.unit}`]) : [50, 100, 150, 200, 300].map((g) => [g, g + ' г']);
+  openSheet(entry ? 'Порция' : f.name, `<div class="form">
+    ${entry ? `<div class="t" style="font-weight:700;font-size:17px">${esc(f.name)}</div>` : ''}
+    <div class="per100"><span class="v">На 100 г: <b>${nf.format(Math.round(f.kcal))} ккал</b>, Б ${fmtG(f.p)}, Ж ${fmtG(f.f)}, У ${fmtG(f.c)}${f.brand ? `. ${esc(f.brand)}` : ''}</span>
+      <button type="button" class="link" id="pEdit">Поправить</button></div>
+    <div class="grams-box"><div class="grams-in"><input type="text" inputmode="decimal" id="pG" value="${fmtG(grams)}" aria-label="Граммы"><span>г</span></div>
+      <div class="pm"><button type="button" class="icon-btn" id="pMinus" aria-label="Минус 10 грамм">${I.minus}</button><button type="button" class="icon-btn" id="pPlus" aria-label="Плюс 10 грамм">${I.plus}</button></div></div>
+    ${sliderHTML('pSl', 0, max, step, grams)}
+    <div class="chips wrap" id="pPre">${presets.map(([g, l]) => `<button type="button" class="chip" data-g="${g}">${l}</button>`).join('')}</div>
+    <div class="portion-tot" id="pTot"></div>
+    <div class="seg" id="pMeal">${MEALS.map(([id, n]) => `<button type="button" data-v="${id}" class="${ml === id ? 'on' : ''}">${n}</button>`).join('')}</div>
+    ${entry ? `<button class="btn danger" type="button" id="pDel">${I.trash}Удалить из дневника</button>` : ''}
+    <div class="sticky-save"><button class="btn primary" type="button" id="pSave">${entry ? 'Сохранить' : 'Добавить'}</button></div>
+  </div>`, (body) => {
+    const gi = $('#pG', body); const tot = $('#pTot', body);
+    const fit = () => { gi.style.width = (Math.max(2, String(gi.value).length) + 0.4) + 'ch'; };
+    const paintTot = () => { fit(); const k = grams / 100; tot.innerHTML = `<div><b>${nf.format(Math.round(f.kcal * k))}</b><span>ккал</span></div><div><b>${fmtG(f.p * k)}</b><span>белки</span></div><div><b>${fmtG(f.f * k)}</b><span>жиры</span></div><div><b>${fmtG(f.c * k)}</b><span>углеводы</span></div>`; };
+    const sl = bindSlider($('#pSl', body), (v) => { grams = v; gi.value = fmtG(v); paintTot(); });
+    const setG = (v) => { grams = Math.max(0, Math.round(v * 10) / 10); gi.value = fmtG(grams); sl.set(grams); paintTot(); };
+    gi.addEventListener('input', () => { const v = num(gi.value); if (v != null) { grams = Math.max(0, v); sl.set(grams); paintTot(); } });
+    gi.addEventListener('focus', () => gi.select());
+    $('#pMinus', body).onclick = () => setG(Math.max(0, grams - 10)); $('#pPlus', body).onclick = () => setG(grams + 10);
+    $('#pPre', body).addEventListener('click', (e) => { const b = e.target.closest('[data-g]'); if (b) setG(+b.dataset.g); });
+    $('#pMeal', body).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; ml = b.dataset.v; $$('#pMeal button', body).forEach((x) => x.classList.toggle('on', x === b)); });
+    $('#pEdit', body).onclick = () => myFoodSheet(f.mine ? f.id : null, { ...f, name: f.name, src: f.off ? 'off' : f.mine ? f.src : 'edit' }, (saved) => portionSheet({ food: myFoodObj(saved), meal: ml, entry, back }), () => portionSheet({ food: f, meal: ml, entry, back }));
+    $('#pSave', body).onclick = () => {
+      if (!grams) { toast('Укажите, сколько грамм'); gi.focus(); return; }
+      let ff = f;
+      if (f.off && !f.mine) { const mf = { id: uid(), name: f.name, brand: f.brand, kcal: r1(f.kcal), p: r1(f.p), f: r1(f.f), c: r1(f.c), portion: f.portion, unit: '', unitG: 0, tags: '', src: 'off', code: f.code }; S.food.my.push(mf); ff = myFoodObj(mf); }
+      const data = { meal: ml, grams, name: ff.name, key: ff.key, kcal100: ff.kcal, p100: ff.p, f100: ff.f, c100: ff.c };
+      if (entry) Object.assign(entry, data); else S.food.entries.push(Object.assign({ id: uid(), date: foodDay(), t: Date.now() }, data));
+      S.food.recent = [ff.key, ...S.food.recent.filter((k) => k !== ff.key)].slice(0, 30);
+      save(); closeSheet(); render(); toast(`${MEAL_NAME[ml]}: ${ff.name}, ${nf.format(Math.round(ff.kcal * grams / 100))} ккал`);
+    };
+    const del = $('#pDel', body);
+    if (del) del.onclick = () => { const idx = S.food.entries.indexOf(entry); closeSheet(); removeWithUndo('Удалено из дневника', () => S.food.entries.splice(idx, 1), () => S.food.entries.splice(idx, 0, entry)); };
+    paintTot();
+  }, { back });
+}
+/* ---------- Свой продукт ---------- */
+function myFoodSheet(id, pre, onSaved, backFn) {
+  const ex = id ? S.food.my.find((x) => x.id === id) : null;
+  const d = ex ? { ...ex } : Object.assign({ name: '', brand: '', kcal: '', p: '', f: '', c: '', portion: 100, unit: '', unitG: '', tags: '' }, pre || {});
+  openSheet(ex ? 'Мой продукт' : (pre && pre.src === 'edit' ? 'Свой вариант' : 'Своё блюдо'), `<form id="f" class="form">
+    ${pre && pre.src === 'edit' ? '<p class="note-small" style="margin:0">Life сохранит ваш вариант в «Мои». Встроенный продукт останется как был.</p>' : ''}
+    <label class="field"><span>Название</span><input type="text" id="mfName" value="${esc(d.name)}" placeholder="Например, суп мамин" maxlength="80"></label>
+    <label class="field"><span>Производитель или магазин</span><input type="text" id="mfBrand" value="${esc(d.brand || '')}" placeholder="Необязательно" maxlength="60"></label>
+    <div class="field"><span>На 100 г</span><div class="four">
+      <label><input type="text" inputmode="decimal" id="mfK" value="${d.kcal === '' ? '' : fmtG(d.kcal)}" placeholder="ккал"><em>ккал</em></label>
+      <label><input type="text" inputmode="decimal" id="mfP" value="${d.p === '' ? '' : fmtG(d.p)}" placeholder="0"><em>белки</em></label>
+      <label><input type="text" inputmode="decimal" id="mfF" value="${d.f === '' ? '' : fmtG(d.f)}" placeholder="0"><em>жиры</em></label>
+      <label><input type="text" inputmode="decimal" id="mfC" value="${d.c === '' ? '' : fmtG(d.c)}" placeholder="0"><em>углев.</em></label></div></div>
+    <p class="note-small" style="margin:-6px 0 0">Если калорий не знаете, оставьте пустым: Life посчитает по белкам, жирам и углеводам.</p>
+    <div class="two"><label class="field"><span>Обычная порция, г</span><input type="number" inputmode="decimal" id="mfPor" value="${d.portion || 100}"></label>
+    <label class="field"><span>Штука, г (если есть)</span><input type="number" inputmode="decimal" id="mfUnit" value="${d.unitG || ''}" placeholder="Например, 50"></label></div>
+    <label class="field"><span>Слова для поиска</span><input type="text" id="mfTags" value="${esc(d.tags || '')}" placeholder="Например, суп обед" maxlength="120"></label>
+    ${ex ? `<button class="btn danger" type="button" id="mfDel">${I.trash}Удалить продукт</button>` : ''}
+    <div class="sticky-save"><button class="btn primary" type="submit">Сохранить</button></div></form>`, (body) => {
+    $('#f', body).addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = $('#mfName', body).value.trim(); if (!name) { toast('Напишите название'); return; }
+      const p = num($('#mfP', body).value) || 0, fa = num($('#mfF', body).value) || 0, c = num($('#mfC', body).value) || 0;
+      let k = num($('#mfK', body).value); if (k == null) k = p * 4 + fa * 9 + c * 4;
+      const ug = num($('#mfUnit', body).value);
+      const data = { name, brand: $('#mfBrand', body).value.trim(), kcal: r1(k), p: r1(p), f: r1(fa), c: r1(c), portion: num($('#mfPor', body).value) || 100, unit: ug ? 'шт' : '', unitG: ug || 0, tags: $('#mfTags', body).value.trim(), src: (pre && pre.src === 'off') ? 'off' : (ex ? ex.src : 'my') };
+      let rec; if (ex) rec = Object.assign(ex, data); else { rec = Object.assign({ id: uid() }, data); S.food.my.push(rec); }
+      save(); toast('Продукт сохранён в «Мои»');
+      if (onSaved) onSaved(rec); else closeSheet();
+    });
+    const del = $('#mfDel', body);
+    if (del) del.onclick = () => { const idx = S.food.my.indexOf(ex); if (backFn) backFn(); else closeSheet(); removeWithUndo('Продукт удалён', () => S.food.my.splice(idx, 1), () => S.food.my.splice(idx, 0, ex)); };
+  }, { back: backFn });
+}
+/* ---------- Норма ---------- */
+function goalsSheet() {
+  const g = { ...S.food.goals };
+  const ACT_L = [[1.2, 'Почти без движения'], [1.375, 'Лёгкая: 1–3 тренировки'], [1.55, 'Средняя: 3–5 тренировок'], [1.725, 'Высокая: каждый день']];
+  openSheet('Норма питания', `<form id="f" class="form">
+    <div class="seg" id="gMode">${[['loss', 'Сбросить жир'], ['maintain', 'Держать вес'], ['gain', 'Набрать']].map(([k, v]) => `<button type="button" data-v="${k}" class="${g.mode === k ? 'on' : ''}">${v}</button>`).join('')}</div>
+    <div class="seg" id="gSex">${[['m', 'Мужчина'], ['f', 'Женщина']].map(([k, v]) => `<button type="button" data-v="${k}" class="${g.sex === k ? 'on' : ''}">${v}</button>`).join('')}</div>
+    <div class="three"><label class="field"><span>Возраст</span><input type="number" inputmode="numeric" id="gAge" value="${g.age || ''}" placeholder="30"></label>
+    <label class="field"><span>Рост, см</span><input type="number" inputmode="numeric" id="gH" value="${g.height || ''}" placeholder="178"></label>
+    <label class="field"><span>Вес, кг</span><input type="number" inputmode="decimal" id="gW" value="${g.weight || latestWeight() || ''}" placeholder="75"></label></div>
+    <label class="field"><span>Активность</span><select id="gAct">${ACT_L.map(([v, l]) => `<option value="${v}" ${+g.activity === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <div class="goal-res" id="gRes"></div>
+    <div class="switch-row"><span>Свои цифры</span><label class="switch"><input type="checkbox" id="gMan" ${g.manual ? 'checked' : ''}><i></i></label></div>
+    <div class="four" id="gManF" ${g.manual ? '' : 'hidden'}>
+      <label><input type="number" inputmode="numeric" id="gK" value="${g.kcal || ''}"><em>ккал</em></label><label><input type="number" inputmode="numeric" id="gP" value="${g.p || ''}"><em>белки</em></label>
+      <label><input type="number" inputmode="numeric" id="gF" value="${g.f || ''}"><em>жиры</em></label><label><input type="number" inputmode="numeric" id="gC" value="${g.c || ''}"><em>углев.</em></label></div>
+    <p class="note-small" style="margin:0">Расчёт по формуле Миффлина — Сан Жеора. Это ориентир, а не медицинская рекомендация. Для снижения веса Life берёт умеренный дефицит 15% и белок 1,8 г на кг.</p>
+    <div class="sticky-save"><button class="btn primary" type="submit">Сохранить</button></div></form>`, (body) => {
+    const read = () => { g.age = num($('#gAge', body).value); g.height = num($('#gH', body).value); g.weight = num($('#gW', body).value); g.activity = num($('#gAct', body).value); g.manual = $('#gMan', body).checked; if (g.manual) { g.kcal = num($('#gK', body).value) || 0; g.p = num($('#gP', body).value) || 0; g.f = num($('#gF', body).value) || 0; g.c = num($('#gC', body).value) || 0; } };
+    const show = () => { read(); const r = calcGoals(g); $('#gRes', body).innerHTML = `<div><b>${nf.format(r.kcal)}</b><span>ккал в день</span></div><div><b>${r.p}</b><span>белки, г</span></div><div><b>${r.f}</b><span>жиры, г</span></div><div><b>${r.c}</b><span>углеводы, г</span></div>`; };
+    const seg = (sel, key) => $(sel, body).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; g[key] = b.dataset.v; $$(sel + ' button', body).forEach((x) => x.classList.toggle('on', x === b)); show(); });
+    seg('#gMode', 'mode'); seg('#gSex', 'sex');
+    body.addEventListener('input', show); body.addEventListener('change', show);
+    $('#gMan', body).addEventListener('change', (e) => { if (e.target.checked) { const r = calcGoals({ ...g, manual: false }); $('#gK', body).value = r.kcal; $('#gP', body).value = r.p; $('#gF', body).value = r.f; $('#gC', body).value = r.c; } $('#gManF', body).hidden = !e.target.checked; show(); });
+    $('#f', body).addEventListener('submit', (e) => {
+      e.preventDefault(); read();
+      if (g.weight && !S.food.weights.some((w) => w.date === todayISO())) S.food.weights.push({ id: uid(), date: todayISO(), kg: g.weight });
+      S.food.goals = Object.assign(g, { set: true }); save(); closeSheet(); render(); toast(`Норма: ${nf.format(goals().kcal)} ккал в день`);
+    });
+    show();
+  });
+}
+function weightSheet() {
+  const last = latestWeight() || 75; let kg = last;
+  openSheet('Вес', `<form id="f" class="form">
+    <div class="grams-box"><div class="grams-in"><input type="text" inputmode="decimal" id="wKg" value="${nf1.format(kg)}" aria-label="Вес"><span>кг</span></div>
+      <div class="pm"><button type="button" class="icon-btn" id="wM" aria-label="Минус 100 грамм">${I.minus}</button><button type="button" class="icon-btn" id="wP" aria-label="Плюс 100 грамм">${I.plus}</button></div></div>
+    <label class="field"><span>Дата</span><input type="date" id="wDate" value="${todayISO()}"></label>
+    <div class="sticky-save"><button class="btn primary" type="submit">Сохранить</button></div></form>`, (body) => {
+    const i = $('#wKg', body); const set = (v) => { kg = Math.round(v * 10) / 10; i.value = nf1.format(kg); };
+    $('#wM', body).onclick = () => set(kg - 0.1); $('#wP', body).onclick = () => set(kg + 0.1);
+    i.addEventListener('input', () => { const v = num(i.value); if (v) kg = v; });
+    $('#f', body).addEventListener('submit', (e) => {
+      e.preventDefault(); if (!kg || kg < 20 || kg > 400) { toast('Проверьте вес'); return; }
+      const date = $('#wDate', body).value || todayISO(); const ex = S.food.weights.find((w) => w.date === date);
+      if (ex) ex.kg = kg; else S.food.weights.push({ id: uid(), date, kg });
+      save(); closeSheet(); render(); toast(`Вес ${nf1.format(kg)} кг записан`);
+    });
+  });
+}
+function weightsSheet() {
+  const ws = [...S.food.weights].sort((a, b) => b.date.localeCompare(a.date));
+  openSheet('Записи веса', `<div class="form">${ws.length ? `<div class="list">${ws.map((w) => `<div class="row"><span class="grow"><span class="t">${nf1.format(w.kg)} кг</span><span class="m">${fmtDY(toDate(w.date))}</span></span><button class="act" data-wdel="${w.id}" aria-label="Удалить">${I.trash}</button></div>`).join('')}</div>` : '<p class="note-small">Записей пока нет.</p>'}</div>`, (body) => {
+    body.addEventListener('click', (e) => { const b = e.target.closest('[data-wdel]'); if (!b) return; const w = S.food.weights.find((x) => x.id === b.dataset.wdel); const idx = S.food.weights.indexOf(w); closeSheet(); removeWithUndo('Запись веса удалена', () => S.food.weights.splice(idx, 1), () => S.food.weights.splice(idx, 0, w)); });
+  });
+}
+ACT['add-food'] = (el) => foodSearchSheet((el && el.dataset.meal) || mealByTime());
+ACT['food-entry'] = (el) => { const e = S.food.entries.find((x) => x.id === el.dataset.id); if (!e) return; const f = { key: e.key, name: e.name, kcal: e.kcal100, p: e.p100, f: e.f100, c: e.c100, portion: e.grams, unit: '', unitG: 0, ...(findFood(e.key) || {}) }; f.kcal = e.kcal100; f.p = e.p100; f.f = e.f100; f.c = e.c100; portionSheet({ food: f, meal: e.meal, entry: e }); };
+ACT['food-day'] = (el) => { const d = addDays(toDate(foodDay()), +el.dataset.dir); if (isoOf(d) <= todayISO()) { ui.foodDate = isoOf(d); render('anim-fade'); } };
+ACT['food-goto'] = (el) => { ui.foodDate = el.dataset.d; render(); };
+ACT['food-goals'] = () => goalsSheet();
+ACT.water = (el) => { const d = foodDay(); const n = +el.dataset.n; S.food.water[d] = (S.food.water[d] || 0) === n ? n - 1 : n; save(); render(); };
+ACT['add-weight'] = () => weightSheet();
+ACT.weights = () => weightsSheet();
+
+/* ================= Тренировки ================= */
+const FIELDS = {
+  w: [['w', 'кг', 2.5, 1], ['r', 'повт.', 1, 0]],
+  bw: [['r', 'повт.', 1, 0], ['w', '+кг', 2.5, 1]],
+  time: [['t', 'сек', 5, 0]],
+  cardio: [['min', 'мин', 1, 0], ['km', 'км', 0.5, 1]],
+  rounds: [['rounds', 'раунды', 1, 0], ['rmin', 'мин', 0.5, 1]]
+};
+const TYPE_NAME = { w: 'С весом', bw: 'Свой вес', time: 'На время', cardio: 'Кардио', rounds: 'Раунды' };
+const BUILTIN_PROGRAMS = [
+  { id: 'b:bar', name: 'Пробежка и турник', items: ['Бег', 'Подтягивания', 'Отжимания на брусьях', 'Подъём ног в висе', 'Отжимания от пола'] },
+  { id: 'b:box', name: 'Бокс', items: ['Скакалка', 'Бой с тенью', 'Работа на мешке', 'Отжимания на кулаках', 'Планка'] },
+  { id: 'b:home', name: 'Всё тело без зала', items: ['Отжимания от пола', 'Приседания без веса', 'Выпады', 'Берпи', 'Планка'] },
+  { id: 'b:up', name: 'Зал: верх', items: ['Жим штанги лёжа', 'Тяга верхнего блока', 'Жим гантелей сидя', 'Подъём штанги на бицепс', 'Французский жим'] },
+  { id: 'b:low', name: 'Зал: ноги и пресс', items: ['Приседания со штангой', 'Румынская тяга', 'Жим ногами', 'Подъём на носки', 'Скручивания'] }
+].map((p) => ({ ...p, items: p.items.map((n) => 'ex:' + n) }));
+const allEx = () => S.myExercises.map((e) => ({ ...e, id: 'my:' + e.id, tags: normq(e.name + ' мои ' + (e.group || '')), mine: true })).concat(EX_DB);
+const exById = (id) => allEx().find((e) => e.id === id);
+const pad2 = (n) => String(n).padStart(2, '0');
+const fmtDur = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}:${pad2(m)}:${pad2(s % 60)}` : `${pad2(m)}:${pad2(s % 60)}`; };
+const fmtMin = (min) => { min = Math.round(min); return min >= 60 ? `${Math.floor(min / 60)} ч ${min % 60} мин` : `${min} мин`; };
+function defaultSet(ex) {
+  return { w: { w: 20, r: 10 }, bw: { r: 10, w: 0 }, time: { t: 30 }, cardio: { min: 30, km: /Бег|бег/.test(ex.name) ? 5 : 0 }, rounds: { rounds: 3, rmin: 3 } }[ex.type];
+}
+function lastSetsFor(exId) {
+  const ws = [...S.workouts].sort((a, b) => b.start - a.start);
+  for (const w of ws) { const it = w.items.find((x) => x.exId === exId); if (it && it.sets.length) return it.sets.map((s) => ({ ...s, done: false })); }
+  return null;
+}
+function makeItem(ex) {
+  const last = lastSetsFor(ex.id);
+  const n = ex.type === 'cardio' || ex.type === 'rounds' ? 1 : 3;
+  return { exId: ex.id, name: ex.name, type: ex.type, met: ex.met, sets: last || Array.from({ length: n }, () => ({ ...defaultSet(ex), done: false })) };
+}
+function setSummary(it) {
+  const s = it.sets.filter((x) => x.done).length ? it.sets.filter((x) => x.done) : it.sets;
+  if (it.type === 'w') return s.map((x) => `${fmtG(x.w)}×${x.r}`).join(', ') + ' кг';
+  if (it.type === 'bw') return s.map((x) => x.r + (x.w ? `(+${fmtG(x.w)})` : '')).join(', ') + ' повт.';
+  if (it.type === 'time') return s.map((x) => x.t + ' с').join(', ');
+  if (it.type === 'cardio') { const m = s.reduce((a, x) => a + (x.min || 0), 0), k = s.reduce((a, x) => a + (x.km || 0), 0); return `${fmtMin(m)}${k ? ', ' + fmtG(k) + ' км' : ''}`; }
+  return s.map((x) => `${x.rounds}×${fmtG(x.rmin)} мин`).join(', ');
+}
+function workoutCalc(w, durMin) {
+  const kg = latestWeight() || 75; let cardioMin = 0, kcal = 0, volume = 0, strength = false;
+  w.items.forEach((it) => {
+    const anyDone = it.sets.some((x) => x.done); const sets = anyDone ? it.sets.filter((x) => x.done) : it.sets;
+    if (it.type === 'cardio') { const m = sets.reduce((a, x) => a + (x.min || 0), 0); cardioMin += m; kcal += it.met * kg * m / 60; }
+    else if (it.type === 'rounds') { const m = sets.reduce((a, x) => a + (x.rounds || 0) * (x.rmin || 0), 0); cardioMin += m; kcal += it.met * kg * m / 60; }
+    else { strength = true; if (it.type === 'w') volume += sets.reduce((a, x) => a + (x.w || 0) * (x.r || 0), 0); }
+  });
+  if (strength) kcal += 5 * kg * Math.max(0, durMin - cardioMin) / 60;
+  return { kcal: Math.round(kcal), volume: Math.round(volume) };
+}
+function weekDays() { const n = new Date(); const dow = (n.getDay() + 6) % 7; return Array.from({ length: 7 }, (_, i) => isoOf(addDays(n, i - dow))); }
+function weekStrip() {
+  const days = weekDays(); const done = new Set(S.workouts.map((w) => isoOf(new Date(w.start))));
+  return `<div class="wk-strip">${days.map((d) => { const dt = toDate(d); return `<span class="wk ${done.has(d) ? 'on' : ''} ${d === todayISO() ? 'today' : ''}"><i>${done.has(d) ? I.tick : dt.getDate()}</i><small>${WD_SHORT[dt.getDay()]}</small></span>`; }).join('')}</div>`;
+}
+RENDER.sport = function () {
+  const days = weekDays(); const wk = S.workouts.filter((w) => days.includes(isoOf(new Date(w.start))));
+  const min = wk.reduce((s, w) => s + (w.end - w.start) / 60000, 0), kc = wk.reduce((s, w) => s + (w.kcal || 0), 0);
+  const A = S.workoutActive;
+  let html = head('Тренировки', '', A ? '' : plusBtn('start-workout', 'Начать тренировку'));
+  if (A) html += `<button class="card active-w" data-act="w-open"><span class="pulse"></span><span class="grow"><b>Идёт тренировка</b><span class="m">${esc(A.title)}, ${A.items.length} ${plural(A.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="w-el" data-elapsed="${A.start}">${fmtDur(Date.now() - A.start)}</span></button>`;
+  html += `<div class="card"><h2>Эта неделя</h2>${weekStrip()}<div class="balance"><div><span>Тренировок</span><b>${wk.length}</b></div><div><span>Время</span><b>${fmtMin(min)}</b></div><div><span>Сожжено ≈</span><b>${nf.format(kc)} ккал</b></div></div></div>`;
+  if (!A) html += `<button class="btn primary big-add" data-act="start-workout">${I.plus}Начать тренировку</button>`;
+  html += `<div class="seg">${[['hist', 'История'], ['rec', 'Рекорды'], ['prog', 'Программы']].map(([k, v]) => `<button data-act="sport-sec" data-sec="${k}" class="${(ui.sportSec || 'hist') === k ? 'on' : ''}">${v}</button>`).join('')}</div>`;
+  const sec2 = ui.sportSec || 'hist';
+  if (sec2 === 'hist') {
+    const ws = [...S.workouts].sort((a, b) => b.start - a.start);
+    html += ws.length ? `<div class="list">${ws.map((w) => `<button class="row" data-act="w-view" data-id="${w.id}"><span class="sec-ic">${I.walk}</span><span class="grow"><span class="t">${esc(w.title)}</span><span class="m">${cap(relDay(new Date(w.start)))}, ${fmtMin((w.end - w.start) / 60000)}, ${w.items.length} ${plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="r">≈${nf.format(w.kcal || 0)} ккал</span></button>`).join('')}</div>`
+      : `<div class="card empty"><b>Тренировок пока нет</b>Нажмите «Начать тренировку»: можно с нуля или по готовой программе — пробежка и турник, бокс, зал.</div>`;
+  } else if (sec2 === 'rec') {
+    const recs = computeRecords();
+    html += recs.length ? `<div class="list">${recs.map((r) => `<div class="row"><span class="cat-ic">🏆</span><span class="grow"><span class="t">${esc(r.name)}</span><span class="m">${fmtD(new Date(r.date))}</span></span><span class="r amt">${r.text}</span></div>`).join('')}</div>`
+      : `<div class="card empty"><b>Рекордов пока нет</b>Они появятся после первых тренировок: лучший вес, больше всего повторов, самая длинная пробежка.</div>`;
+  } else {
+    html += `<div class="section-label"><span>Мои программы</span></div>`;
+    html += S.wTemplates.length ? `<div class="list">${S.wTemplates.map((t) => `<button class="row" data-act="prog-open" data-id="${t.id}"><span class="grow"><span class="t">${esc(t.name)}</span><span class="m">${t.items.map((id) => (exById(id) || { name: '?' }).name).join(', ')}</span></span><span class="chev">${I.right}</span></button>`).join('')}</div>`
+      : '<p class="note-small">Сохраните любую тренировку как программу, и её можно будет запускать в одно касание.</p>';
+    html += `<div class="section-label"><span>Готовые</span></div><div class="list">${BUILTIN_PROGRAMS.map((t) => `<button class="row" data-act="prog-start" data-id="${t.id}"><span class="grow"><span class="t">${esc(t.name)}</span><span class="m">${t.items.map((id) => (exById(id) || { name: '?' }).name).join(', ')}</span></span><span class="chev">${I.right}</span></button>`).join('')}</div>`;
+  }
+  if (A) ui.mounts.push(tickElapsed);
+  return html;
+};
+function computeRecords() {
+  const best = {};
+  S.workouts.forEach((w) => w.items.forEach((it) => it.sets.forEach((s) => {
+    if (it.sets.some((x) => x.done) && !s.done) return;
+    let score = 0, text = '';
+    if (it.type === 'w') { score = (s.w || 0) * 1000 + (s.r || 0); text = `${fmtG(s.w)} кг × ${s.r}`; }
+    else if (it.type === 'bw') { score = (s.r || 0) * 1000 + (s.w || 0); text = `${s.r} повт.${s.w ? ' +' + fmtG(s.w) + ' кг' : ''}`; }
+    else if (it.type === 'time') { score = s.t || 0; text = `${s.t} с`; }
+    else if (it.type === 'cardio') { score = (s.km || 0) * 1000 + (s.min || 0); text = s.km ? `${fmtG(s.km)} км` : fmtMin(s.min || 0); }
+    else { score = (s.rounds || 0) * (s.rmin || 0); text = `${s.rounds} × ${fmtG(s.rmin)} мин`; }
+    if (score > 0 && (!best[it.exId] || score > best[it.exId].score)) best[it.exId] = { score, text, name: it.name, date: w.start };
+  })));
+  return Object.values(best).sort((a, b) => b.date - a.date);
+}
+let tickIv = null;
+function tickElapsed() {
+  clearInterval(tickIv);
+  tickIv = setInterval(() => {
+    const els = $$('[data-elapsed]'); if (!els.length) { clearInterval(tickIv); tickIv = null; return; }
+    els.forEach((el) => { el.textContent = fmtDur(Date.now() - (+el.dataset.elapsed)); });
+  }, 1000);
+}
+/* ---------- Идущая тренировка ---------- */
+function stepper(i, j, f, val, dec) {
+  return `<div class="stepper"><button type="button" data-act="st" data-i="${i}" data-j="${j}" data-f="${f}" data-d="-1" aria-label="Меньше">${I.minus}</button><input type="text" inputmode="decimal" data-sv data-i="${i}" data-j="${j}" data-f="${f}" value="${dec ? fmtG(val || 0) : (val || 0)}" aria-label="${f}"><button type="button" data-act="st" data-i="${i}" data-j="${j}" data-f="${f}" data-d="1" aria-label="Больше">${I.plus}</button></div>`;
+}
+DETAIL.workout = function () {
+  const A = S.workoutActive; if (!A) { ui.stack.pop(); return currentHTML(); }
+  const rest = S.settings.rest || 90;
+  let html = `<div class="detail-top">${backBtn('Тренировки')}<button class="icon-btn" data-act="w-rename" aria-label="Переименовать">${I.edit}</button></div>
+    <div class="w-head"><h1>${esc(A.title)}</h1><div class="w-timer" data-elapsed="${A.start}">${fmtDur(Date.now() - A.start)}</div></div>
+    <div class="rest-pick"><span>Отдых</span>${[60, 90, 120, 180].map((s) => `<button class="chip ${rest === s ? 'on' : ''}" data-act="rest-set" data-s="${s}">${s < 120 ? s + ' с' : s / 60 + ' мин'}</button>`).join('')}</div>`;
+  html += A.items.map((it, i) => {
+    const fs = FIELDS[it.type]; const last = lastSetsFor(it.exId);
+    return `<div class="card ex-card"><div class="ex-head"><span class="grow"><b>${esc(it.name)}</b><span class="m">${last ? 'В прошлый раз: ' + setSummary({ ...it, sets: last }) : TYPE_NAME[it.type]}</span></span><button class="act" data-act="w-ex-del" data-i="${i}" aria-label="Убрать упражнение">${I.trash}</button></div>
+      <div class="sets" style="--cols:${fs.length}"><div class="set-row head"><span>№</span>${fs.map(([, l]) => `<span>${l}</span>`).join('')}<span></span></div>
+      ${it.sets.map((s, j) => `<div class="set-row ${s.done ? 'done' : ''}" id="sr-${i}-${j}"><span class="n">${j + 1}</span>${fs.map(([f, , , dec]) => stepper(i, j, f, s[f], dec)).join('')}<button class="check ${s.done ? 'on' : ''}" data-act="set-done" data-i="${i}" data-j="${j}" aria-label="Подход выполнен">${s.done ? I.tick : ''}</button></div>`).join('')}</div>
+      <div class="btn-row"><button class="btn sm" data-act="set-add" data-i="${i}">${I.plus}Подход</button>${it.sets.length > 1 ? `<button class="btn sm" data-act="set-del" data-i="${i}">${I.minus}Подход</button>` : ''}</div></div>`;
+  }).join('');
+  if (!A.items.length) html += `<div class="card empty"><b>Добавьте первое упражнение</b>Турник, бег, бокс, зал: больше 80 упражнений и свои.</div>`;
+  html += `<button class="btn" data-act="w-add-ex">${I.plus}Упражнение</button>
+    <button class="btn primary big-add" data-act="w-finish">${I.tick}Завершить тренировку</button>
+    <button class="btn danger" type="button" data-act="ask-del">Отменить тренировку</button>
+    <div class="confirm" id="delBox" hidden><p>Отменить тренировку? Записанные подходы не сохранятся.</p><div class="btn-row"><button type="button" class="btn sm" data-act="cancel-del">Продолжить</button><button type="button" class="btn sm danger" data-act="w-cancel">Отменить</button></div></div>`;
+  ui.mounts.push(tickElapsed);
+  return html;
+};
+function startWorkout(title, exIds) {
+  if (S.workoutActive) { push({ type: 'workout' }); return; }
+  const t = new Date();
+  S.workoutActive = { id: uid(), title: title || `Тренировка ${t.getDate()} ${MONTH_GEN[t.getMonth()]}`, start: Date.now(), items: (exIds || []).map(exById).filter(Boolean).map(makeItem) };
+  save(); if (ui.tab !== 'sport') { ui.tab = 'sport'; ui.stack = []; } push({ type: 'workout' });
+  if (!exIds || !exIds.length) setTimeout(() => exPickSheet(), 350);
+}
+function startSheet() {
+  openSheet('Начать тренировку', `<div class="form">
+    <button class="btn primary" type="button" data-act="w-empty">${I.plus}С чистого листа</button>
+    ${S.wTemplates.length ? `<div class="section-label"><span>Мои программы</span></div><div class="list">${S.wTemplates.map((t) => `<button class="row" data-act="prog-start" data-id="${t.id}"><span class="grow"><span class="t">${esc(t.name)}</span><span class="m">${t.items.length} ${plural(t.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="chev">${I.right}</span></button>`).join('')}</div>` : ''}
+    <div class="section-label"><span>Готовые программы</span></div>
+    <div class="list">${BUILTIN_PROGRAMS.map((t) => `<button class="row" data-act="prog-start" data-id="${t.id}"><span class="grow"><span class="t">${esc(t.name)}</span><span class="m">${t.items.map((id) => (exById(id) || { name: '?' }).name).join(', ')}</span></span><span class="chev">${I.right}</span></button>`).join('')}</div>
+  </div>`);
+}
+function exPickSheet() {
+  const st = { q: '', g: '' };
+  openSheet('Упражнение', `<div class="form">
+    <label class="search">${I.search}<input type="search" id="exq" placeholder="Подтягивания, бег, мешок…" autocomplete="off"></label>
+    <div class="chips" id="exg">${[['', 'Все'], S.myExercises.length && ['my', 'Мои'], ...EX_GROUPS.map((g) => [g, g])].filter(Boolean).map(([id, n]) => `<button type="button" class="chip ${id === '' ? 'on' : ''}" data-g="${esc(id)}">${n}</button>`).join('')}</div>
+    <div id="exres"></div>
+    <button type="button" class="btn sm" id="exMine">${I.plus}Своё упражнение</button></div>`, (body) => {
+    const draw = () => {
+      const toks = normq(st.q).split(' ').filter(Boolean);
+      const list = allEx().filter((e) => (st.g === '' || (st.g === 'my' ? e.mine : e.group === st.g)) && toks.every((t) => (normq(e.name) + ' ' + e.tags).includes(stem(t))));
+      $('#exres', body).innerHTML = list.length ? `<div class="list">${list.slice(0, 80).map((e) => `<button class="row" data-ex="${esc(e.id)}"><span class="grow"><span class="t">${esc(e.name)}</span><span class="m">${esc(e.group || 'Мои')}, ${TYPE_NAME[e.type].toLowerCase()}</span></span><span class="chev">${I.plus}</span></button>`).join('')}</div>`
+        : `<div class="card empty" style="padding:18px"><b>Не нашлось</b>Добавьте своё упражнение.</div>`;
+    };
+    $('#exq', body).addEventListener('input', (e) => { st.q = e.target.value; draw(); });
+    $('#exg', body).addEventListener('click', (e) => { const b = e.target.closest('[data-g]'); if (!b) return; st.g = b.dataset.g; $$('#exg .chip', body).forEach((x) => x.classList.toggle('on', x === b)); draw(); });
+    $('#exres', body).addEventListener('click', (e) => { const b = e.target.closest('[data-ex]'); if (!b) return; addExercise(b.dataset.ex); });
+    $('#exMine', body).onclick = () => myExSheet(st.q);
+    draw(); setTimeout(() => { const i = $('#exq', body); if (i) i.focus(); }, 320);
+  });
+}
+function addExercise(id) {
+  const ex = exById(id); if (!ex || !S.workoutActive) return;
+  S.workoutActive.items.push(makeItem(ex)); save(); closeSheet(); render();
+  setTimeout(() => { const cards = $$('.ex-card'); const c = cards[cards.length - 1]; if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
+  toast(`${ex.name}: добавлено`);
+}
+function myExSheet(name) {
+  let type = 'bw';
+  openSheet('Своё упражнение', `<form id="f" class="form">
+    <label class="field"><span>Название</span><input type="text" id="meName" value="${esc(name || '')}" maxlength="60" placeholder="Например, подтягивания с утяжелением"></label>
+    <div class="field"><span>Как считать</span><div class="seg col" id="meType">${Object.entries(TYPE_NAME).map(([k, v]) => `<button type="button" data-v="${k}" class="${type === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+    <div class="sticky-save"><button class="btn primary" type="submit">Добавить</button></div></form>`, (body) => {
+    $('#meType', body).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; type = b.dataset.v; $$('#meType button', body).forEach((x) => x.classList.toggle('on', x === b)); });
+    $('#f', body).addEventListener('submit', (e) => {
+      e.preventDefault(); const n = $('#meName', body).value.trim(); if (!n) { toast('Напишите название'); return; }
+      const ex = { id: uid(), name: n, type, met: type === 'cardio' ? 7 : type === 'rounds' ? 7 : 5, group: 'Мои' }; S.myExercises.push(ex); save();
+      addExercise('my:' + ex.id);
+    });
+  }, { back: () => exPickSheet() });
+}
+/* Таймер отдыха */
+const REST = { until: 0, iv: null, ac: null };
+function beep() {
+  try {
+    if (!REST.ac) return; const ctx = REST.ac;
+    [0, 0.25].forEach((t) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; g.gain.setValueAtTime(0.0001, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.18); o.connect(g).connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.2); });
+  } catch (e) { /* без звука */ }
+}
+function startRest(sec) {
+  try { if (!REST.ac) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) REST.ac = new AC(); } else if (REST.ac.state === 'suspended') REST.ac.resume(); } catch (e) { /* без звука */ }
+  REST.until = Date.now() + sec * 1000; const el = $('#rest'); el.hidden = false; requestAnimationFrame(() => el.classList.add('show'));
+  clearInterval(REST.iv); const tick = () => {
+    const left = REST.until - Date.now();
+    if (left <= 0) { stopRest(); beep(); toast('Отдых закончен. Следующий подход'); notifyNow('Life: отдых закончен', 'Пора на следующий подход'); return; }
+    $('#restT').textContent = fmtDur(left + 999);
+  }; tick(); REST.iv = setInterval(tick, 250);
+}
+function stopRest() { clearInterval(REST.iv); REST.iv = null; const el = $('#rest'); el.classList.remove('show'); setTimeout(() => { if (!REST.iv) el.hidden = true; }, 220); }
+/* Завершение */
+function finishSheet() {
+  const A = S.workoutActive; if (!A) return;
+  if (!A.items.length) { toast('Добавьте хотя бы одно упражнение или отмените тренировку'); return; }
+  const dur = (Date.now() - A.start) / 60000; const c = workoutCalc(A, dur);
+  openSheet('Тренировка завершена', `<form id="f" class="form">
+    <div class="balance" style="margin:0;border:0;padding:0"><div><span>Время</span><b>${fmtMin(dur)}</b></div><div><span>Упражнений</span><b>${A.items.length}</b></div><div><span>Сожжено ≈</span><b>${nf.format(c.kcal)} ккал</b></div></div>
+    ${c.volume ? `<p class="note-small" style="margin:0">Поднято за тренировку: ${nf.format(c.volume)} кг</p>` : ''}
+    <label class="field"><span>Название</span><input type="text" id="wfName" value="${esc(A.title)}" maxlength="60"></label>
+    <div class="switch-row"><span>Сохранить как программу</span><label class="switch"><input type="checkbox" id="wfTpl"><i></i></label></div>
+    <p class="note-small" style="margin:0">Калории — оценка по весу тела ${nf1.format(latestWeight() || 75)} кг. Укажите свой вес в «Питании», чтобы было точнее.</p>
+    <div class="sticky-save"><button class="btn primary" type="submit">Сохранить тренировку</button></div></form>`, (body) => {
+    $('#f', body).addEventListener('submit', (e) => {
+      e.preventDefault();
+      const before = new Map(computeRecords().map((r) => [r.name, r.text]));
+      const w = { id: A.id, title: $('#wfName', body).value.trim() || A.title, start: A.start, end: Date.now(), items: A.items, kcal: c.kcal, volume: c.volume };
+      S.workouts.push(w);
+      if ($('#wfTpl', body).checked) S.wTemplates.push({ id: uid(), name: w.title, items: w.items.map((x) => x.exId) });
+      S.workoutActive = null; stopRest(); save(); closeSheet(); ui.stack = []; ui.sportSec = 'hist'; render('anim-back');
+      const recs = computeRecords().filter((r) => before.get(r.name) !== r.text && isoOf(new Date(r.date)) === isoOf(new Date(w.start)));
+      toast(recs.length ? `Новый рекорд: ${recs[0].name}, ${recs[0].text}` : `Тренировка сохранена, ≈${nf.format(c.kcal)} ккал`);
+    });
+  });
+}
+DETAIL.wview = function (d) {
+  const w = S.workouts.find((x) => x.id === d.id); if (!w) { ui.stack.pop(); return currentHTML(); }
+  return `<div class="detail-top">${backBtn('Тренировки')}<button class="icon-btn" data-act="w-hdel" data-id="${w.id}" aria-label="Удалить тренировку" style="color:var(--bad)">${I.trash}</button></div>
+    ${head(esc(w.title), `${cap(fmtD(new Date(w.start), { weekday: 'long', day: 'numeric', month: 'long' }))}, ${fmtT(new Date(w.start))}`, '')}
+    <div class="card"><div class="balance" style="margin:0;border:0;padding:0"><div><span>Время</span><b>${fmtMin((w.end - w.start) / 60000)}</b></div><div><span>Упражнений</span><b>${w.items.length}</b></div><div><span>Сожжено ≈</span><b>${nf.format(w.kcal || 0)} ккал</b></div></div></div>
+    <div class="list">${w.items.map((it) => `<div class="row"><span class="grow"><span class="t">${esc(it.name)}</span><span class="m">${setSummary(it)}</span></span></div>`).join('')}</div>
+    <div class="btn-row"><button class="btn primary" data-act="w-repeat" data-id="${w.id}">Повторить</button><button class="btn" data-act="w-totpl" data-id="${w.id}">В программы</button></div>`;
+};
+ACT['start-workout'] = () => { if (S.workoutActive) { if (ui.tab !== 'sport') { ui.tab = 'sport'; ui.stack = []; } push({ type: 'workout' }); } else startSheet(); };
+ACT['w-empty'] = () => { closeSheet(); startWorkout(); };
+ACT['w-open'] = () => push({ type: 'workout' });
+ACT['prog-start'] = (el) => { const t = BUILTIN_PROGRAMS.find((x) => x.id === el.dataset.id) || S.wTemplates.find((x) => x.id === el.dataset.id); if (!t) return; closeSheet(); startWorkout(t.name, t.items); };
+ACT['prog-open'] = (el) => {
+  const t = S.wTemplates.find((x) => x.id === el.dataset.id); if (!t) return;
+  openSheet(t.name, `<div class="form"><div class="list">${t.items.map((id) => `<div class="row"><span class="grow"><span class="t">${esc((exById(id) || { name: '?' }).name)}</span></span></div>`).join('')}</div>
+    <label class="field"><span>Название</span><input type="text" id="tName" value="${esc(t.name)}" maxlength="60"></label>
+    <button class="btn danger" type="button" id="tDel">${I.trash}Удалить программу</button>
+    <div class="sticky-save two-btn"><button class="btn" type="button" id="tSave">Сохранить</button><button class="btn primary" type="button" id="tGo">Начать</button></div></div>`, (body) => {
+    $('#tSave', body).onclick = () => { t.name = $('#tName', body).value.trim() || t.name; save(); closeSheet(); render(); toast('Программа сохранена'); };
+    $('#tGo', body).onclick = () => { closeSheet(); startWorkout(t.name, t.items); };
+    $('#tDel', body).onclick = () => { const idx = S.wTemplates.indexOf(t); closeSheet(); removeWithUndo('Программа удалена', () => S.wTemplates.splice(idx, 1), () => S.wTemplates.splice(idx, 0, t)); };
+  });
+};
+ACT['sport-sec'] = (el) => { ui.sportSec = el.dataset.sec; render(); };
+ACT['w-add-ex'] = () => exPickSheet();
+ACT['w-rename'] = () => {
+  const A = S.workoutActive; if (!A) return;
+  openSheet('Название', `<form id="f" class="form"><input type="text" id="wn" value="${esc(A.title)}" maxlength="60"><button class="btn primary" type="submit">Сохранить</button></form>`, (body) => {
+    $('#f', body).addEventListener('submit', (e) => { e.preventDefault(); A.title = $('#wn', body).value.trim() || A.title; save(); closeSheet(); render(); });
+    setTimeout(() => $('#wn', body).select(), 320);
+  });
+};
+ACT['w-ex-del'] = (el) => { const A = S.workoutActive; const i = +el.dataset.i; const it = A.items[i]; removeWithUndo(`${it.name}: убрано`, () => A.items.splice(i, 1), () => A.items.splice(i, 0, it)); };
+ACT['set-add'] = (el) => { const it = S.workoutActive.items[+el.dataset.i]; const last = it.sets[it.sets.length - 1]; it.sets.push({ ...(last || defaultSet(it)), done: false }); save(); render(); };
+ACT['set-del'] = (el) => { const it = S.workoutActive.items[+el.dataset.i]; if (it.sets.length > 1) { it.sets.pop(); save(); render(); } };
+ACT.st = (el) => {
+  const A = S.workoutActive; if (!A) return; const it = A.items[+el.dataset.i]; const s = it.sets[+el.dataset.j]; const f = el.dataset.f;
+  const def = FIELDS[it.type].find((x) => x[0] === f); const v = Math.max(0, Math.round(((s[f] || 0) + def[2] * (+el.dataset.d)) * 10) / 10);
+  s[f] = v; save(); const inp = el.parentElement.querySelector('input'); if (inp) inp.value = def[3] ? fmtG(v) : v;
+};
+ACT['set-done'] = (el) => {
+  const A = S.workoutActive; if (!A) return; const s = A.items[+el.dataset.i].sets[+el.dataset.j];
+  s.done = !s.done; save();
+  el.classList.toggle('on', s.done); el.innerHTML = s.done ? I.tick : ''; const row = $(`#sr-${el.dataset.i}-${el.dataset.j}`); if (row) row.classList.toggle('done', s.done);
+  if (s.done && !['cardio', 'rounds'].includes(A.items[+el.dataset.i].type)) startRest(S.settings.rest || 90);
+};
+ACT['rest-set'] = (el) => { S.settings.rest = +el.dataset.s; save(); render(); };
+ACT['w-finish'] = () => finishSheet();
+ACT['w-cancel'] = () => { S.workoutActive = null; stopRest(); save(); ui.stack = []; render('anim-back'); toast('Тренировка отменена'); };
+ACT['w-view'] = (el) => push({ type: 'wview', id: el.dataset.id });
+ACT['w-repeat'] = (el) => { const w = S.workouts.find((x) => x.id === el.dataset.id); if (!w) return; ui.stack = []; startWorkout(w.title, w.items.map((x) => x.exId)); };
+ACT['w-totpl'] = (el) => { const w = S.workouts.find((x) => x.id === el.dataset.id); if (!w) return; S.wTemplates.push({ id: uid(), name: w.title, items: w.items.map((x) => x.exId) }); save(); toast('Добавлено в «Программы»'); };
+ACT['w-hdel'] = (el) => { const w = S.workouts.find((x) => x.id === el.dataset.id); if (!w) return; const idx = S.workouts.indexOf(w); ui.stack.pop(); removeWithUndo('Тренировка удалена', () => S.workouts.splice(idx, 1), () => S.workouts.splice(idx, 0, w)); };
+
 /* ================= Настройки ================= */
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const isStandalone = () => window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
@@ -2013,6 +3076,7 @@ document.addEventListener('input', (e) => {
   if (t.id === 'noteSearch') { ui.noteQuery = t.value; renderNoteList(); }
   else if (t.id === 'remSearch') { ui.remQuery = t.value; refreshRemList(); }
   else if (t.id === 'setName') { S.settings.name = t.value.trim(); save(); }
+  else if (t.matches('[data-sv]') && S.workoutActive) { const it = S.workoutActive.items[+t.dataset.i]; const v = num(t.value); if (it && v != null) { it.sets[+t.dataset.j][t.dataset.f] = Math.max(0, v); save(); } }
 });
 document.addEventListener('submit', (e) => {
   if (e.target.id !== 'todoForm') return;
@@ -2103,6 +3167,7 @@ function start() {
   $('#vwClose').innerHTML = I.close; $('#vwPrev').innerHTML = I.left; $('#vwNext').innerHTML = I.right;
   $('#keypad').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map((k) => k === '' ? '<span></span>' : `<button type="button" data-k="${k}" aria-label="${k === 'del' ? 'Стереть' : k}">${k === 'del' ? I.left : k}</button>`).join('');
   $('#scrim').addEventListener('click', closeSheet);
+  $('#restSkip').addEventListener('click', stopRest); $('#restPlus').addEventListener('click', () => { REST.until += 30000; });
   $('#sheetBack').addEventListener('click', () => { if (sheetBack) sheetBack(); });
   applyTheme();
   const t = location.hash.slice(1); ui.tab = (t === 'home' || (SECTION_DEFS[t] && sec(t))) ? t : 'home';
