@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.6';
+const LIFE_VERSION = '1.7';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -152,6 +152,7 @@ const QUICK_DEFS = {
 /* ================= Данные ================= */
 const KEY = 'life.v1';
 let S;
+const STORE = LifeCore.createStore({ getItem: (k) => localStorage.getItem(k), setItem: (k, v) => localStorage.setItem(k, v) }, KEY);
 const DEFAULT_SERVICES = [
   ['Моторное масло и фильтр', 7500, 6], ['Воздушный фильтр', 15000, 12], ['Салонный фильтр', 15000, 12],
   ['Жидкость коробки передач', 40000, 24], ['Свечи зажигания', 30000, 36], ['Тормозная жидкость', 40000, 24],
@@ -214,8 +215,11 @@ function normalize(s) {
   return s;
 }
 function load() {
-  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v) return normalize(s); } } catch (e) { /* нет хранилища */ }
-  return seed();
+  const data = STORE.read();
+  if (STORE.state.blocked) { saveFailed = true; return seed(); }
+  if (!data) return seed();
+  try { return normalize(data); }
+  catch (e) { STORE.state.blocked = true; STORE.state.error = String(e.message || e); saveFailed = true; return seed(); }
 }
 /* Стереть записи. keepSetup — оставить машину (без пробега и отметок) и объекты с подрядчиками */
 async function wipeAll(keepSetup) {
@@ -235,8 +239,11 @@ async function wipeAll(keepSetup) {
 let saveFailed = false;
 function save() {
   updateBadge();
-  try { localStorage.setItem(KEY, JSON.stringify(S)); saveFailed = false; }
-  catch (e) { if (!saveFailed) toast('Не удалось сохранить: память телефона заполнена. Удалите старые фото или сделайте резервную копию.'); saveFailed = true; }
+  const ok = STORE.write(S);
+  const wasFailed = saveFailed; saveFailed = !ok;
+  storageIndicator();
+  if (!ok && !wasFailed) toast('Не удалось сохранить изменения. Откройте «Сохранение» и сделайте копию.');
+  return ok;
 }
 const sec = (id) => !!S.settings.sections[id];
 const feat = (id) => !!S.settings.features[id] && sec(FEATURE_DEFS[id].sec);
@@ -357,6 +364,7 @@ async function applyIcon() {
 /* ================= Тост с «Вернуть» ================= */
 let toastT, pendingFinal = null;
 function toast(msg, undo) {
+  if (saveFailed && /сохран|добавлен|записан|восстановлен|выполнен|удален/i.test(msg) && !/не удалось|не сохран/i.test(msg)) msg = 'Изменения пока не сохранены. Откройте «Сохранение».';
   const t = $('#toast');
   t.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button type="button" id="toastUndo">Вернуть</button>' : ''}`;
   t.classList.toggle('has-undo', !!undo); t.classList.add('show');
@@ -367,8 +375,8 @@ function toast(msg, undo) {
 /* Удаление с возможностью вернуть: remove() убирает запись, restore() возвращает, finalize() — окончательная уборка (фото) */
 function removeWithUndo(msg, remove, restore, finalize) {
   if (pendingFinal) { const f = pendingFinal; pendingFinal = null; f(); }
-  remove(); save(); render();
-  pendingFinal = finalize || null;
+  remove(); const ok = save(); render();
+  pendingFinal = ok ? (finalize || null) : null;
   toast(msg, () => { restore(); save(); render(); toast('Восстановлено'); });
 }
 
@@ -449,6 +457,7 @@ function currentHTML() {
   return (RENDER[ui.tab] || RENDER.home)();
 }
 function render(anim) {
+  if (STORE.state.blocked) { showStorageRecovery(); return; }
   ui.mounts = [];
   const el = $('#view');
   const top = ui.stack[ui.stack.length - 1]; const ed = !!(top && top.type === 'deditor');
@@ -457,6 +466,7 @@ function render(anim) {
   renderTabbar();
   hydratePhotos(el);
   const ms = ui.mounts; ui.mounts = []; ms.forEach((f) => f());
+  storageIndicator();
 }
 function go(tab) {
   if (tab !== 'home' && !sec(tab)) tab = 'home';
@@ -1120,6 +1130,7 @@ RENDER.home = function () {
   let html = `<div class="head" style="align-items:center"><div class="brand"><img data-logo src="icons/logo.png" alt=""><span>Life</span></div>
     <div class="head-actions"><button class="icon-btn" data-act="settings" aria-label="Настройки">${I.gear}</button></div></div>
     <div class="hello"><h1>${greeting()}${S.settings.name ? ', ' + esc(S.settings.name) : ''}</h1><p>${cap(WD_LONG[d.getDay()])}, ${d.getDate()} ${MONTH_GEN[d.getMonth()]}</p></div>`;
+  html += homeToolsHTML();
   html += installBanner();
   if (exampleCount()) html += `<div class="banner"><div class="grow"><b>Это примеры</b>Записи с пометкой «пример» показывают, как всё выглядит. Удалите их, когда начнёте вести свои.</div><button class="btn sm" data-act="clear-examples">Удалить</button></div>`;
   const ws = S.settings.widgets.filter((w) => w.on && widgetAvailable(w.id));
@@ -1449,7 +1460,7 @@ function remSheet(id, preset) {
       const dv = $('#rDate', body).value, tv = $('#rTime', body).value || '09:00';
       if (!dv) { toast('Укажите дату'); return; }
       const [y, m, dd] = dv.split('-').map(Number); const [hh, mm] = tv.split(':').map(Number);
-      const data = { title, note: $('#rNote', body).value.trim(), at: new Date(y, m - 1, dd, hh, mm).toISOString(), repeat: $('#rRepeat', body).value, done: false, notified: false };
+      const data = { title, note: $('#rNote', body).value.trim(), at: new Date(y, m - 1, dd, hh, mm).toISOString(), repeat: $('#rRepeat', body).value, repeatDay: dd, repeatMonth: m - 1, done: false, notified: false };
       let rec; if (id) rec = Object.assign(r, data, { example: false }); else { rec = Object.assign({ id: uid() }, data); S.reminders.push(rec); }
       save(); closeSheet(); render(); toast('Напоминание сохранено');
       if (sig !== 'none') setTimeout(() => sendSignal(rec, sig), 250);
@@ -1460,10 +1471,7 @@ function remSheet(id, preset) {
   });
 }
 function nextOccurrence(r) {
-  const d = new Date(r.at); const now = new Date(); let guard = 0;
-  const step = (x) => { if (r.repeat === 'day') x.setDate(x.getDate() + 1); else if (r.repeat === 'week') x.setDate(x.getDate() + 7); else if (r.repeat === 'month') x.setMonth(x.getMonth() + 1); else x.setFullYear(x.getFullYear() + 1); };
-  do { step(d); guard++; } while (d < now && guard < 5000);
-  return d.toISOString();
+  return LifeCore.nextRepeat(r);
 }
 function icsDate(d) { return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`; }
 function icsText(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n'); }
@@ -1502,7 +1510,7 @@ ACT['new-rem'] = () => remSheet();
 ACT['edit-rem'] = (el) => remSheet(el.dataset.id);
 ACT['toggle-rem'] = (el) => {
   const r = S.reminders.find((x) => x.id === el.dataset.id); if (!r) return;
-  if (!r.done && r.repeat !== 'none') { r.at = nextOccurrence(r); r.notified = false; save(); render(); toast('Выполнено. Следующее: ' + relDay(new Date(r.at))); }
+  if (!r.done && r.repeat !== 'none') { if (!r.repeatDay) { const anchor = new Date(r.at); r.repeatDay = anchor.getDate(); r.repeatMonth = anchor.getMonth(); } r.at = nextOccurrence(r); r.notified = false; save(); render(); toast('Выполнено. Следующее: ' + relDay(new Date(r.at))); }
   else { r.done = !r.done; save(); render(); if (r.done) toast('Выполнено'); }
 };
 ACT['rem-cal'] = (el) => { const r = S.reminders.find((x) => x.id === el.dataset.id); if (r) sendSignal(r, sigMethod() === 'none' ? 'calendar' : sigMethod()); };
@@ -4033,7 +4041,7 @@ DETAIL.settings = function () {
       <p class="note-small" style="margin:0">Выберите вариант до того, как добавите Life на экран «Домой». Чтобы сменить потом, удалите значок и добавьте заново, данные останутся.</p></div>
     <div class="field"><span>Резервная копия</span><div class="btn-row"><button type="button" class="btn sm" data-act="export">Сохранить копию</button><button type="button" class="btn sm" data-act="import">Восстановить</button></div>
       <input type="file" id="impFile" accept="application/json,.json" hidden>
-      <p class="note-small" style="margin:0">Данные и фото хранятся только на этом телефоне. Сохраняйте копию в «Файлы» хотя бы раз в месяц. Видео из дневника в копию не входят: сохраните их в галерею кнопкой в дневнике.</p></div>
+      <p class="note-small" style="margin:0">Данные и фото хранятся только на этом телефоне. Сохраняйте копию в «Файлы» хотя бы раз в месяц. Видео из дневника в копию не входят. Перед восстановлением Life покажет состав копии; текущие записи можно вернуть через «Сохранение».</p></div>
     <div class="field"><span>Сброс</span><button class="btn danger" type="button" data-act="ask-del">Стереть данные</button>
       <div class="confirm" id="delBox" hidden><p>Что стереть? Восстановить можно только из резервной копии.</p>
         <button type="button" class="btn sm danger" data-act="wipe" data-keep="1">Записи и фото, машину и объекты оставить</button>
@@ -4094,28 +4102,88 @@ function installSheet() {
 }
 /* Резервная копия вместе с фото */
 const blobToDataURL = (b) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(b); });
+function downloadFile(file) {
+  const url = URL.createObjectURL(file), a = document.createElement('a');
+  a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 async function exportData() {
-  save(); toast('Готовлю копию…');
-  const photos = {}; let skipped = 0; try { (await phAll() || []).forEach((p) => { if (p.video) { skipped++; return; } if (p.full) photos[p.id] = p.full; }); } catch (e) { /* без фото */ }
-  const out = { life: S, photos: {} };
-  for (const [id, b] of Object.entries(photos)) { const u = await blobToDataURL(b); if (u) out.photos[id] = u; }
-  const name = `life-копия-${todayISO()}.json`;
-  const file = new File([JSON.stringify(out)], name, { type: 'application/json' });
-  try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Резервная копия Life' }); toast('Копия сохранена'); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
-  const url = URL.createObjectURL(file); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
-  toast('Копия сохранена');
-}
-async function importData(f) {
-  if (!f) return;
-  let data; try { data = JSON.parse(await f.text()); } catch (e) { toast('Это не резервная копия Life. Выберите файл life-копия-….json'); return; }
-  const st = data && data.life ? data.life : data;
-  if (!st || !st.v || !st.settings) { toast('Это не резервная копия Life. Выберите файл life-копия-….json'); return; }
-  toast('Восстанавливаю…');
-  for (const [id, u] of Object.entries(data.photos || {})) {
-    try { const full = await (await fetch(u)).blob(); const thumb = await scaleImage(full, 360, 0.75); await phPut({ id, full, thumb, created: Date.now() }); } catch (e) { /* пропускаем битое фото */ }
+  if (STORE.state.blocked) { downloadFile(new File([STORE.state.raw || ''], 'life-поврежденные-данные.txt', { type: 'text/plain' })); return false; }
+  toast('Готовлю копию…');
+  const snapshot = JSON.parse(JSON.stringify(S));
+  let records;
+  try { records = await phAll(); } catch (e) { toast('Не удалось прочитать вложения. Копия не создана, повторите попытку.'); return false; }
+  const byId = new Map((records || []).map((p) => [p.id, p]));
+  const photos = {}, missing = [], videos = [];
+  for (const id of LifeCore.mediaRefs(snapshot)) {
+    const p = byId.get(id);
+    if (p && p.video) { videos.push(id); continue; }
+    if (!p || !p.full) { missing.push(id); continue; }
+    const value = await blobToDataURL(p.full);
+    if (value) photos[id] = value; else missing.push(id);
   }
-  S = normalize(st); S.settings.onboarded = true; delete S.settings.freshOffer; save(); applyTheme(); applyIcon(); ui.stack = []; render('anim-fade'); toast('Данные восстановлены');
+  const created = new Date().toISOString();
+  const out = { life: snapshot, photos, backup: { version: 1, created, videos, missing } };
+  const file = new File([JSON.stringify(out)], `life-копия-${todayISO()}-${pad(new Date().getHours())}${pad(new Date().getMinutes())}.json`, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Резервная копия Life' });
+    else downloadFile(file);
+  } catch (e) { if (e.name !== 'AbortError') toast('Не удалось передать копию. Повторите попытку.'); return false; }
+  try { localStorage.setItem(KEY + '.backupAt', created); } catch (e) { /* optional metadata */ }
+  openSheet('Копия подготовлена', `<p>В файле: фотографии — <b>${Object.keys(photos).length}</b>. Сохраните файл в «Файлы» или другое надёжное место.</p>${videos.length ? `<p>Видео не включены: <b>${videos.length}</b>. Сохраните их отдельно из дневника.</p>` : ''}${missing.length ? `<p>Не удалось включить вложения: <b>${missing.length}</b>. Проверьте исходные записи.</p>` : ''}<button class="btn primary" data-act="close-sheet">Понятно</button>`);
+  storageIndicator(); return true;
 }
+function backupCounts(s) {
+  return [['Заметки', s.notes], ['Планы', s.plans], ['Напоминания', s.reminders], ['Расходы', s.expenses], ['Доходы', s.incomes], ['Тренировки', s.workouts], ['Страницы дневника', s.diary && s.diary.pages]].map(([name, list]) => `<div class="restore-count"><span>${name}</span><b>${(list || []).length}</b></div>`).join('');
+}
+let importBusy = false;
+async function importData(f) {
+  if (!f || importBusy) return;
+  let data, st;
+  try {
+    data = JSON.parse(await f.text());
+    st = JSON.parse(JSON.stringify(data && data.life ? data.life : data));
+    LifeCore.validateState(st); st = normalize(st);
+    if (data.photos !== undefined && (!data.photos || typeof data.photos !== 'object' || Array.isArray(data.photos))) throw new Error('Неверный список фотографий');
+  } catch (e) { toast('Копия не открыта: ' + String(e.message || e)); return; }
+  const refs = LifeCore.mediaRefs(st), available = data.photos || {};
+  const absent = refs.filter((id) => !available[id]).length;
+  openSheet('Восстановить копию?', `<p>Файл: <b>${esc(f.name || 'Резервная копия')}</b></p>${backupCounts(st)}<div class="restore-count"><span>Вложений в файле</span><b>${Object.keys(available).length}</b></div>${absent ? `<p class="note-small">В копии нет вложений: ${absent}. Среди них могут быть видео — они экспортируются отдельно.</p>` : ''}<p>Записи в Life будут заменены. Текущие записи останутся в локальной копии перед восстановлением. Для полной страховки сначала сохраните копию с фотографиями в «Файлы».</p><div class="btn-row"><button class="btn primary" id="restoreApply">Заменить записи</button><button class="btn" data-act="close-sheet">Отмена</button></div>`, (body) => {
+    $('#restoreApply', body).onclick = async () => {
+      if (importBusy) return; importBusy = true;
+      const button = $('#restoreApply', body); button.disabled = true; button.textContent = 'Восстанавливаю…';
+      const added = [], mapping = {}; let restored = 0, skipped = absent;
+      try {
+        const oldRaw = STORE.state.raw || JSON.stringify(S);
+        localStorage.setItem(KEY + '.before-import', oldRaw);
+        refs.forEach((id) => { mapping[id] = 'restore-' + uid(); });
+        for (const id of refs) {
+          const u = available[id]; if (!u) continue;
+          try {
+            if (typeof u !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/i.test(u)) throw new Error('Неверный формат фотографии');
+            const full = await (await fetch(u)).blob(), thumb = await scaleImage(full, 360, 0.75);
+            await phPut({ id: mapping[id], full, thumb, created: Date.now() }); added.push(mapping[id]); restored++;
+          } catch (e) { skipped++; }
+        }
+        const next = LifeCore.remapMedia(st, mapping);
+        // Keep the code that protects this device instead of importing a different PIN.
+        const wasBlocked = STORE.state.blocked;
+        if (!wasBlocked) next.settings.pin = S.settings.pin;
+        next.settings.onboarded = true; delete next.settings.freshOffer;
+        if (!STORE.write(next, true)) throw new Error('Не удалось записать данные: освободите место и повторите');
+        S = next; saveFailed = false; ui.stack = []; ui.tab = 'home';
+        closeSheet();
+        if (wasBlocked) { $('.tabbar').hidden = false; start(); }
+        else { applyTheme(); applyIcon(); render('anim-fade'); }
+        openSheet('Восстановление завершено', `${backupCounts(S)}<p>Восстановлено фотографий: <b>${restored}</b>.</p>${skipped ? `<p>Вложений пропущено или нет в копии: <b>${skipped}</b>. Записи восстановлены, но эти вложения недоступны.</p>` : ''}<p class="note-small">Предыдущие записи можно вернуть: Настройки → Сохранение → До восстановления.</p><button class="btn primary" data-act="close-sheet">Готово</button>`);
+      } catch (e) {
+        await Promise.all(added.map(phDel)); toast('Восстановление не выполнено: ' + e.message);
+        button.disabled = false; button.textContent = 'Повторить';
+      } finally { importBusy = false; }
+    };
+  });
+}
+
 ACT.settings = () => push({ type: 'settings' });
 ACT['settings-sections'] = () => { if (sheetOpen) closeSheet(); if (ui.stack.length && ui.stack[ui.stack.length - 1].type === 'sections') return; if (!ui.stack.length || ui.stack[0].type !== 'settings') { ui.tab = 'home'; ui.stack = [{ type: 'settings' }]; } push({ type: 'sections' }); };
 ACT['settings-home'] = () => push({ type: 'homecfg' });
@@ -4303,9 +4371,107 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', save);
 window.addEventListener('hashchange', () => { const t = location.hash.slice(1); if (t && t !== ui.tab && (t === 'home' || SECTION_DEFS[t])) go(t); });
 
+/* ================= Life 1.7: сегодня, поиск, сохранение ================= */
+function safeLocal(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+function backupLabel() {
+  const at = safeLocal(KEY + '.backupAt');
+  return at ? 'Копия подготовлена ' + fmtShort(new Date(at)) : 'Резервная копия ещё не создана';
+}
+function storageIndicator() {
+  let el = $('#storageStatus');
+  if (!el) { el = document.createElement('button'); el.id = 'storageStatus'; el.type = 'button'; el.dataset.act = 'storage'; document.body.appendChild(el); }
+  el.hidden = !saveFailed || STORE.state.blocked;
+  el.textContent = 'Изменения не сохранены · нажмите для помощи';
+  const status = $('#lifeSaveState');
+  if (status) { status.textContent = saveFailed ? 'Ошибка сохранения' : 'На устройстве · сохранено'; status.classList.toggle('save-error', saveFailed); }
+}
+function homeToolsHTML() {
+  const rows = LifeCore.agenda(S, todayISO()), late = rows.filter((x) => x.date < todayISO()).length;
+  return `<section class="life-hub" aria-label="Быстрый доступ"><div class="life-hub-row"><button class="life-today" data-act="today"><span class="life-hub-icon">${I.cal}</span><span><b>Сегодня</b><small>${rows.length ? rows.length + ' ' + plural(rows.length, 'дело', 'дела', 'дел') + (late ? ' · ' + late + ' просрочено' : '') : 'День свободен. Добавим планы?'}</small></span><span class="life-count">${rows.length}</span></button><button class="life-search" data-act="global-search" aria-label="Поиск по Life">${I.search}</button></div><button class="life-save" data-act="storage"><span id="lifeSaveState">${saveFailed ? 'Ошибка сохранения' : 'На устройстве · сохранено'}</span><span>${esc(backupLabel())}</span></button></section>`;
+}
+ACT.today = () => push({ type: 'today' });
+DETAIL.today = function () {
+  const rows = LifeCore.agenda(S, todayISO());
+  const groups = [['Просрочено', rows.filter((x) => x.date < todayISO())], ['По времени', rows.filter((x) => x.date === todayISO() && x.time)], ['Без времени', rows.filter((x) => x.date === todayISO() && !x.time)]];
+  const html = groups.filter(([, list]) => list.length).map(([name, list]) => `<section class="agenda-group"><h2>${name}<span>${list.length}</span></h2><div class="list">${list.map((r) => `<div class="agenda-row">${r.kind !== 'remark' ? `<button class="agenda-check" data-act="agenda-done" data-kind="${r.kind}" data-id="${esc(r.id)}" aria-label="Выполнить: ${esc(r.title)}">${I.tick}</button>` : `<span class="agenda-object">${I.building}</span>`}<button class="agenda-open" data-act="search-open" data-kind="${r.kind}" data-id="${esc(r.id)}" data-obj="${esc(r.obj || '')}"><b>${esc(r.title)}</b><span>${esc(r.label)}${r.date < todayISO() ? ' · ' + fmtShort(toDate(r.date)) : ''}${r.time ? ' · ' + r.time : ''}</span></button>${r.date < todayISO() && r.kind === 'plan' ? `<button class="link agenda-move" data-act="agenda-move" data-id="${esc(r.id)}">На сегодня</button>` : ''}</div>`).join('')}</div></section>`).join('');
+  return `<div class="detail-top">${backBtn('Главная')}</div>${head('Сегодня', cap(WD_LONG[new Date().getDay()]) + ', ' + fmtD(new Date()), plusBtn('today-add', 'Добавить дело'))}${html || '<div class="card empty"><b>Всё спокойно</b>Просроченных дел и задач на сегодня нет. Добавьте план или напоминание.</div>'}<p class="note-small">Планы, напоминания и сроки по объектам — из включённых разделов. Для повторяющегося напоминания отметка запускает следующий повтор.</p>`;
+};
+ACT['today-add'] = () => {
+  openSheet('Добавить на сегодня', `<div class="list">${sec('plans') ? `<button class="row" data-act="new-plan"><span class="sec-ic">${I.plans}</span><span>План</span></button>` : ''}${sec('reminders') ? `<button class="row" data-act="new-rem"><span class="sec-ic">${I.bell}</span><span>Напоминание</span></button>` : ''}${!sec('plans') && !sec('reminders') ? '<p>Включите планы или напоминания в настройках разделов.</p>' : ''}</div>`);
+};
+ACT['agenda-done'] = (el) => { if (el.dataset.kind === 'plan') togglePlan(el.dataset.id); else ACT['toggle-rem'](el); };
+ACT['agenda-move'] = (el) => {
+  const p = S.plans.find((x) => x.id === el.dataset.id); if (!p) return;
+  const old = { date: p.date, month: p.month }; p.date = todayISO(); p.month = p.date.slice(0, 7);
+  if (!save()) { Object.assign(p, old); return; } render();
+  toast('Перенесено на сегодня', () => { Object.assign(p, old); save(); render(); });
+};
+let globalQuery = '';
+ACT['global-search'] = () => { globalQuery = ''; push({ type: 'search' }); };
+DETAIL.search = function () {
+  ui.mounts.push(() => { renderGlobalResults(); const input = $('#globalSearch'); if (input) input.focus(); });
+  return `<div class="detail-top">${backBtn('Главная')}</div>${head('Поиск по Life', 'Записи из ваших включённых разделов', '')}<label class="search life-global-search">${I.search}<input id="globalSearch" type="search" value="${esc(globalQuery)}" placeholder="Мысль, дело, расход, квартира…" aria-label="Поиск по Life" autocomplete="off"></label><div id="globalResults" aria-live="polite"></div>`;
+};
+function renderGlobalResults() {
+  const el = $('#globalResults'); if (!el) return;
+  if (!globalQuery.trim()) { el.innerHTML = '<div class="card empty"><b>Вспомните слово — Life найдёт запись</b>Например: «масло», «отпуск» или номер квартиры.</div>'; return; }
+  const rows = LifeCore.search(S, globalQuery);
+  el.innerHTML = rows.length ? `<p class="note-small">${rows.length === 100 ? 'Первые 100 результатов — уточните запрос' : 'Найдено: ' + rows.length}</p><div class="list">${rows.map((r) => `<button class="row big" data-act="search-open" data-kind="${r.kind}" data-id="${esc(r.id)}" data-obj="${esc(r.obj || '')}" data-index="${r.index ?? ''}"><span class="grow"><span class="t">${esc(r.title)}</span><span class="m">${esc(r.sub)}</span></span><span class="chev">${I.right}</span></button>`).join('')}</div>` : '<div class="card empty"><b>Ничего не найдено</b>Попробуйте другое слово или включите нужный раздел.</div>';
+}
+document.addEventListener('input', (e) => { if (e.target.id === 'globalSearch') { globalQuery = e.target.value; renderGlobalResults(); } });
+ACT['search-open'] = (el) => {
+  const id = el.dataset.id;
+  switch (el.dataset.kind) {
+    case 'note': return noteSheet(id);
+    case 'plan': return planSheet(id);
+    case 'reminder': return remSheet(id);
+    case 'expense': return entrySheet('exp', id);
+    case 'income': return entrySheet('inc', id);
+    case 'goal': return goalSheet(id);
+    case 'remark': return remarkSheet(el.dataset.obj, id);
+    case 'carlog': return logSheet(id);
+    case 'diary': ui.dIdx = Number(el.dataset.index); return go('diary');
+    case 'workout': return push({ type: 'wview', id });
+  }
+};
+ACT.storage = () => { if (STORE.state.blocked) showStorageRecovery(); else push({ type: 'storage' }); };
+DETAIL.storage = function () {
+  const previous = !!safeLocal(KEY + '.previous'), imported = !!safeLocal(KEY + '.before-import');
+  return `<div class="detail-top">${backBtn('Назад')}</div>${head('Сохранение', 'Данные остаются на этом устройстве', '')}<div class="card"><h2>${saveFailed ? 'Есть несохранённые изменения' : 'Данные сохранены'}</h2><p>${saveFailed ? 'Не закрывайте Life. Повторите запись или сохраните текущие записи в файл.' : 'Life сохраняет записи в браузере. Внешняя копия поможет при замене телефона или очистке данных браузера.'}</p><div class="btn-row">${saveFailed ? '<button class="btn primary" data-act="save-retry">Повторить запись</button>' : ''}<button class="btn" data-act="export">Сохранить копию</button><button class="btn" data-act="import">Открыть копию</button></div><p class="note-small">${esc(backupLabel())}. Файл копии не зашифрован; храните его в личной папке.</p></div>${previous || imported ? `<div class="card"><h2>Локальное восстановление</h2><p class="note-small">Эти копии находятся на том же устройстве и не заменяют файл с фотографиями.</p><div class="btn-row">${imported ? '<button class="btn" data-act="local-restore" data-key="before-import">До восстановления</button>' : ''}${previous ? '<button class="btn" data-act="local-restore" data-key="previous">Предыдущая запись</button>' : ''}</div></div>` : ''}<input id="impFile" type="file" accept="application/json,.json" hidden>`;
+};
+ACT['save-retry'] = () => { if (save()) { render(); toast('Данные сохранены'); } };
+ACT.import = () => {
+  let input = $('#impFile');
+  if (!input) { input = document.createElement('input'); input.type = 'file'; input.id = 'impFile'; input.accept = 'application/json,.json'; input.hidden = true; document.body.appendChild(input); }
+  input.click();
+};
+ACT['local-restore'] = (el) => {
+  const key = el.dataset.key === 'before-import' ? 'before-import' : 'previous';
+  let next; try { next = normalize(LifeCore.validateState(JSON.parse(safeLocal(KEY + '.' + key)))); }
+  catch (e) { toast('Эта копия не читается. Попробуйте файл резервной копии.'); return; }
+  openSheet('Вернуть локальную копию?', `${backupCounts(next)}<p>Текущие записи будут заменены выбранной копией. Фотографии останутся на устройстве.</p><button class="btn primary" id="localRestoreApply">Восстановить</button>`, (body) => {
+    $('#localRestoreApply', body).onclick = () => {
+      const wasBlocked = STORE.state.blocked;
+      if (!wasBlocked) next.settings.pin = S.settings.pin;
+      if (!STORE.write(next, true)) { toast('Не удалось записать данные. Освободите место и повторите.'); return; }
+      S = next; saveFailed = false; closeSheet();
+      if (wasBlocked) { $('.tabbar').hidden = false; start(); }
+      else { ui.stack = []; ui.tab = 'home'; applyTheme(); render(); }
+      toast('Локальная копия восстановлена');
+    };
+  });
+};
+function showStorageRecovery() {
+  $('.tabbar').hidden = true;
+  $('#view').innerHTML = `<div class="view"><div class="storage-recovery"><div class="life-hub-icon">${I.lock}</div><h1>Сохраним ваши данные</h1><p>Life не смог прочитать сохранённые записи. Запись остановлена: исходные данные не заменены пустыми.</p><div class="card"><h2>Восстановление</h2><div class="btn-row"><button class="btn primary" data-act="import">Открыть резервную копию</button>${safeLocal(KEY + '.previous') ? '<button class="btn" data-act="local-restore" data-key="previous">Предыдущая запись</button>' : ''}${safeLocal(KEY + '.before-import') ? '<button class="btn" data-act="local-restore" data-key="before-import">До восстановления</button>' : ''}<button class="btn" data-act="export">Скачать исходные данные</button></div></div><p class="note-small">Если доступ к памяти браузера ограничен, разрешите хранение данных и перезапустите Life.</p><input id="impFile" type="file" accept="application/json,.json" hidden></div></div>`;
+}
+const oldSettingsView = DETAIL.settings;
+DETAIL.settings = function () { return oldSettingsView().replace('<div class="list">', '<div class="list"><button class="row big" data-act="storage"><span class="sec-ic">' + I.lock + '</span><span class="grow"><span class="t">Сохранение и восстановление</span><span class="m">' + esc(backupLabel()) + '</span></span><span class="chev">' + I.right + '</span></button>'); };
+
 /* ================= Запуск ================= */
 function start() {
   S = load();
+  if (STORE.state.blocked) { showStorageRecovery(); return; }
   if (/[?&]selftest\b/.test(location.search)) window.__life = { ACT, DETAIL, RENDER, get S() { return S; }, ui, DE };
   document.body.insertAdjacentHTML('afterbegin', muscleSprite());
   $('#sheetClose').innerHTML = I.close; $('#sheetBack').innerHTML = I.back; $('#sheetDel').innerHTML = I.trash;
@@ -4328,3 +4494,4 @@ function start() {
 start();
 
 })();
+
