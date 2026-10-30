@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.9';
+const LIFE_VERSION = '2.0';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -164,8 +164,8 @@ function seed() {
     v: 2,
     settings: {
       name: '', theme: 'auto', accent: 'blue', wallpaper: 'dots', icon: 'light', budget: null,
-      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false, food: true, sport: true, diary: true },
-      order: ['plans', 'food', 'bank', 'diary', 'sport', 'notes', 'car', 'reminders', 'objects'],
+      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false, food: true, sport: true, diary: false },
+      order: ['plans', 'food', 'bank', 'sport', 'notes', 'car', 'reminders', 'objects'],
       features: { income: true, recurring: true, piggy: true, fuel: true, photos: true },
       quick: ['add-food', 'start-workout', 'new-exp', 'new-plan', 'new-note'],
       widgets: ['quick', 'today', 'next', 'plans', 'water', 'food', 'streak', 'money', 'reminders', 'week', 'memory', 'expenses', 'car', 'bank', 'notes', 'objects', 'sport'].map((id) => ({ id, on: id !== 'sport', size: id === 'food' ? 's' : undefined })),
@@ -186,9 +186,10 @@ function normalize(s) {
   const legacy = !s.settings || s.settings.onboarded === undefined;
   const st = s.settings = Object.assign({}, d.settings, s.settings || {});
   st.sections = Object.assign({}, d.settings.sections, st.sections || {});
+  st.sections.diary = false;
   st.features = Object.assign({}, d.settings.features, st.features || {});
-  st.order = (st.order || []).filter((id) => SECTION_DEFS[id]);
-  Object.keys(SECTION_DEFS).forEach((id) => { if (!st.order.includes(id)) st.order.push(id); });
+  st.order = (st.order || []).filter((id) => SECTION_DEFS[id] && id !== 'diary');
+  Object.keys(SECTION_DEFS).forEach((id) => { if (id !== 'diary' && !st.order.includes(id)) st.order.push(id); });
   if (!Array.isArray(st.quick)) st.quick = d.settings.quick;
   st.quick = st.quick.filter((q) => QUICK_DEFS[q]);
   const wids = (st.widgets || []).filter((w) => WIDGETS[w.id]);
@@ -245,7 +246,7 @@ function save() {
   if (!ok && !wasFailed) toast('Не удалось сохранить изменения. Откройте «Сохранение» и сделайте копию.');
   return ok;
 }
-const sec = (id) => !!S.settings.sections[id];
+const sec = (id) => id !== 'diary' && !!S.settings.sections[id];
 const feat = (id) => !!S.settings.features[id] && sec(FEATURE_DEFS[id].sec);
 
 /* ================= Фото (IndexedDB) ================= */
@@ -4051,7 +4052,7 @@ DETAIL.settings = function () {
     <p class="note-small" style="text-align:center">Life, версия ${LIFE_VERSION}</p>`;
 };
 DETAIL.sections = function () {
-  const st = S.settings; const order = st.order;
+  const st = S.settings; const order = st.order.filter(id => id !== 'diary');
   const slots = tabSlots().filter((x) => x !== 'more');
   return `<div class="detail-top">${backBtn('Настройки')}</div>${head('Разделы и функции', 'Включите нужное. Порядок задаёт нижнюю панель.', '')}
     <div class="sec-list">${order.map((id, i) => {
@@ -4218,7 +4219,7 @@ ACT.wipe = (el) => { const keep = !!el.dataset.keep; wipeAll(keep).then(() => { 
 /* ================= Первый запуск ================= */
 function showWelcome(mode) {
   const w = $('#welcome'); const st = S.settings;
-  const secsHTML = () => S.settings.order.map((id) => { const d = SECTION_DEFS[id]; const on = st.sections[id]; return `<button type="button" class="wl-sec ${on ? 'on' : ''}" data-wsec="${id}"><span class="sec-ic">${I[d.icon]}</span><span class="t">${d.name}</span><span class="m">${d.desc}</span><span class="wl-tick">${I.tick}</span></button>`; }).join('');
+  const secsHTML = () => S.settings.order.filter(id => id !== 'diary').map((id) => { const d = SECTION_DEFS[id]; const on = st.sections[id]; return `<button type="button" class="wl-sec ${on ? 'on' : ''}" data-wsec="${id}"><span class="sec-ic">${I[d.icon]}</span><span class="t">${d.name}</span><span class="m">${d.desc}</span><span class="wl-tick">${I.tick}</span></button>`; }).join('');
   if (mode === 'offer') {
     w.innerHTML = `<div class="wl-in"><img data-logo src="icons/logo.png" alt=""><h2>Начать с чистого листа?</h2>
       <p>Сейчас в Life примеры и тестовые записи. Можно стереть их и начать вести свои.</p>
@@ -4593,6 +4594,83 @@ ACT['orbit-today']=()=>{
  const V=$('#bubbleStage')?._v,day=$('.orbit-day[data-day="'+todayISO()+'"]');if(!V||!day)return;
  const x=Number(day.style.getPropertyValue('--x')),y=Number(day.style.getPropertyValue('--y')),d=Number(day.style.getPropertyValue('--d'));
  const T={W:V.W,H:V.H,k:2.4,tx:V.W/2-(x+d/2)*2.4,ty:Math.min(V.H/2,240)-(y+d/2)*2.4};clampView(T);animateView(V,T.k,T.tx,T.ty,450);V.stage.scrollIntoView({block:'start',behavior:reduceMotion()?'auto':'smooth'});
+};
+
+
+/* Life 2.0 · focused dashboards */
+const DASH_OLD_CAR=RENDER.car,DASH_OLD_SPORT=RENDER.sport;
+function dashTabs(items,selected,act){return '<div class="dash-tabs" role="tablist">'+items.map(([id,n])=>'<button role="tab" aria-selected="'+(id===selected)+'" class="'+(id===selected?'on':'')+'" data-act="'+act+'" data-sec="'+id+'">'+n+'</button>').join('')+'</div>';}
+function dashStat(label,value,hint){return '<div class="dash-stat"><span>'+label+'</span><b>'+value+'</b>'+(hint?'<small>'+hint+'</small>':'')+'</div>';}
+function dashQuick(act,icon,label,extra=''){return '<button data-act="'+act+'" '+extra+'><span>'+I[icon]+'</span><b>'+label+'</b></button>';}
+function dashLegacyBody(html){const i=html.indexOf('<div class="seg">');return i<0?html:html.slice(html.indexOf('</div>',i)+6);}
+ACT['dash-log']=()=>logSheet();
+ACT['car-hub']=el=>{ui.carHub=el.dataset.sec;if(ui.carHub!=='overview')ui.carSec=ui.carHub;render();};
+RENDER.car=function(){
+ const c=S.car,f=fuelStats(),mk=todayISO().slice(0,7),items=S.services.map(s=>({s,st:svcStatus(s)})).sort((a,b)=>b.st.rank-a.st.rank||b.st.frac-a.st.frac);
+ const urgent=items.filter(x=>x.st.cls==='bad'),soon=items.filter(x=>x.st.cls==='warn'),known=items.filter(x=>x.st.cls!=='none');
+ const section=ui.carHub||'overview',tabs=[['overview','Обзор'],['service','ТО'],...(feat('fuel')?[['fuel','Топливо']]:[]),['log','История'],['todo','Задачи']];
+ let html='<div class="dash-page dash-auto">'+head('Гараж','Всё о машине — без лишнего', '<button class="icon-btn" data-act="car-edit" aria-label="Настроить машину">'+I.gear+'</button>'+(section!=='overview'?plusBtn('car-add','Добавить запись'):''));
+ html+='<section class="dash-vehicle"><div class="dash-eyebrow">MY GARAGE <span>'+esc(c.year||'LIFE AUTO')+'</span></div><div class="dash-vehicle-title">'+esc(c.name||'Ваша машина')+'</div><p>'+esc([c.body,c.engine].filter(Boolean).join(' · ')||'Добавьте машину и ведите её историю')+'</p><div class="dash-car-art">'+carSVG(c.color)+'</div><div class="dash-odo"><div><small>ТЕКУЩИЙ ПРОБЕГ</small><b>'+(c.mileage==null?'—':nf.format(c.mileage))+'<em> км</em></b></div><button class="btn sm" data-act="mileage">Обновить</button></div></section>';
+ html+=dashTabs(tabs,section,'car-hub');
+ if(section!=='overview'){
+  ui.carSec=tabs.some(x=>x[0]===section)?section:'service';
+  return html+dashLegacyBody(DASH_OLD_CAR())+'</div>';
+ }
+ html+='<div class="dash-stats">'+dashStat('Пора обслужить',String(urgent.length),'пунктов регламента')+dashStat('Скоро',String(soon.length),'проверьте сроки')+dashStat('Расход',f.avg?nf1.format(f.avg):'—','л / 100 км')+'</div>';
+ html+='<div class="dash-quick">'+dashQuick('mileage','odo','Пробег')+(feat('fuel')?dashQuick('new-fuel','fuel','Заправка'):'')+dashQuick('dash-log','notes','Обслуживание')+'</div>';
+ const next=items.filter(x=>x.st.cls!=='none').slice(0,3);
+ html+='<div class="dash-section"><h2>Ближайшее обслуживание</h2><button class="link" data-act="car-hub" data-sec="service">Весь регламент</button></div>';
+ if(next.length)html+='<div class="list">'+next.map(({s,st})=>'<button class="row big" data-act="svc" data-id="'+esc(s.id)+'"><span class="dash-service-mark '+st.cls+'">'+I.gear+'</span><span class="grow"><span class="t">'+esc(s.name)+'</span><span class="m">'+esc((st.parts||[]).join(' · '))+'</span></span><span class="pill '+st.cls+'">'+st.label+'</span></button>').join('')+'</div>';
+ else html+='<div class="card dash-onboard"><h2>История начинается с первой отметки</h2><p>Укажите пробег и отметьте последнее ТО. Life покажет ближайшие замены.</p><button class="btn primary" data-act="car-hub" data-sec="service">Настроить регламент</button></div>';
+ const cost=S.carLog.filter(l=>(l.date||'').startsWith(mk)).reduce((sum,l)=>sum+(Number(l.cost)||0),0);
+ html+='<section class="card dash-cost"><span class="dash-eyebrow">ЗА '+MONTH_NOM[new Date().getMonth()].toUpperCase()+'</span><h2>Содержание машины</h2><div class="dash-cost-value">'+money(cost+(feat('fuel')?f.month:0))+'</div><div class="dash-cost-split"><span>Обслуживание <b>'+money(cost)+'</b></span>'+(feat('fuel')?'<span>Топливо <b>'+money(f.month)+'</b></span>':'')+'</div></section>';
+ if(!known.length)html+='<p class="note-small">Нули в обзоре означают отсутствие отмеченных сроков. Интервалы ТО можно настроить под свою машину.</p>';
+ return html+'</div>';
+};
+ACT['sport-hub']=el=>{ui.sportHub=el.dataset.sec;if(ui.sportHub!=='overview')ui.sportSec=ui.sportHub;render();};
+RENDER.sport=function(){
+ const A=S.workoutActive,days=weekDays(),week=S.workouts.filter(w=>days.includes(isoOf(new Date(w.start))));
+ const mins=week.reduce((sum,w)=>sum+Math.max(0,(w.end-w.start)/60000),0),section=ui.sportHub||'overview';
+ let html='<div class="dash-page dash-training">'+head('Движение','Ваш ритм. Ваш прогресс.','');
+ html+='<section class="dash-training-hero"><span class="dash-eyebrow">'+(A?'ТРЕНИРОВКА ИДЁТ':'ОДНО ЗАНЯТИЕ БЛИЖЕ К ЦЕЛИ')+'</span><div class="dash-training-symbol">'+I.dumbbell+'</div><h2>'+(A?esc(A.title):'Время для себя')+'</h2><p>'+(A?'Продолжайте с того места, где остановились.':'Зал, турник или пробежка — начните с удобной программы.')+'</p><button class="btn primary" data-act="'+(A?'w-open':'start-workout')+'">'+I.play+(A?'Продолжить тренировку':'Начать тренировку')+'</button>'+(A?'<span class="dash-active-time" data-elapsed="'+A.start+'">'+fmtDur(Date.now()-A.start)+'</span>':'')+'</section>';
+ html+=dashTabs([['overview','Обзор'],['prog','Программы'],['hist','История'],['lib','Упражнения'],['rec','Рекорды']],section,'sport-hub');
+ if(section!=='overview'){
+  ui.sportSec=section;
+  let body=dashLegacyBody(DASH_OLD_SPORT());const footer=body.indexOf('<div class="cta-bar">');if(footer>=0)body=body.slice(0,footer);
+  return html+body+'</div>';
+ }
+ html+='<div class="dash-stats">'+dashStat('За неделю',String(week.length),'тренировок')+dashStat('В движении',String(Math.round(mins)),'минут')+dashStat('Всего',String(S.workouts.length),'занятий')+'</div><section class="card dash-week"><h2>Ваш ритм на неделе</h2>'+weekStrip()+'</section>';
+ const programs=[...S.wTemplates,...BUILTIN_PROGRAMS].slice(0,4);
+ html+='<div class="dash-section"><h2>Выберите программу</h2><button class="link" data-act="sport-hub" data-sec="prog">Все</button></div><div class="dash-programs">'+programs.map((t,i)=>'<button class="dash-program" data-act="prog-start" data-id="'+esc(t.id)+'"><span class="dash-program-num">0'+(i+1)+'</span><span>'+I.dumbbell+'</span><b>'+esc(t.name)+'</b><small>'+t.items.length+' '+plural(t.items.length,'упражнение','упражнения','упражнений')+'</small></button>').join('')+'</div>';
+ const recent=[...S.workouts].sort((a,b)=>b.start-a.start).slice(0,3);
+ html+='<div class="dash-section"><h2>Последние занятия</h2><button class="link" data-act="sport-hub" data-sec="hist">История</button></div>';
+ html+=recent.length?'<div class="list">'+recent.map(w=>'<button class="row big" data-act="w-view" data-id="'+esc(w.id)+'"><span class="sec-ic">'+I.walk+'</span><span class="grow"><span class="t">'+esc(w.title)+'</span><span class="m">'+fmtShort(new Date(w.start))+' · '+fmtMin(Math.max(0,(w.end-w.start)/60000))+'</span></span><span class="chev">'+I.right+'</span></button>').join('')+'</div>':'<div class="card dash-onboard"><h2>Здесь будет ваша история</h2><p>Завершённые тренировки и личные рекорды сохранятся автоматически.</p></div>';
+ if(A)ui.mounts.push(tickElapsed);return html+'</div>';
+};
+const dashWorkout=DETAIL.workout;
+DETAIL.workout=function(){
+ const A=S.workoutActive;if(!A)return dashWorkout();
+ const total=A.items.reduce((n,it)=>n+it.sets.length,0),done=A.items.reduce((n,it)=>n+it.sets.filter(s=>s.done).length,0),pct=total?Math.round(done/total*100):0;
+ return '<div class="dash-workout-progress"><span>Подходы <b>'+done+' / '+total+'</b></span><span class="bar"><i style="width:'+pct+'%"></i></span></div>'+dashWorkout();
+};
+/* Keep every editor and existing record; simplify section entry points. */
+for(const [key,label,tag] of [['notes','Мысли, которые хочется сохранить','ЗАМЕТКИ'],['bank','Понятная картина ваших денег','ФИНАНСЫ'],['food','Еда, вода и баланс дня','ПИТАНИЕ'],['reminders','Важное — в нужный момент','НАПОМИНАНИЯ'],['objects','Контроль работ и замечаний','ОБЪЕКТЫ']]){
+ const old=RENDER[key];RENDER[key]=function(){
+  let body=old();const stats=key==='notes'?S.notes.length+' '+plural(S.notes.length,'запись','записи','записей'):key==='objects'?S.objects.length+' '+plural(S.objects.length,'объект','объекта','объектов'):key==='reminders'?S.reminders.filter(r=>!r.done).length+' активных':'';
+  return '<div class="dash-page dash-'+key+'"><div class="dash-kicker"><span>'+tag+'</span><span>'+stats+'</span></div>'+body.replace('<div class="head-text">','<div class="head-text"><p class="dash-intro">'+label+'</p>')+'</div>';
+ };
+}
+const dashHome=RENDER.home;
+RENDER.home=function(){return '<div class="dash-page dash-home">'+dashHome()+'</div>';};
+
+
+const dashSetDone=ACT['set-done'];
+ACT['set-done']=el=>{
+ dashSetDone(el);
+ const A=S.workoutActive;if(!A)return;
+ const total=A.items.reduce((n,it)=>n+it.sets.length,0),done=A.items.reduce((n,it)=>n+it.sets.filter(s=>s.done).length,0);
+ const label=$('.dash-workout-progress b'),bar=$('.dash-workout-progress .bar i');
+ if(label)label.textContent=done+' / '+total;if(bar)bar.style.width=(total?done/total*100:0)+'%';
 };
 
 /* ================= Запуск ================= */
