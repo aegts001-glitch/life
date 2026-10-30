@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.7';
+const LIFE_VERSION = '1.8';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -329,7 +329,7 @@ function applyTheme() {
   root.style.setProperty('--accent', c); root.style.setProperty('--accent-soft', `rgba(${r},${g},${b},.13)`); root.style.setProperty('--accent-rgb', `${r},${g},${b}`);
   document.body.classList.toggle('wp-dots', S.settings.wallpaper === 'dots');
   document.body.classList.toggle('wp-glow', S.settings.wallpaper === 'glow');
-  const meta = $('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', getComputedStyle(document.body).backgroundColor);
+  applyVisual();
 }
 const iconCache = {}; let baseIcon = null;
 function loadBaseIcon() {
@@ -1130,6 +1130,7 @@ RENDER.home = function () {
   let html = `<div class="head" style="align-items:center"><div class="brand"><img data-logo src="icons/logo.png" alt=""><span>Life</span></div>
     <div class="head-actions"><button class="icon-btn" data-act="settings" aria-label="Настройки">${I.gear}</button></div></div>
     <div class="hello"><h1>${greeting()}${S.settings.name ? ', ' + esc(S.settings.name) : ''}</h1><p>${cap(WD_LONG[d.getDay()])}, ${d.getDate()} ${MONTH_GEN[d.getMonth()]}</p></div>`;
+  html += visualButtonHTML();
   html += homeToolsHTML();
   html += installBanner();
   if (exampleCount()) html += `<div class="banner"><div class="grow"><b>Это примеры</b>Записи с пометкой «пример» показывают, как всё выглядит. Удалите их, когда начнёте вести свои.</div><button class="btn sm" data-act="clear-examples">Удалить</button></div>`;
@@ -4467,6 +4468,91 @@ function showStorageRecovery() {
 }
 const oldSettingsView = DETAIL.settings;
 DETAIL.settings = function () { return oldSettingsView().replace('<div class="list">', '<div class="list"><button class="row big" data-act="storage"><span class="sec-ic">' + I.lock + '</span><span class="grow"><span class="t">Сохранение и восстановление</span><span class="m">' + esc(backupLabel()) + '</span></span><span class="chev">' + I.right + '</span></button>'); };
+
+
+/* ================= Life 1.8 · Appearance studio ================= */
+const VISUAL_BACKGROUNDS = [
+ ['aurora','Сияние','#070F25','#274B8B','#24BCA7','#995CE5'],
+ ['ocean','Океан','#061A27','#006D8F','#48C8BE','#244AC4'],
+ ['sunset','Закат','#261426','#D45B64','#EDAB69','#6C49AA'],
+ ['lava','Лава','#230E19','#BF3350','#EA8249','#792669'],
+ ['pearl','Перламутр','#E9E7F0','#BEBCE8','#ACE1D8','#E8BDD8'],
+ ['midnight','Полночь','#080C19','#172550','#3C3070','#193848'],
+ ['forest','Лес','#0A1D1B','#1A6654','#6E9865','#214A51'],
+ ['rose','Розовый кварц','#28182C','#A0558B','#D99FA6','#7567B3'],
+ ['ice','Ледник','#DDECF2','#A5C9EC','#ACDFDB','#C6BFE5'],
+ ['desert','Пески','#E8D9C6','#D3AC88','#C6A3A6','#E6CBA3'],
+ ['cobalt','Кобальт','#0A1534','#254BF1','#4D92E8','#7145DB'],
+ ['violet','Аметист','#180F30','#6E3FC8','#AC77DE','#343A9C'],
+ ['mint','Мята','#DAEBE4','#A2CFBC','#92C5D7','#C5DCAB'],
+ ['graphite','Графит','#111317','#373B44','#535A68','#252A36'],
+ ['paper','Бумага','#F1EEE7','#DCD5C6','#EAE5D9','#D1D7D1'],
+ ['space','Космос','#090B20','#452B8D','#1E5B8A','#A5427D']
+];
+const VISUAL_DEFAULT = { background:'aurora', material:'glass', glass:72, blur:16, radius:24, motion:true, intensity:65 };
+function visualSettings() { return Object.assign({}, VISUAL_DEFAULT, S.settings.visual || {}); }
+function applyVisual() {
+ const v=visualSettings(), root=document.documentElement;
+ const bg=VISUAL_BACKGROUNDS.find(b=>b[0]===v.background)||VISUAL_BACKGROUNDS[0];
+ root.dataset.visual=v.material; root.dataset.motion=v.motion?'on':'off';
+ root.style.setProperty('--v-base',bg[2]); root.style.setProperty('--v-a',bg[3]); root.style.setProperty('--v-b',bg[4]); root.style.setProperty('--v-c',bg[5]);
+ root.style.setProperty('--v-blur',v.blur+'px'); root.style.setProperty('--v-radius',v.radius+'px');
+ root.style.setProperty('--v-intensity',v.intensity/100);
+ const dark=S.settings.theme==='dark'||(S.settings.theme!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);
+ const lightBase=hexToRgb(bg[2]).reduce((a,b)=>a+b,0)/3>160;
+ root.style.setProperty('--v-wash',dark?(lightBase?'rgba(0,0,0,.74)':'rgba(0,0,0,.06)'):(lightBase?'rgba(255,255,255,.08)':'rgba(255,255,255,.84)'));
+ const opacity=v.material==='solid'?1:v.material==='soft'?.94:Math.max(.2,v.glass/100);
+ root.style.setProperty('--v-surface',dark?'rgba(22,25,36,'+opacity+')':'rgba(255,255,255,'+opacity+')');
+ root.style.setProperty('--v-line',dark?'rgba(255,255,255,.12)':'rgba(255,255,255,.55)');
+ let layer=$('#lifeAtmosphere');
+ if(!layer){layer=document.createElement('div');layer.id='lifeAtmosphere';layer.setAttribute('aria-hidden','true');layer.innerHTML='<i></i><i></i><i></i><span></span>';document.body.prepend(layer);}
+ const meta=$('meta[name="theme-color"]');if(meta)meta.setAttribute('content',bg[2]);
+}
+function visualButtonHTML() {
+ return '<button class="visual-entry" data-act="visual-studio"><span class="visual-entry-dot"></span>Студия оформления<span>Фоны · стекло · движение '+I.right+'</span></button>';
+}
+ACT['visual-studio']=()=>push({type:'visualstudio'});
+DETAIL.visualstudio=function(){
+ const v=visualSettings();
+ ui.mounts.push(bindVisualStudio);
+ return '<div class="detail-top">'+backBtn('Назад')+'</div>'+head('Ваш Life','Оформление, которое чувствуется вашим','')+
+ '<div class="visual-preview"><div class="visual-preview-top"><span class="visual-eyebrow">LIFE / APPEARANCE</span><span class="visual-live">● Предпросмотр</span></div><h2>Меньше шума.<br>Больше вашего.</h2><div class="visual-demo-card"><span>'+I.cal+'</span><div><b>Хороший день начинается здесь</b><small>Всё важное — под рукой</small></div><span class="visual-demo-dot"></span></div></div>'+
+ '<section class="card visual-panel"><div class="visual-section-title"><h2>Готовые сочетания</h2><span>В одно касание</span></div><div class="visual-presets">'+[['night','Ночной неон'],['light','Светлый жемчуг'],['warm','Тёплый закат'],['minimal','Тихий графит']].map(([id,n])=>'<button data-act="visual-preset" data-preset="'+id+'">'+n+'</button>').join('')+'</div></section>'+
+ '<section class="card visual-panel"><div class="visual-section-title"><h2>Атмосфера</h2><span>16 фонов</span></div><div class="visual-bg-grid">'+VISUAL_BACKGROUNDS.map(b=>'<button class="visual-bg '+(v.background===b[0]?'on':'')+'" data-act="visual-bg" data-bg="'+b[0]+'" aria-pressed="'+(v.background===b[0])+'"><span style="--tile-base:'+b[2]+';--tile-a:'+b[3]+';--tile-b:'+b[4]+';--tile-c:'+b[5]+'"><i>✓</i></span><b>'+b[1]+'</b></button>').join('')+'</div></section>'+
+ '<section class="card visual-panel"><h2>Поверхности</h2><div class="seg visual-material">'+[['glass','Стекло'],['soft','Мягкие'],['solid','Плотные']].map(([id,n])=>'<button data-act="visual-material" data-material="'+id+'" class="'+(v.material===id?'on':'')+'">'+n+'</button>').join('')+'</div>'+
+ visualRange('glass','Плотность стекла',v.glass,25,95,'%')+visualRange('blur','Размытие',v.blur,0,28,'px')+visualRange('radius','Скругления',v.radius,10,32,'px')+visualRange('intensity','Насыщенность фона',v.intensity,0,100,'%')+'</section>'+
+ '<section class="card visual-panel"><h2>Цвет и свет</h2><div class="seg">'+[['auto','Система'],['light','Светлая'],['dark','Тёмная']].map(([id,n])=>'<button data-act="visual-theme" data-theme="'+id+'" class="'+(S.settings.theme===id?'on':'')+'">'+n+'</button>').join('')+'</div><div class="visual-accents">'+ACCENTS.map(a=>'<button aria-label="'+a.name+'" aria-pressed="'+(S.settings.accent===a.id)+'" class="'+(S.settings.accent===a.id?'on':'')+'" style="--pick:'+a.c+'" data-act="visual-accent" data-accent="'+a.id+'"></button>').join('')+'</div></section>'+
+ '<section class="card visual-panel"><label class="switch-row"><span><b>Живой фон</b><small class="visual-hint">Плавное движение света и переливы</small></span><span class="switch"><input id="visualMotion" type="checkbox" '+(v.motion?'checked':'')+'><i></i></span></label><p class="note-small">Системная настройка уменьшения движения также учитывается. Изменения сохраняются автоматически.</p></section>'+
+ '<button class="btn ghost visual-reset" data-act="visual-reset">Вернуть исходное оформление</button><p class="note-small visual-version">Life 1.8 · Сделано под ваш ритм</p>';
+};
+function visualRange(key,label,value,min,max,unit){
+ return '<label class="visual-range"><span>'+label+'<output id="visualOut-'+key+'">'+value+unit+'</output></span><input type="range" data-visual-range="'+key+'" data-unit="'+unit+'" min="'+min+'" max="'+max+'" value="'+value+'" aria-label="'+label+'"></label>';
+}
+function setVisual(delta){S.settings.visual=Object.assign(visualSettings(),delta);applyTheme();save();}
+function bindVisualStudio(){
+ $('[data-visual-range]').forEach(input=>input.addEventListener('input',()=>{
+  const key=input.dataset.visualRange;const output=$('#visualOut-'+key);if(output)output.textContent=input.value+input.dataset.unit;
+  S.settings.visual=Object.assign(visualSettings(),{[key]:Number(input.value)});applyVisual();
+ }));
+ $('[data-visual-range]').forEach(input=>input.addEventListener('change',()=>save()));
+ const motion=$('#visualMotion');if(motion)motion.onchange=()=>{setVisual({motion:motion.checked});};
+}
+ACT['visual-bg']=el=>{setVisual({background:el.dataset.bg});render();};
+ACT['visual-material']=el=>{setVisual({material:el.dataset.material});render();};
+ACT['visual-theme']=el=>{S.settings.theme=el.dataset.theme;applyTheme();save();render();};
+ACT['visual-accent']=el=>{S.settings.accent=el.dataset.accent;applyTheme();save();render();};
+ACT['visual-preset']=el=>{
+ const presets={
+ night:{theme:'dark',accent:'blue',visual:{background:'aurora',material:'glass',glass:58,blur:20,radius:26,motion:true,intensity:80}},
+ light:{theme:'light',accent:'berry',visual:{background:'pearl',material:'glass',glass:65,blur:18,radius:26,motion:true,intensity:65}},
+ warm:{theme:'dark',accent:'amber',visual:{background:'sunset',material:'glass',glass:64,blur:18,radius:24,motion:true,intensity:75}},
+ minimal:{theme:'dark',accent:'graphite',visual:{background:'graphite',material:'soft',glass:90,blur:8,radius:16,motion:false,intensity:25}}
+ };
+ Object.assign(S.settings,presets[el.dataset.preset]||{});applyTheme();save();render();
+};
+ACT['visual-reset']=()=>{S.settings.visual=Object.assign({},VISUAL_DEFAULT);applyTheme();save();render();};
+const visualOldSettings=DETAIL.settings;
+DETAIL.settings=function(){return visualOldSettings().replace('<div class="list">','<div class="list"><button class="row big" data-act="visual-studio"><span class="sec-ic">'+I.gear+'</span><span class="grow"><span class="t">Студия оформления</span><span class="m">16 фонов, стекло, свет и движение</span></span><span class="chev">'+I.right+'</span></button>');};
 
 /* ================= Запуск ================= */
 function start() {

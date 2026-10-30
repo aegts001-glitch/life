@@ -1,0 +1,55 @@
+
+/* Life 1.8 · Liquid atmosphere */
+body{isolation:isolate;background:var(--bg);overflow-x:hidden}
+#lifeAtmosphere{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;background:var(--v-base);contain:strict}
+#lifeAtmosphere i{position:absolute;width:85vmax;height:85vmax;border-radius:50%;filter:blur(65px);opacity:calc(var(--v-intensity)*.75);will-change:transform;animation:lifeDrift 28s ease-in-out infinite alternate}
+#lifeAtmosphere i:nth-child(1){background:radial-gradient(circle,var(--v-a),transparent 65%);left:-35vmax;top:-30vmax}
+#lifeAtmosphere i:nth-child(2){background:radial-gradient(circle,var(--v-b),transparent 65%);right:-40vmax;top:15vh;animation-delay:-11s;animation-duration:34s}
+#lifeAtmosphere i:nth-child(3){background:radial-gradient(circle,var(--v-c),transparent 65%);left:5vw;bottom:-50vmax;animation-delay:-19s;animation-duration:38s}
+#lifeAtmosphere span{position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='.18' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.12}
+@keyframes lifeDrift{0%{transform:translate3d(-3%,-3%,0) scale(.95)}100%{transform:translate3d(16%,12%,0) scale(1.12)}}
+html[data-visual] body.wp-dots::before,html[data-visual] body.wp-glow::before{display:none}
+html[data-visual] .card,html[data-visual] .list,html[data-visual] .note-card,html[data-visual] .tile,html[data-visual] .wg-s>button,html[data-visual] .life-search{
+ background:var(--v-surface);border:1px solid var(--v-line);border-radius:var(--v-radius);box-shadow:0 8px 32px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.12)
+}
+html[data-visual="glass"] .card,html[data-visual="glass"] .list,html[data-visual="glass"] .note-card,html[data-visual="glass"] .life-search{backdrop-filter:blur(var(--v-blur)) saturate(135%);-webkit-backdrop-filter:blur(var(--v-blur)) saturate(135%)}
+html[data-visual] .sheet,html[data-visual] .tabbar{background:var(--v-surface);backdrop-filter:blur(24px) saturate(140%);-webkit-backdrop-filter:blur(24px) saturate(140%);border-color:var(--v-line);box-shadow:0 -8px 40px rgba(0,0,0,.06)}
+html[data-visual="solid"] .sheet,html[data-visual="solid"] .tabbar{backdrop-filter:none;-webkit-backdrop-filter:none}
+html[data-visual] .sheet{border-radius:calc(var(--v-radius) + 8px) calc(var(--v-radius) + 8px) 0 0}
+html[data-visual] .life-today{position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(120deg,var(--accent),color-mix(in srgb,var(--accent),#AA85F4 45%));border:1px solid rgba(255,255,255,.25);border-radius:var(--v-radius);box-shadow:0 12px 32px color-mix(in srgb,var(--accent),transparent 70%)}
+html[data-visual] .life-today::after{content:'';position:absolute;inset:-100%;background:linear-gradient(110deg,transparent 40%,rgba(255,255,255,.18),transparent 60%);z-index:-1;animation:lifeSheen 10s ease-in-out infinite}
+@keyframes lifeSheen{0%,65%{transform:translateX(-45%)}100%{transform:translateX(45%)}}
+html[data-visual] .hello h1{letter-spacing:-1.2px;line-height:1.2}
+html[data-visual] button{touch-action:manipulation;transition:transform .22s ease,background-color .25s,border-color .25s,box-shadow .25s}
+html[data-visual] button:active{transform:scale(.975)}
+html[data-visual] .view{animation:lifeReveal .4s cubic-bezier(.2,.7,.2,1)}
+@keyframes lifeReveal{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.visual-entry{display:flex;align-items:center;gap:8px;width:100%;padding:12px 2px 18px;border:0;background:none;color:var(--ink);font-size:12px;font-weight:650;text-align:left}
+.visual-entry>span:last-child{margin-left:auto;display:flex;align-items:center;gap:3px;color:var(--ink-2);font-weight:400;font-size:10px}
+.visual-entry svg{width:13px;height:13px}
+.visual-entry-dot{width:9px;height:9px;border-radius:50%;background:conic-gradient(#9E81E8,#66DBD4,#EFA6A0,#9E81E8);box-shadow:0 0 12px #A690DB66}
+.visual-preview{padding:24px 20px;margin-bottom:22px;border:1px solid var(--v-line);border-radius:calc(var(--v-radius) + 4px);background:linear-gradient(135deg,color-mix(in srgb,var(--v-a),transparent 50%),color-mix(in srgb,var(--v-c),transparent 65%));overflow:hidden;color:white;box-shadow:0 16px 40px #00000012}
+.visual-preview-top{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.visual-eyebrow{font-size:9px;letter-spacing:2px;font-weight:700;opacity:.8}
+.visual-live{font-size:9px;background:#00000030;padding:6px 9px;border-radius:20px}
+.visual-preview h2{font-family:var(--font-display);font-size:clamp(23px,6vw,32px);line-height:1.35;letter-spacing:-1px;margin:24px 0}
+.visual-demo-card{display:flex;align-items:center;gap:12px;padding:16px;border-radius:18px;background:var(--v-surface);border:1px solid var(--v-line);color:var(--ink);backdrop-filter:blur(var(--v-blur));-webkit-backdrop-filter:blur(var(--v-blur))}
+.visual-demo-card svg{width:24px;height:24px;color:var(--accent)}.visual-demo-card b{font-size:12px;display:block}.visual-demo-card small{display:block;color:var(--ink-2);font-size:10px;margin-top:4px}
+.visual-demo-dot{width:8px;height:8px;background:var(--ok);border-radius:50%;margin-left:auto;flex-shrink:0}
+.visual-panel{margin-bottom:16px;padding:20px!important}.visual-panel h2{font-size:16px;margin-bottom:16px}
+.visual-section-title{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.visual-section-title>span{font-size:10px;color:var(--ink-2)}
+.visual-presets{display:grid;grid-template-columns:1fr 1fr;gap:8px}.visual-presets button{padding:13px 8px;border:1px solid var(--line);border-radius:12px;color:var(--ink);background:var(--surface-2);font-size:11px}
+.visual-bg-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 9px}
+.visual-bg{padding:0;border:0;background:none;color:var(--ink);min-width:0}.visual-bg>span{display:grid;place-items:center;aspect-ratio:1;border-radius:16px;background:radial-gradient(ellipse at 15% 15%,var(--tile-a),transparent 70%),radial-gradient(ellipse at 90% 35%,var(--tile-b),transparent 70%),radial-gradient(ellipse at 30% 100%,var(--tile-c),transparent 60%),var(--tile-base);border:2px solid transparent;box-shadow:inset 0 1px 0 #ffffff40}
+.visual-bg.on>span{border-color:var(--accent);outline:2px solid var(--surface);outline-offset:-4px}.visual-bg i{display:none;font-style:normal;background:#00000050;border-radius:50%;width:22px;height:22px;line-height:22px;color:white;font-size:12px}.visual-bg.on i{display:block}.visual-bg b{display:block;margin-top:6px;font-size:9px;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.visual-range{display:block;margin:22px 0 4px}.visual-range>span{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-bottom:12px}.visual-range output{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+.visual-range input{width:100%;height:22px;accent-color:var(--accent);cursor:pointer}
+.visual-accents{display:flex;justify-content:space-between;gap:10px;margin-top:22px}.visual-accents button{width:34px;height:34px;border-radius:50%;border:3px solid transparent;background:var(--pick);box-shadow:0 4px 10px #00000012}.visual-accents button.on{outline:2px solid var(--accent);border-color:var(--surface)}
+.visual-hint{display:block;font-size:11px;color:var(--ink-2);margin-top:5px}.visual-reset{width:100%;margin-top:8px}.visual-version{text-align:center;margin-bottom:25px}
+html[data-motion="off"] #lifeAtmosphere i,html[data-motion="off"] .life-today::after{animation:none!important;will-change:auto}
+html[data-motion="off"] .view{animation:none!important}
+@media(prefers-reduced-motion:reduce){html[data-visual] *,html[data-visual] *::before,html[data-visual] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}#lifeAtmosphere i{will-change:auto}}
+@supports not (backdrop-filter:blur(1px)){html[data-visual="glass"] .card,html[data-visual="glass"] .list{background:var(--surface)}}
+
+#lifeAtmosphere::after{content:'';position:absolute;inset:0;background:var(--v-wash);pointer-events:none}
+.visual-preview{background:radial-gradient(ellipse at 10% 0%,var(--v-a),transparent 85%),radial-gradient(ellipse at 100% 100%,var(--v-c),transparent 75%),#142039}
