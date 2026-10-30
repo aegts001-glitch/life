@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '1.8';
+const LIFE_VERSION = '1.9';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -4553,6 +4553,47 @@ ACT['visual-preset']=el=>{
 ACT['visual-reset']=()=>{S.settings.visual=Object.assign({},VISUAL_DEFAULT);applyTheme();save();render();};
 const visualOldSettings=DETAIL.settings;
 DETAIL.settings=function(){return visualOldSettings().replace('<div class="list">','<div class="list"><button class="row big" data-act="visual-studio"><span class="sec-ic">'+I.gear+'</span><span class="grow"><span class="t">Студия оформления</span><span class="m">16 фонов, стекло, свет и движение</span></span><span class="chev">'+I.right+'</span></button>');};
+
+
+/* Life 1.9: floating day world; reuses the tested pinch/pan camera. */
+RENDER.plans=function(){
+ const m=planMonth(),mk=monthKey(m),days=new Date(m.getFullYear(),m.getMonth()+1,0).getDate(),W=bubW();
+ const all=S.plans.filter(p=>(p.date?p.date.slice(0,7):p.month)===mk),goals=all.filter(p=>!p.date);
+ const byDay=new Map();for(const p of all){if(p.date){if(!byDay.has(p.date))byDay.set(p.date,[]);byDay.get(p.date).push(p);}}
+ const cell=W/5.2,top=cell*.16,H=Math.ceil(days/5)*cell*1.03+top+cell*.2;
+ const pv=ui.planView,view={k:1,tx:0,ty:0};if(pv&&pv.mk===mk&&Math.abs(pv.W-W)<2){Object.assign(view,pv);clampView(Object.assign(view,{W,H}));}
+ let bubbles='',busy=0;
+ for(let i=0;i<days;i++){
+  const iso=mk+'-'+pad(i+1),ps=(byDay.get(iso)||[]).slice().sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
+  if(ps.length)busy++;const dt=new Date(m.getFullYear(),m.getMonth(),i+1),today=iso===todayISO(),weekend=dt.getDay()===0||dt.getDay()===6;
+  const row=Math.floor(i/5),col=i%5;
+  const d=cell*(ps.length?.89:.74)+(today?cell*.035:0);
+  const cx=cell*(col+.59)+(row%2?cell*.12:0)+(seeded(i+81)-.5)*cell*.06;
+  const cy=top+cell*(row+.5)*1.03+(seeded(i+31)-.5)*cell*.13;
+  const color=ps.length?(ps[0].cat==='work'?'114,158,255':ps[0].cat==='study'?'195,143,245':'94,197,175'):(weekend?'225,161,156':'150,167,197');
+  bubbles+='<button class="bub orbit-day '+(today?'today ':'')+(ps.length?'has ':'')+(ps.length&&ps.every(p=>p.done)?'all-done ':'')+'" data-act="plan-day" data-day="'+iso+'" data-n="'+ps.length+'" style="--x:'+(cx-d/2).toFixed(2)+';--y:'+(cy-d/2).toFixed(2)+';--d:'+d.toFixed(2)+';--orbit-rgb:'+color+';--orbit-duration:'+(7+seeded(i+2)*6).toFixed(1)+'s;--orbit-delay:'+(-seeded(i+4)*14).toFixed(1)+'s" aria-label="'+esc(dayTitle(iso)+', планов '+ps.length+': '+ps.map(p=>p.title).join(', '))+'"><span class="orbit-inner"><span class="orbit-content"><span class="orbit-date"><b>'+(i+1)+'</b><small>'+WD_SHORT[dt.getDay()]+'</small></span>'+(ps.length?'<span class="orbit-total">'+ps.length+' '+plural(ps.length,'план','плана','планов')+'</span><span class="orbit-tasks">'+ps.slice(0,5).map(p=>'<span class="orbit-task '+(p.done?'done':'')+'">'+(p.time?'<em>'+esc(p.time)+'</em> ':'')+esc(p.title)+'</span>').join('')+(ps.length>5?'<span class="orbit-extra">Ещё '+(ps.length-5)+'</span>':'')+'</span>':'<span class="orbit-empty">Свободно</span>')+'</span></span></button>';
+ }
+ let html=head('Планы','Ваш месяц — маленькая вселенная',plusBtn('new-plan','Новый план','data-date="'+(mk===todayISO().slice(0,7)?todayISO():mk+'-01')+'"'));
+ html+='<div class="month-nav"><button class="icon-btn" data-act="plan-month" data-dir="-1" aria-label="Предыдущий месяц">'+I.left+'</button><b>'+monthTitle(m)+'</b><button class="icon-btn" data-act="plan-month" data-dir="1" aria-label="Следующий месяц">'+I.right+'</button></div>';
+ html+='<section class="bubbles-card orbit-world"><div class="orbit-toolbar"><span><i></i>МИР ПЛАНОВ</span><button class="link" data-act="orbit-motion">'+(S.settings.bubbleMotion===false?'Оживить':'Остановить')+'</button></div><div class="bubbles orbit-stage '+(S.settings.bubbleMotion===false?'orbit-paused':'')+'" id="bubbleStage" style="height:'+H+'px" aria-label="Мир дней: разведите пальцы для увеличения"><div class="bub-layer" id="bubLayer" style="--k:'+view.k+';transform:translate3d('+view.tx+'px,'+view.ty+'px,0)">'+bubbles+'</div></div><div class="bubbles-foot"><span><b>'+busy+'</b> '+plural(busy,'день','дня','дней')+' с планами<span class="zoom-hint">'+zoomHint(view.k)+'</span></span><div class="zoom-btns"><button class="icon-btn" data-act="bub-zoom" data-d="-1" aria-label="Отдалить">'+I.minus+'</button><button class="icon-btn" data-act="bub-zoom" data-d="1" aria-label="Приблизить">'+I.plus+'</button></div></div><div class="orbit-navigation"><button class="btn sm" data-act="orbit-overview">Весь месяц</button>'+(mk===todayISO().slice(0,7)?'<button class="btn sm" data-act="orbit-today">К сегодня</button>':'')+'</div></section>';
+ html+='<p class="note-small orbit-help">Разведите пальцы — увидите планы внутри. При увеличении перемещайте мир одним пальцем. Нажмите на день, чтобы открыть все дела.</p>';
+ if(goals.length)html+='<div class="section-label"><span>Цели месяца</span></div><div class="list">'+goals.map(planRow).join('')+'</div>';
+ html+='<button class="btn sm" data-act="new-plan" data-goal="1">'+I.plus+'Цель на месяц</button>';
+ ui.mounts.push(()=>{
+  const stage=$('#bubbleStage'),layer=$('#bubLayer');if(!stage||!layer)return;
+  const V={stage,layer,headEl:null,W,H,c:cell,pad:0,k:view.k,kc:view.k,tx:view.tx,ty:view.ty,anim:0};
+  stage._v=V;commitView(V);bindBubbleGestures(V);stage.classList.add('ready');
+  stage.addEventListener('dblclick',e=>{if(e.target.closest('.orbit-day'))return;const r=stage.getBoundingClientRect();zoomViewTo(V,V.k>1.1?1:2,e.clientX-r.left,e.clientY-r.top,360);});
+ });
+ return html;
+};
+ACT['orbit-motion']=()=>{S.settings.bubbleMotion=S.settings.bubbleMotion===false;save();render();};
+ACT['orbit-overview']=()=>{const V=$('#bubbleStage')?._v;if(V)animateView(V,1,0,0,400);};
+ACT['orbit-today']=()=>{
+ const V=$('#bubbleStage')?._v,day=$('.orbit-day[data-day="'+todayISO()+'"]');if(!V||!day)return;
+ const x=Number(day.style.getPropertyValue('--x')),y=Number(day.style.getPropertyValue('--y')),d=Number(day.style.getPropertyValue('--d'));
+ const T={W:V.W,H:V.H,k:2.4,tx:V.W/2-(x+d/2)*2.4,ty:Math.min(V.H/2,240)-(y+d/2)*2.4};clampView(T);animateView(V,T.k,T.tx,T.ty,450);V.stage.scrollIntoView({block:'start',behavior:reduceMotion()?'auto':'smooth'});
+};
 
 /* ================= Запуск ================= */
 function start() {

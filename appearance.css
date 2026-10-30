@@ -53,3 +53,27 @@ html[data-motion="off"] .view{animation:none!important}
 
 #lifeAtmosphere::after{content:'';position:absolute;inset:0;background:var(--v-wash);pointer-events:none}
 .visual-preview{background:radial-gradient(ellipse at 10% 0%,var(--v-a),transparent 85%),radial-gradient(ellipse at 100% 100%,var(--v-c),transparent 75%),#142039}
+
+/* Life 1.9: a calm, legible floating world */
+.orbit-world{position:relative;border:1px solid var(--v-line,var(--line));border-radius:28px;overflow:hidden;background:var(--v-surface,var(--surface));box-shadow:inset 0 1px 0 #ffffff18,0 18px 50px #0000000d}
+.orbit-toolbar{display:flex;justify-content:space-between;align-items:center;padding:18px 18px 4px;position:relative;z-index:2}.orbit-toolbar>span{display:flex;align-items:center;gap:7px;font-size:9px;letter-spacing:2px;color:var(--ink-2);font-weight:650}.orbit-toolbar i{width:5px;height:5px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent)}.orbit-toolbar .link{font-size:10px}
+.orbit-stage{overflow:hidden!important;isolation:isolate;background:radial-gradient(ellipse at 50% 30%,var(--accent-soft),transparent 65%);touch-action:pan-y}
+.orbit-stage .bub-layer{position:absolute;inset:0;transform-origin:0 0}
+.orbit-stage .orbit-day{position:absolute;left:calc(var(--x)*var(--k,1)*1px);top:calc(var(--y)*var(--k,1)*1px);width:calc(var(--d)*var(--k,1)*1px);height:calc(var(--d)*var(--k,1)*1px);padding:0;border:0;background:none!important;box-shadow:none!important;transform:none!important;opacity:1!important;overflow:visible;animation:none!important;border-radius:50%;cursor:pointer}
+.orbit-inner{display:flex;position:absolute;inset:0;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;container-type:inline-size;border:1px solid rgba(var(--orbit-rgb),.4);background:radial-gradient(circle at 26% 18%,rgba(255,255,255,.27),transparent 48%),radial-gradient(circle at 65% 90%,rgba(var(--orbit-rgb),.24),transparent 80%),rgba(var(--orbit-rgb),.09);box-shadow:inset 0 2px 5px #ffffff24,inset 0 -5px 12px rgba(var(--orbit-rgb),.09),0 8px 18px #00000009;animation:orbitFloat var(--orbit-duration,9s) ease-in-out var(--orbit-delay,0s) infinite alternate;will-change:transform}
+.orbit-day.today .orbit-inner{border:2px solid var(--accent);box-shadow:0 0 22px var(--accent-soft),inset 0 1px 7px #ffffff44}
+.orbit-day.all-done .orbit-inner{border-color:var(--ok);background-color:var(--ok-soft)}
+.orbit-content{display:flex;flex-direction:column;align-items:center;justify-content:center;width:80%;max-height:85%;color:var(--ink);text-align:center;gap:3px}
+.orbit-date{display:flex;align-items:baseline;justify-content:center;gap:4px}.orbit-date b{font-size:clamp(17px,29cqi,30px);line-height:1;font-weight:650;letter-spacing:-1px}.orbit-date small{font-size:clamp(7px,10cqi,12px);color:var(--ink-2)}
+.orbit-total{font-size:clamp(7px,10cqi,12px);font-weight:550;color:var(--ink-2)}
+.orbit-tasks{display:none;width:100%;gap:4px}.orbit-task{font-size:11px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;padding-top:3px;border-top:1px solid rgba(var(--orbit-rgb),.22)}
+.orbit-task em{font-style:normal;color:var(--accent);font-size:9px}.orbit-task.done{text-decoration:line-through;opacity:.5}
+.orbit-empty{font-size:8px;color:var(--ink-3)}.orbit-extra{font-size:9px;color:var(--accent)}
+@container(min-width:100px){.orbit-tasks{display:grid}.orbit-task:nth-child(n+3){display:none}.orbit-date b{font-size:26px}.orbit-empty{font-size:11px}.orbit-content{gap:6px}}
+@container(min-width:160px){.orbit-task{font-size:12px}.orbit-task:nth-child(n+3){display:-webkit-box}.orbit-content{width:76%}.orbit-date b{font-size:32px}.orbit-total{font-size:11px}}
+.orbit-navigation{display:flex;justify-content:center;gap:8px;padding:0 16px 16px}.orbit-navigation .btn{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-size:11px}
+.orbit-help{text-align:center;max-width:420px;margin:16px auto 24px;line-height:1.6}
+@keyframes orbitFloat{0%{transform:translate3d(-2px,-3px,0) rotate(-1deg)}50%{transform:translate3d(2px,1px,0) rotate(.5deg)}100%{transform:translate3d(-1px,4px,0) rotate(-.5deg)}}
+.orbit-stage.still .orbit-inner{animation-play-state:paused}
+.orbit-stage.orbit-paused .orbit-inner,html[data-motion="off"] .orbit-inner{animation:none;will-change:auto}
+@media(prefers-reduced-motion:reduce){.orbit-inner{animation:none!important;will-change:auto}}
