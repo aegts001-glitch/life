@@ -111,3 +111,17 @@ html[data-motion="off"] .view{animation:none!important}
 .dash-bank .seg,.dash-food .month-nav{margin:0}.dash-bank .big-num{font-variant-numeric:tabular-nums;letter-spacing:-1.5px}.dash-food .meal{padding:20px}.dash-food .meal-add{width:100%;justify-content:center;border-style:dashed;border-color:var(--line);background:none;margin-top:12px}.dash-food .cups{gap:5px}.dash-reminders .row{padding-top:17px;padding-bottom:17px}
 .dash-home .hello{margin-bottom:0}.dash-home .visual-entry{padding-bottom:4px}.dash-home .life-hub{margin-bottom:0}.dash-home .wgrid{gap:13px}.dash-home .wg .card{height:100%}
 @media(max-width:360px){.dash-tabs button{font-size:10px;padding:11px 8px}.dash-vehicle-title,.dash-training-hero h2{font-size:24px}.dash-stat>b{font-size:24px}}
+
+/* Fixed, compact plans: page never scrolls; only the camera moves. */
+html.plans-screen,html.plans-screen body{height:100%;overflow:hidden!important;overscroll-behavior:none}
+html.plans-screen #app{box-sizing:border-box;height:100dvh;min-height:0;padding-top:calc(var(--sat) + 8px);padding-bottom:calc(var(--tabbar) + var(--sab) + 8px)}
+html.plans-screen #view>.view{gap:8px;overflow:hidden;animation:none}
+html.plans-screen .head{flex-shrink:0;margin:0}.plans-screen .month-nav{flex-shrink:0;margin:0;padding:0}
+.compact-plans{display:flex;flex-direction:column;flex:1;min-height:0;margin:0!important;overflow:hidden;border:1px solid var(--v-line,var(--line));border-radius:22px;background:var(--v-surface,var(--surface))}
+.compact-plans .plan-filter{flex-shrink:0;margin:8px}.compact-plans .wd-head{display:none}
+.compact-plans .bubbles{flex:1;min-height:0;height:auto!important;overflow:hidden!important;touch-action:none;overscroll-behavior:none}
+.compact-plans .bubbles-foot{flex-shrink:0;min-height:45px;padding:8px 12px}
+.compact-plans>.bar{flex-shrink:0;margin-bottom:8px!important}
+html.plans-screen .bub-in{animation:none!important}
+html.plans-screen .bubbles-foot>span{font-size:10px}.plans-screen .zoom-hint{font-size:9px}
+@media(max-height:550px){.plans-screen .head h1{font-size:22px}.plans-screen .head{min-height:36px}.compact-plans .plan-filter{margin:4px}.compact-plans .zoom-hint{display:none}}

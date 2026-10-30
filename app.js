@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '2.0';
+const LIFE_VERSION = '2.0.1';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -462,7 +462,7 @@ function render(anim) {
   ui.mounts = [];
   const el = $('#view');
   const top = ui.stack[ui.stack.length - 1]; const ed = !!(top && top.type === 'deditor');
-  const root = document.documentElement; root.classList.toggle('fixed-screen', ed || (!top && ui.tab === 'diary')); root.classList.toggle('editor-screen', ed);
+  const root = document.documentElement; root.classList.toggle('fixed-screen', ed || (!top && (ui.tab === 'diary' || ui.tab === 'plans'))); root.classList.toggle('editor-screen', ed); root.classList.toggle('plans-screen', !top && ui.tab === 'plans');
   el.innerHTML = `<div class="view ${anim || ''}">${currentHTML()}</div>`;
   renderTabbar();
   hydratePhotos(el);
@@ -4556,6 +4556,7 @@ const visualOldSettings=DETAIL.settings;
 DETAIL.settings=function(){return visualOldSettings().replace('<div class="list">','<div class="list"><button class="row big" data-act="visual-studio"><span class="sec-ic">'+I.gear+'</span><span class="grow"><span class="t">Студия оформления</span><span class="m">16 фонов, стекло, свет и движение</span></span><span class="chev">'+I.right+'</span></button>');};
 
 
+const COMPACT_PLAN_RENDER = RENDER.plans;
 /* Life 1.9: floating day world; reuses the tested pinch/pan camera. */
 RENDER.plans=function(){
  const m=planMonth(),mk=monthKey(m),days=new Date(m.getFullYear(),m.getMonth()+1,0).getDate(),W=bubW();
@@ -4671,6 +4672,21 @@ ACT['set-done']=el=>{
  const total=A.items.reduce((n,it)=>n+it.sets.length,0),done=A.items.reduce((n,it)=>n+it.sets.filter(s=>s.done).length,0);
  const label=$('.dash-workout-progress b'),bar=$('.dash-workout-progress .bar i');
  if(label)label.textContent=done+' / '+total;if(bar)bar.style.width=(total?done/total*100:0)+'%';
+};
+
+
+/* Fixed compact plans. */
+RENDER.plans=function(){
+ let html=COMPACT_PLAN_RENDER();const tail=html.indexOf('<div class="section-label">');if(tail>=0)html=html.slice(0,tail);
+ html=html.replace('<div class="bubbles-card">','<div class="bubbles-card compact-plans">');
+ ui.mounts.push(()=>{
+  const stage=$('#bubbleStage'),layer=$('#bubLayer'),V=stage&&stage._v;if(!stage||!layer||!V)return;
+  const available=stage.clientHeight,scale=Math.min(1,Math.max(.2,(available-8)/V.H)),left=(V.W-V.W*scale)/2;
+  $('.bub',layer).forEach(el=>{const x=Number(el.style.getPropertyValue('--x')),y=Number(el.style.getPropertyValue('--y')),d=Number(el.style.getPropertyValue('--d'));el.style.setProperty('--x',(left+x*scale).toFixed(2));el.style.setProperty('--y',(y*scale).toFixed(2));el.style.setProperty('--d',(d*scale).toFixed(2));});
+  const band=$('.wk-band',layer);if(band)band.hidden=true;
+  V.H=available;V.headEl=null;V.k=1;V.kc=1;V.tx=0;V.ty=0;commitView(V);
+  stage.addEventListener('touchmove',e=>{if(e.cancelable)e.preventDefault();},{passive:false});
+ });return html;
 };
 
 /* ================= Запуск ================= */
