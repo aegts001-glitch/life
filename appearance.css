@@ -123,5 +123,7 @@ html.plans-screen .head{flex-shrink:0;margin:0}.plans-screen .month-nav{flex-shr
 .compact-plans .bubbles-foot{flex-shrink:0;min-height:45px;padding:8px 12px}
 .compact-plans>.bar{flex-shrink:0;margin-bottom:8px!important}
 html.plans-screen .bub-in{animation:none!important}
+.compact-plans .bub{left:calc(var(--x)*var(--k,1)*1px);top:calc(var(--y)*var(--k,1)*1px);transform:none!important;transition:none!important;touch-action:none}
+.compact-plans .wk-band{pointer-events:none}
 html.plans-screen .bubbles-foot>span{font-size:10px}.plans-screen .zoom-hint{font-size:9px}
 @media(max-height:550px){.plans-screen .head h1{font-size:22px}.plans-screen .head{min-height:36px}.compact-plans .plan-filter{margin:4px}.compact-plans .zoom-hint{display:none}}

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '2.0.1';
+const LIFE_VERSION = '2.0.2';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -4531,11 +4531,11 @@ function visualRange(key,label,value,min,max,unit){
 }
 function setVisual(delta){S.settings.visual=Object.assign(visualSettings(),delta);applyTheme();save();}
 function bindVisualStudio(){
- $('[data-visual-range]').forEach(input=>input.addEventListener('input',()=>{
+ $$('[data-visual-range]').forEach(input=>input.addEventListener('input',()=>{
   const key=input.dataset.visualRange;const output=$('#visualOut-'+key);if(output)output.textContent=input.value+input.dataset.unit;
   S.settings.visual=Object.assign(visualSettings(),{[key]:Number(input.value)});applyVisual();
  }));
- $('[data-visual-range]').forEach(input=>input.addEventListener('change',()=>save()));
+ $$('[data-visual-range]').forEach(input=>input.addEventListener('change',()=>save()));
  const motion=$('#visualMotion');if(motion)motion.onchange=()=>{setVisual({motion:motion.checked});};
 }
 ACT['visual-bg']=el=>{setVisual({background:el.dataset.bg});render();};
@@ -4682,10 +4682,10 @@ RENDER.plans=function(){
  ui.mounts.push(()=>{
   const stage=$('#bubbleStage'),layer=$('#bubLayer'),V=stage&&stage._v;if(!stage||!layer||!V)return;
   const available=stage.clientHeight,scale=Math.min(1,Math.max(.2,(available-8)/V.H)),left=(V.W-V.W*scale)/2;
-  $('.bub',layer).forEach(el=>{const x=Number(el.style.getPropertyValue('--x')),y=Number(el.style.getPropertyValue('--y')),d=Number(el.style.getPropertyValue('--d'));el.style.setProperty('--x',(left+x*scale).toFixed(2));el.style.setProperty('--y',(y*scale).toFixed(2));el.style.setProperty('--d',(d*scale).toFixed(2));});
-  const band=$('.wk-band',layer);if(band)band.hidden=true;
+  $$('.bub',layer).forEach(el=>{const x=Number(el.style.getPropertyValue('--x')),y=Number(el.style.getPropertyValue('--y')),d=Number(el.style.getPropertyValue('--d'));el.style.setProperty('--x',(left+x*scale).toFixed(2));el.style.setProperty('--y',(y*scale).toFixed(2));el.style.setProperty('--d',(d*scale).toFixed(2));});
+  const band=$('.wk-band',layer);if(band)band.style.display='none';
   V.H=available;V.headEl=null;V.k=1;V.kc=1;V.tx=0;V.ty=0;commitView(V);
-  stage.addEventListener('touchmove',e=>{if(e.cancelable)e.preventDefault();},{passive:false});
+  // Keep small tap movements native; CSS contains scrolling, camera handles drags.
  });return html;
 };
 
