@@ -86,6 +86,56 @@ test('broken debt payments and a future schema are rejected', () => {
   assert.throws(() => core.validateState({ v: 4, settings: {} }));
   assert.throws(() => core.validateState({ v: 3, settings: { prefs: [] } }));
 });
+test('natural plan text reads day and time and keeps the title', () => {
+  const a = core.parsePlanText('завтра в 9 купить диски', '2026-11-24');
+  assert.equal(a.date, '2026-11-25'); assert.equal(a.time, '09:00'); assert.equal(a.title, 'купить диски');
+  const b = core.parsePlanText('сегодня 18:30 созвон', '2026-11-24');
+  assert.equal(b.date, '2026-11-24'); assert.equal(b.time, '18:30'); assert.equal(b.title, 'созвон');
+  const c = core.parsePlanText('через 2 дня масло', '2026-11-24');
+  assert.equal(c.date, '2026-11-26'); assert.equal(c.time, ''); assert.equal(c.title, 'масло');
+  const d = core.parsePlanText('просто текст', '2026-11-24');
+  assert.equal(d.date, '2026-11-24'); assert.equal(d.title, 'просто текст');
+});
+test('old plans migrate without losing the title or the date', () => {
+  const old = [{ id: 'p1', title: 'Стяжка', date: '2026-11-24', time: '09:30', cat: 'work', done: false, note: 'секция', month: '2026-11' }];
+  const next = core.migratePlans(old);
+  assert.equal(next[0].title, 'Стяжка'); assert.equal(next[0].date, '2026-11-24'); assert.equal(next[0].time, '09:30');
+  assert.equal(next[0].priority, 'mid'); assert.deepEqual(next[0].subtasks, []); assert.equal(next[0].repeat, 'none');
+  assert.equal(old[0].priority, undefined);
+  assert.equal(core.planSlot('09:30'), 'morning'); assert.equal(core.planSlot(''), 'none');
+  assert.deepEqual(core.planProgress([{ done: true }, { done: false }]), { total: 2, done: 1, left: 1, ratio: 0.5 });
+});
+test('repeating plan keeps a finished copy and moves the next date', () => {
+  const plan = { id: 'p', title: 'Табель', date: '2026-01-31', repeat: 'month', done: false, subtasks: [{ id: 's', title: 'сдать', done: true }] };
+  const res = core.advancePlan(plan);
+  assert.equal(res.repeated, true); assert.equal(res.plan.date, '2026-02-28'); assert.equal(res.plan.done, false); assert.equal(res.plan.subtasks[0].done, false);
+  assert.equal(res.archive.done, true); assert.equal(res.archive.date, '2026-01-31'); assert.equal(plan.date, '2026-01-31');
+  const once = core.advancePlan({ id: 'q', title: 'Разовое', date: '2026-11-24', done: false });
+  assert.equal(once.repeated, false); assert.equal(once.plan.done, true); assert.equal(once.archive, null);
+});
+test('finance period, safe-to-spend and section merge keep the records', () => {
+  assert.deepEqual(core.periodBounds('week', '2026-11-24'), { start: '2026-11-23', end: '2026-11-29', mode: 'week' });
+  assert.equal(core.periodBounds('month', '2026-11-24').start, '2026-11-01');
+  assert.equal(core.periodBounds('custom', '2026-11-24', { start: '2026-11-20', end: '2026-11-10' }).start, '2026-11-10');
+  const range = { start: '2026-11-01', end: '2026-11-30' };
+  const snap = core.financeSnapshot({
+    incomes: [{ id: 'i', amount: 1000, date: '2026-11-02' }],
+    expenses: [{ id: 'e', amount: 200, date: '2026-11-10', rec: 'net' }],
+    recurring: [{ id: 'net', kind: 'exp', amount: 200, start: '2026-11-10', freq: 'month', last: '2026-11-10', name: 'Интернет' }, { id: 'rent', kind: 'exp', amount: 300, start: '2026-11-20', freq: 'month', name: 'Квартира' }],
+    debts: [{ id: 'old', direction: 'out', amount: 100, due: '2026-10-01', payments: [] }, { id: 'now', direction: 'out', amount: 50, due: '2026-11-18', payments: [] }, { id: 'mine', direction: 'in', amount: 80, due: '2026-11-18', payments: [] }]
+  }, range);
+  assert.equal(snap.income, 1000); assert.equal(snap.spent, 200); assert.equal(snap.balance, 800);
+  assert.equal(snap.mandatorySum, 300); assert.equal(snap.debtDue, 150); assert.equal(snap.safe, 350);
+  assert.equal(snap.timeline.some((x) => x.id === 'net'), false);
+  const merged = core.mergeFinanceSettings({ sections: { bank: false, debts: true, notes: true }, order: ['debts', 'notes', 'bank'], prefs: {} });
+  assert.equal(merged.sections.bank, true); assert.equal(merged.sections.debts, true);
+  assert.deepEqual(merged.order, ['notes', 'bank']); assert.equal(merged.sections.notes, true);
+  assert.equal(merged.prefs.financePeriod, 'month');
+});
+test('search finds a plan by a subtask', () => {
+  const s = state(); s.plans = [{ id: 'p', title: 'Склад', date: '2026-11-24', note: '', subtasks: [{ id: 's', title: 'перфоратор', done: false }] }];
+  assert.equal(core.search(s, 'перфоратор')[0].id, 'p');
+});
 test('restore remaps media references and preserves text', () => {
   const s = state(); s.notes = [{ id: 'n', title: 'old', photos: ['old'] }]; s.diary = { pages: [{ drawing: 'drawing', items: [{ kind: 'video', ref: 'video' }] }] };
   assert.deepEqual(core.mediaRefs(s).sort(), ['drawing', 'old', 'video']); core.remapMedia(s, { old: 'new', drawing: 'new-d', video: 'new-v' });
