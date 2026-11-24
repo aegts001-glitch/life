@@ -143,7 +143,7 @@
     const out = [], on = s.settings.sections;
     const add = (kind, id, title, sub, text, extra) => { if (words.every((w) => clean(title + ' ' + sub + ' ' + text).includes(w))) out.push(Object.assign({ kind, id, title: title || 'Без названия', sub }, extra || {})); };
     if (on.notes) (s.notes || []).forEach((n) => add('note', n.id, n.title, 'Заметка', n.body));
-    if (on.plans) (s.plans || []).forEach((p) => add('plan', p.id, p.title, 'План · ' + (p.date || p.month || ''), p.note));
+    if (on.plans) (s.plans || []).forEach((p) => add('plan', p.id, p.title, 'План · ' + (p.date || p.month || ''), [p.note, ...(p.tags || []), ...(p.subtasks || []).map((s) => s && s.title)].join(' ')));
     if (on.reminders) (s.reminders || []).forEach((r) => add('reminder', r.id, r.title, 'Напоминание', r.note));
     const sym = currencySymbol(s);
     if (on.bank) ['expenses', 'incomes'].forEach((k) => (s[k] || []).forEach((x) => add(k === 'expenses' ? 'expense' : 'income', x.id, x.note || String(x.amount), (k === 'expenses' ? 'Расход' : 'Доход') + ' · ' + x.amount + ' ' + sym + ' · ' + x.date, x.cat)));
@@ -176,5 +176,92 @@
     }
     walk(s); return s;
   }
-  return { validateState, createStore, nextRepeat, agenda, search, mediaRefs, remapMedia, migrateState, debtLeft, debtOpen, debtSummary, debtPeople, applyPayment, currencySymbol };
+  function shiftISO(iso, days) {
+    const [y, m, d] = String(iso).split('-').map(Number);
+    const dt = new Date(y, (m || 1) - 1, (d || 1) + days);
+    const p = (n) => String(n).padStart(2, '0');
+    return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate());
+  }
+  function parsePlanText(text, today) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(today || '')) throw new Error('Нужна дата');
+    let rest = String(text || '').trim();
+    let date = today;
+    const eat = (re) => {
+      const src = rest.toLocaleLowerCase('ru').replace(/ё/g, 'е');
+      const m = src.match(re);
+      if (!m) return null;
+      rest = rest.slice(m[0].length).trim();
+      return m;
+    };
+    let m = eat(/^(послезавтра|завтра|сегодня)(?:\s+|$)/);
+    if (m) date = m[1] === 'послезавтра' ? shiftISO(today, 2) : m[1] === 'завтра' ? shiftISO(today, 1) : today;
+    else {
+      m = eat(/^через\s+(\d+)\s+(?:день|дня|дней)(?:\s+|$)/);
+      if (m) date = shiftISO(today, Math.min(366, Number(m[1]) || 0));
+    }
+    const src = rest.toLocaleLowerCase('ru').replace(/ё/g, 'е');
+    const tm = src.match(/^(?:в\s+)?(\d{1,2})(?::(\d{2}))?(?:\s+|$)/);
+    let time = '';
+    if (tm && (/^в\s+/.test(src) || tm[2])) {
+      const h = Number(tm[1]), min = tm[2] ? Number(tm[2]) : 0;
+      if (h >= 0 && h <= 23 && min >= 0 && min <= 59) {
+        time = String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+        rest = rest.slice(tm[0].length).trim();
+      }
+    }
+    return { title: rest, date, time };
+  }
+  function planSlot(time) {
+    if (!time) return 'none';
+    const h = Number(String(time).slice(0, 2));
+    if (!Number.isFinite(h)) return 'none';
+    if (h >= 5 && h < 12) return 'morning';
+    if (h >= 12 && h < 17) return 'day';
+    if (h >= 17 && h < 22) return 'evening';
+    return 'night';
+  }
+  function planProgress(list) {
+    const items = Array.isArray(list) ? list : [];
+    const done = items.filter((p) => p && p.done).length;
+    return { total: items.length, done, left: items.length - done, ratio: items.length ? done / items.length : 0 };
+  }
+  function migratePlan(p) {
+    if (!plain(p) || typeof p.id !== 'string') throw new Error('Повреждён план');
+    const next = JSON.parse(JSON.stringify(p));
+    if (next.priority !== 'low' && next.priority !== 'mid' && next.priority !== 'high') next.priority = 'mid';
+    next.tags = Array.isArray(next.tags) ? next.tags.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim()).slice(0, 8) : [];
+    next.subtasks = Array.isArray(next.subtasks) ? next.subtasks.filter((s) => plain(s) && typeof s.id === 'string').map((s) => ({ id: s.id, title: String(s.title || ''), done: !!s.done })) : [];
+    if (next.repeat !== 'day' && next.repeat !== 'week' && next.repeat !== 'month') next.repeat = 'none';
+    next.order = Number.isFinite(Number(next.order)) ? Number(next.order) : 0;
+    return next;
+  }
+  function migratePlans(list) {
+    if (!Array.isArray(list)) throw new Error('Повреждён раздел: plans');
+    return list.map(migratePlan);
+  }
+  function planNextDate(plan, fromISO) {
+    if (plan && plan.repeat === 'month') {
+      const [y, m, d] = String(fromISO).split('-').map(Number);
+      const dt = new Date(y, m, 1);
+      dt.setDate(Math.min(d, new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate()));
+      const p = (n) => String(n).padStart(2, '0');
+      return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate());
+    }
+    return shiftISO(fromISO, plan && plan.repeat === 'week' ? 7 : 1);
+  }
+  function advancePlan(plan) {
+    const next = migratePlan(plan);
+    if (next.repeat !== 'none' && next.date && !next.done) {
+      const archive = migratePlan(next);
+      archive.done = true; archive.repeat = 'none'; archive.id = '';
+      next.date = planNextDate(next, next.date);
+      next.month = next.date.slice(0, 7);
+      next.done = false;
+      next.subtasks.forEach((s) => { s.done = false; });
+      return { plan: next, repeated: true, archive };
+    }
+    next.done = !next.done;
+    return { plan: next, repeated: false, archive: null };
+  }
+  return { validateState, createStore, nextRepeat, agenda, search, mediaRefs, remapMedia, migrateState, debtLeft, debtOpen, debtSummary, debtPeople, applyPayment, currencySymbol, shiftISO, parsePlanText, planSlot, planProgress, migratePlan, migratePlans, planNextDate, advancePlan };
 });

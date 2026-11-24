@@ -86,6 +86,37 @@ test('broken debt payments and a future schema are rejected', () => {
   assert.throws(() => core.validateState({ v: 4, settings: {} }));
   assert.throws(() => core.validateState({ v: 3, settings: { prefs: [] } }));
 });
+test('natural plan text reads day and time and keeps the title', () => {
+  const a = core.parsePlanText('завтра в 9 купить диски', '2026-11-24');
+  assert.equal(a.date, '2026-11-25'); assert.equal(a.time, '09:00'); assert.equal(a.title, 'купить диски');
+  const b = core.parsePlanText('сегодня 18:30 созвон', '2026-11-24');
+  assert.equal(b.date, '2026-11-24'); assert.equal(b.time, '18:30'); assert.equal(b.title, 'созвон');
+  const c = core.parsePlanText('через 2 дня масло', '2026-11-24');
+  assert.equal(c.date, '2026-11-26'); assert.equal(c.time, ''); assert.equal(c.title, 'масло');
+  const d = core.parsePlanText('просто текст', '2026-11-24');
+  assert.equal(d.date, '2026-11-24'); assert.equal(d.title, 'просто текст');
+});
+test('old plans migrate without losing the title or the date', () => {
+  const old = [{ id: 'p1', title: 'Стяжка', date: '2026-11-24', time: '09:30', cat: 'work', done: false, note: 'секция', month: '2026-11' }];
+  const next = core.migratePlans(old);
+  assert.equal(next[0].title, 'Стяжка'); assert.equal(next[0].date, '2026-11-24'); assert.equal(next[0].time, '09:30');
+  assert.equal(next[0].priority, 'mid'); assert.deepEqual(next[0].subtasks, []); assert.equal(next[0].repeat, 'none');
+  assert.equal(old[0].priority, undefined);
+  assert.equal(core.planSlot('09:30'), 'morning'); assert.equal(core.planSlot(''), 'none');
+  assert.deepEqual(core.planProgress([{ done: true }, { done: false }]), { total: 2, done: 1, left: 1, ratio: 0.5 });
+});
+test('repeating plan keeps a finished copy and moves the next date', () => {
+  const plan = { id: 'p', title: 'Табель', date: '2026-01-31', repeat: 'month', done: false, subtasks: [{ id: 's', title: 'сдать', done: true }] };
+  const res = core.advancePlan(plan);
+  assert.equal(res.repeated, true); assert.equal(res.plan.date, '2026-02-28'); assert.equal(res.plan.done, false); assert.equal(res.plan.subtasks[0].done, false);
+  assert.equal(res.archive.done, true); assert.equal(res.archive.date, '2026-01-31'); assert.equal(plan.date, '2026-01-31');
+  const once = core.advancePlan({ id: 'q', title: 'Разовое', date: '2026-11-24', done: false });
+  assert.equal(once.repeated, false); assert.equal(once.plan.done, true); assert.equal(once.archive, null);
+});
+test('search finds a plan by a subtask', () => {
+  const s = state(); s.plans = [{ id: 'p', title: 'Склад', date: '2026-11-24', note: '', subtasks: [{ id: 's', title: 'перфоратор', done: false }] }];
+  assert.equal(core.search(s, 'перфоратор')[0].id, 'p');
+});
 test('restore remaps media references and preserves text', () => {
   const s = state(); s.notes = [{ id: 'n', title: 'old', photos: ['old'] }]; s.diary = { pages: [{ drawing: 'drawing', items: [{ kind: 'video', ref: 'video' }] }] };
   assert.deepEqual(core.mediaRefs(s).sort(), ['drawing', 'old', 'video']); core.remapMedia(s, { old: 'new', drawing: 'new-d', video: 'new-v' });
