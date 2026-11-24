@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '2.0.2';
+const LIFE_VERSION = '2.1.0';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -41,7 +41,8 @@ const I = {
   widgets: svg('<rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="3.5" y="13" width="17" height="7.5" rx="2"/>'),
   food: svg('<path d="M4 13h16a8 8 0 0 1-16 0z"/><path d="M8 9c0-2 1.5-2.5 1.5-4.5M12 9c0-2 1.5-2.5 1.5-4.5M16 9c0-2 1.5-2.5 1.5-4.5"/>'),
   dumbbell: svg('<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>', 2),
-  scale: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0L13 12"/>')
+  scale: svg('<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8.5 9.5a5 5 0 0 1 7 0L13 12"/>'),
+  debt: svg('<path d="M4 8h11a2.5 2.5 0 0 1 0 5H7"/><path d="M6.5 11.2 4 13.5l2.5 2.3"/><path d="M20 16H9a2.5 2.5 0 0 1 0-5h8"/><path d="m17.5 12.8 2.5-2.3-2.5-2.3"/>')
 };
 
 /* ================= Утилиты ================= */
@@ -53,7 +54,26 @@ const NB = ' ';
 const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const nf2 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
-const money = (n) => nf.format(Math.round(n || 0)) + NB + '₽';
+const PREF_DEFAULT = {
+  currency: 'RUB', dateStyle: 'long', moneyDecimals: 0,
+  homeLayout: 'widgets', fontScale: 'regular', tabStyle: 'float',
+  showSaveChip: true, todayBlocks: ['overdue', 'timed', 'untimed'],
+  remindLead: 0, debtRemind: true, debtLeadDays: 0, inAppToast: true, haptics: true
+};
+function prefs() {
+  return Object.assign({}, PREF_DEFAULT, (S && S.settings && S.settings.prefs) || {});
+}
+function curSym() { return LifeCore.currencySymbol({ settings: { prefs: prefs() } }); }
+function money(n) {
+  const digits = prefs().moneyDecimals === 2 ? 2 : 0;
+  const fmt = new Intl.NumberFormat('ru-RU', digits ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 });
+  const val = digits ? Number(n || 0) : Math.round(Number(n) || 0);
+  return fmt.format(Number.isFinite(val) ? val : 0) + NB + curSym();
+}
+function dateStyle() {
+  try { return (S && S.settings && S.settings.prefs && S.settings.prefs.dateStyle) || 'long'; }
+  catch (e) { return 'long'; }
+}
 const kmf = (n) => nf.format(Math.round(n || 0)) + NB + 'км';
 const pad = (n) => String(n).padStart(2, '0');
 const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -63,7 +83,17 @@ const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); r
 const addMonths = (d, m) => { const r = new Date(d); const day = r.getDate(); r.setDate(1); r.setMonth(r.getMonth() + m); r.setDate(Math.min(day, new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate())); return r; };
 const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const dayDiff = (a, b) => Math.round((dayStart(a) - dayStart(b)) / 864e5);
-const fmtD = (d, opts = { day: 'numeric', month: 'long' }) => d ? d.toLocaleDateString('ru-RU', opts) : '';
+const fmtD = (d, opts) => {
+  if (!d) return '';
+  const base = opts || { day: 'numeric', month: 'long' };
+  const style = dateStyle();
+  if (style === 'numeric' && !base.weekday) {
+    const day = pad(d.getDate()), month = pad(d.getMonth() + 1);
+    return base.year ? `${day}.${month}.${d.getFullYear()}` : `${day}.${month}`;
+  }
+  const use = style === 'short' && base.month === 'long' ? Object.assign({}, base, { month: 'short' }) : base;
+  return d.toLocaleDateString('ru-RU', use);
+};
 const fmtDY = (d) => fmtD(d, { day: 'numeric', month: 'long', year: 'numeric' });
 const fmtShort = (d) => fmtD(d, { day: 'numeric', month: 'short' });
 const fmtT = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -92,7 +122,8 @@ const CATS = { work: 'Работа', study: 'Учёба', life: 'Жизнь' };
 const ACCENTS = [
   { id: 'blue', name: 'Ультрамарин', c: '#3550E6' }, { id: 'pine', name: 'Хвоя', c: '#1E7A58' },
   { id: 'amber', name: 'Янтарь', c: '#C97A12' }, { id: 'berry', name: 'Брусника', c: '#C2365C' },
-  { id: 'sky', name: 'Лазурь', c: '#1C86C2' }, { id: 'graphite', name: 'Графит', c: '#4A505C' }
+  { id: 'sky', name: 'Лазурь', c: '#1C86C2' }, { id: 'graphite', name: 'Графит', c: '#4A505C' },
+  { id: 'orange', name: 'Каска', c: '#E25B2A' }, { id: 'lime', name: 'Лайм', c: '#2F9E44' }
 ];
 const CAR_COLORS = ['#C9CDD3', '#F4F4F2', '#20232A', '#B3282E', '#2D5BA8', '#3F7A4E', '#D9A93A', '#8A6BB8'];
 const GOAL_COLORS = ['#3550E6', '#1E7A58', '#C97A12', '#C2365C', '#1C86C2', '#7A4FC4'];
@@ -119,14 +150,15 @@ const CUSTOM_EMOJI = ['🍰', '🍺', '🎮', '🐟', '🌱', '🧸', '👶', '�
 
 const SECTION_DEFS = {
   notes: { name: 'Заметки', icon: 'notes', desc: 'Работа, учёба, жизнь, фото' },
-  reminders: { name: 'Напоминания', icon: 'bell', desc: 'С сигналом в Календаре iPhone' },
+  reminders: { name: 'Напоминания', tab: 'Сигнал', icon: 'bell', desc: 'С сигналом в Календаре iPhone' },
   plans: { name: 'Планы', icon: 'plans', desc: 'Месяц в пузырях дней' },
   bank: { name: 'Деньги', icon: 'bank', desc: 'Расходы, доходы, платежи, копилка' },
   car: { name: 'Авто', icon: 'car', desc: 'Регламент, заправки, история' },
   objects: { name: 'Объекты', icon: 'building', desc: 'Замечания, обходы, подрядчики' },
   food: { name: 'Питание', icon: 'food', desc: 'Еда, калории и БЖУ, вода, вес' },
   sport: { name: 'Тренировки', icon: 'dumbbell', desc: 'Турник, бег, бокс, зал, рекорды' },
-  diary: { name: 'Дневник', icon: 'book', desc: 'Книжка: текст, фото, видео, рисунки' }
+  diary: { name: 'Дневник', icon: 'book', desc: 'Книжка: текст, фото, видео, рисунки' },
+  debts: { name: 'Долги', icon: 'debt', desc: 'Кто должен мне и кому должен я' }
 };
 const FEATURE_DEFS = {
   income: { sec: 'bank', name: 'Доходы' }, recurring: { sec: 'bank', name: 'Регулярные платежи' }, piggy: { sec: 'bank', name: 'Копилка' },
@@ -137,7 +169,8 @@ const WIDGETS = {
   money: { name: 'Траты за день', sec: 'bank' }, memory: { name: 'Дневник: воспоминание', sec: 'diary' }, week: { name: 'Неделя планов', sec: 'plans' },
   food: { name: 'Питание сегодня', sec: 'food' }, sport: { name: 'Тренировки', sec: 'sport' }, reminders: { name: 'Ближайшие напоминания', sec: 'reminders' }, plans: { name: 'Планы на сегодня', sec: 'plans' },
   expenses: { name: 'Деньги за месяц', sec: 'bank' }, objects: { name: 'Объекты: сроки', sec: 'objects' }, car: { name: 'Машина', sec: 'car' },
-  bank: { name: 'Копилка', sec: 'bank', feat: 'piggy' }, notes: { name: 'Последние заметки', sec: 'notes' }
+  bank: { name: 'Копилка', sec: 'bank', feat: 'piggy' }, notes: { name: 'Последние заметки', sec: 'notes' },
+  debts: { name: 'Долги', sec: 'debts' }
 };
 const QUICK_DEFS = {
   'new-note': { name: 'Заметка', icon: 'notes', sec: 'notes' }, 'new-rem': { name: 'Напомнить', icon: 'bell', sec: 'reminders' },
@@ -146,7 +179,8 @@ const QUICK_DEFS = {
   mileage: { name: 'Пробег', icon: 'odo', sec: 'car' }, 'new-remark': { name: 'Замечание', icon: 'building', sec: 'objects' },
   'quick-deposit': { name: 'В копилку', icon: 'bank', sec: 'bank', feat: 'piggy' },
   'add-food': { name: 'Еда', icon: 'food', sec: 'food' }, 'start-workout': { name: 'Тренировка', icon: 'dumbbell', sec: 'sport' },
-  'add-weight': { name: 'Вес', icon: 'scale', sec: 'food' }, 'd-new': { name: 'Запись', icon: 'book', sec: 'diary' }
+  'add-weight': { name: 'Вес', icon: 'scale', sec: 'food' }, 'd-new': { name: 'Запись', icon: 'book', sec: 'diary' },
+  'new-debt': { name: 'Долг', icon: 'debt', sec: 'debts' }
 };
 
 /* ================= Данные ================= */
@@ -161,18 +195,19 @@ const DEFAULT_SERVICES = [
 /* Чистое приложение без чужих данных: так его видит каждый новый человек */
 function seed() {
   return {
-    v: 2,
+    v: 3,
     settings: {
       name: '', theme: 'auto', accent: 'blue', wallpaper: 'dots', icon: 'light', budget: null,
-      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false, food: true, sport: true, diary: false },
-      order: ['plans', 'food', 'bank', 'sport', 'notes', 'car', 'reminders', 'objects'],
+      sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false, food: true, sport: true, diary: false, debts: true },
+      order: ['plans', 'food', 'bank', 'debts', 'sport', 'notes', 'car', 'reminders', 'objects'],
       features: { income: true, recurring: true, piggy: true, fuel: true, photos: true },
+      prefs: Object.assign({}, PREF_DEFAULT),
       quick: ['add-food', 'start-workout', 'new-exp', 'new-plan', 'new-note'],
       widgets: ['quick', 'today', 'next', 'plans', 'water', 'food', 'streak', 'money', 'reminders', 'week', 'memory', 'expenses', 'car', 'bank', 'notes', 'objects', 'sport'].map((id) => ({ id, on: id !== 'sport', size: id === 'food' ? 's' : undefined })),
       planFilter: 'all', notifyMethod: 'calendar', badge: true,
       pin: null, lockAfter: 1, onboarded: false
     },
-    notes: [], reminders: [], plans: [], expenses: [], incomes: [], recurring: [], customCats: [], goals: [],
+    notes: [], reminders: [], plans: [], expenses: [], incomes: [], recurring: [], customCats: [], goals: [], debts: [],
     car: { name: '', body: '', year: '', engine: '', color: '#C9CDD3', mileage: null, mileageDate: null },
     services: DEFAULT_SERVICES.map(([name, km, months]) => ({ id: uid(), name, km, months, lastKm: null, lastDate: null, rec: true })),
     carLog: [], carTodo: [], fuel: [], objects: [],
@@ -182,12 +217,15 @@ function seed() {
   };
 }
 function normalize(s) {
+  if (LifeCore.migrateState && (!Array.isArray(s.debts) || s.v < 3)) s = LifeCore.migrateState(s);
   const d = seed();
   const legacy = !s.settings || s.settings.onboarded === undefined;
   const st = s.settings = Object.assign({}, d.settings, s.settings || {});
   st.sections = Object.assign({}, d.settings.sections, st.sections || {});
   st.sections.diary = false;
   st.features = Object.assign({}, d.settings.features, st.features || {});
+  st.prefs = Object.assign({}, PREF_DEFAULT, st.prefs || {});
+  if (!Array.isArray(st.prefs.todayBlocks)) st.prefs.todayBlocks = PREF_DEFAULT.todayBlocks.slice();
   st.order = (st.order || []).filter((id) => SECTION_DEFS[id] && id !== 'diary');
   Object.keys(SECTION_DEFS).forEach((id) => { if (id !== 'diary' && !st.order.includes(id)) st.order.push(id); });
   if (!Array.isArray(st.quick)) st.quick = d.settings.quick;
@@ -195,11 +233,17 @@ function normalize(s) {
   const wids = (st.widgets || []).filter((w) => WIDGETS[w.id]);
   const qi = Math.max(0, wids.findIndex((w) => w.id === 'quick') + 1);
   ['streak', 'water', 'next', 'today'].forEach((id) => { if (!wids.some((w) => w.id === id)) wids.splice(qi, 0, { id, on: true }); });
-  Object.keys(WIDGETS).forEach((id) => { if (!wids.some((w) => w.id === id)) wids.push({ id, on: id !== 'sport' }); });
+  Object.keys(WIDGETS).forEach((id) => { if (!wids.some((w) => w.id === id)) wids.push({ id, on: id !== 'sport' && id !== 'debts' }); });
   st.widgets = wids;
   if (!st.quick.includes('start-workout') && !st.quickMigrated) { st.quick = ['start-workout', ...st.quick].slice(0, 5); } st.quickMigrated = true;
-  ['notes', 'reminders', 'plans', 'expenses', 'incomes', 'recurring', 'customCats', 'goals', 'services', 'carLog', 'carTodo', 'fuel', 'objects'].forEach((k) => {
+  ['notes', 'reminders', 'plans', 'expenses', 'incomes', 'recurring', 'customCats', 'goals', 'services', 'carLog', 'carTodo', 'fuel', 'objects', 'debts'].forEach((k) => {
     if (!Array.isArray(s[k])) s[k] = k === 'services' ? d.services : [];
+  });
+  s.debts.forEach((d) => {
+    if (!Array.isArray(d.payments)) d.payments = [];
+    d.payments.forEach((p) => { if (typeof p.id !== 'string') p.id = uid(); });
+    if (d.direction !== 'in' && d.direction !== 'out') d.direction = 'in';
+    if (typeof d.amount !== 'number') d.amount = Number(d.amount) || 0;
   });
   if (legacy) { st.onboarded = false; st.freshOffer = true; }
   s.car = Object.assign({}, d.car, s.car || {});
@@ -212,7 +256,7 @@ function normalize(s) {
   s.notes.forEach((n) => { if (!Array.isArray(n.photos)) n.photos = []; });
   s.goals.forEach((g) => { if (!Array.isArray(g.ops)) g.ops = []; });
   s.objects.forEach((o) => { ['contractors', 'remarks', 'walks'].forEach((k) => { if (!Array.isArray(o[k])) o[k] = []; }); o.remarks.forEach((r) => { if (!Array.isArray(r.photos)) r.photos = []; }); if (!o.days) o.days = 20; });
-  s.v = 2;
+  s.v = 3;
   return s;
 }
 function load() {
@@ -322,7 +366,11 @@ function closeViewer() { const v = $('#viewer'); v.classList.remove('show'); set
 const viewerOpen = () => !$('#viewer').hidden;
 
 /* ================= Тема и иконка ================= */
-const accentHex = () => (ACCENTS.find((a) => a.id === S.settings.accent) || ACCENTS[0]).c;
+const accentHex = () => {
+  const hex = S.settings && S.settings.accentHex;
+  if (S.settings && S.settings.accent === 'custom' && /^#[0-9A-Fa-f]{6}$/.test(hex || '')) return hex;
+  return (ACCENTS.find((a) => a.id === S.settings.accent) || ACCENTS[0]).c;
+};
 function applyTheme() {
   const root = document.documentElement; const t = S.settings.theme;
   if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
@@ -331,6 +379,7 @@ function applyTheme() {
   document.body.classList.toggle('wp-dots', S.settings.wallpaper === 'dots');
   document.body.classList.toggle('wp-glow', S.settings.wallpaper === 'glow');
   applyVisual();
+  applyPrefs();
 }
 const iconCache = {}; let baseIcon = null;
 function loadBaseIcon() {
@@ -449,7 +498,7 @@ function renderTabbar() {
   nav.innerHTML = slots.map((id) => {
     const d = id === 'home' ? { name: 'Главная', icon: 'home' } : id === 'more' ? { name: 'Ещё', icon: 'more' } : SECTION_DEFS[id];
     const on = id === ui.tab || (id === 'more' && inMore);
-    return `<button data-act="${id === 'more' ? 'more' : 'tab'}" data-tab="${id}" class="${on ? 'on' : ''}" aria-label="${d.name}">${I[d.icon]}<span>${d.name}</span></button>`;
+    return `<button data-act="${id === 'more' ? 'more' : 'tab'}" data-tab="${id}" class="${on ? 'on' : ''}" aria-label="${d.name}">${I[d.icon]}<span>${d.tab || d.name}</span></button>`;
   }).join('');
 }
 function currentHTML() {
@@ -1502,11 +1551,16 @@ async function notifyNow(title, body) {
 }
 function checkDue() {
   const now = new Date(); let changed = false;
+  const lead = Math.max(0, Number(prefs().remindLead) || 0) * 60000;
   S.reminders.forEach((r) => {
     if (r.done || r.notified) return; const d = new Date(r.at);
-    if (d <= now && now - d < 12 * 3600e3) { r.notified = true; changed = true; notifyNow('Life: напоминание', r.title).then((ok) => { if (!ok) toast('Напоминание: ' + r.title); }); }
+    if (now >= d.getTime() - lead && now - d < 12 * 3600e3) {
+      r.notified = true; changed = true;
+      notifyNow('Life: напоминание', r.title).then((ok) => { if (!ok && prefs().inAppToast !== false) toast('Напоминание: ' + r.title); });
+    }
   });
-  if (changed) { save(); if (!sheetOpen && (ui.tab === 'reminders' || ui.tab === 'home')) render(); }
+  if (checkDebtReminders()) changed = true;
+  if (changed) { save(); if (!sheetOpen && (ui.tab === 'reminders' || ui.tab === 'home' || ui.tab === 'debts' || (ui.stack[ui.stack.length - 1] || {}).type === 'today')) render(); }
 }
 ACT['new-rem'] = () => remSheet();
 ACT['edit-rem'] = (el) => remSheet(el.dataset.id);
@@ -1908,7 +1962,7 @@ function entrySheet(kind, id) {
   const d = x ? { ...x } : { amount: '', cat: null, date: todayISO(), note: '', pay: 'card' };
   let cat = d.cat, pay = d.pay || 'card';
   openSheet(kind === 'inc' ? (x ? 'Доход' : 'Новый доход') : (x ? 'Расход' : 'Новый расход'), `<form id="f" class="form">
-    <label class="amount-in ${kind}"><input type="text" inputmode="decimal" id="eAmount" placeholder="0" value="${d.amount || ''}" autocomplete="off" aria-label="Сумма"><span>₽</span></label>
+    <label class="amount-in ${kind}"><input type="text" inputmode="decimal" id="eAmount" placeholder="0" value="${d.amount || ''}" autocomplete="off" aria-label="Сумма"><span>${curSym()}</span></label>
     <div class="sel-cat ${cat ? 'ok' : ''}" id="selCat">${cat ? `${ofFn(cat).e} ${esc(ofFn(cat).name)}` : (kind === 'inc' ? 'Выберите, откуда деньги' : 'Выберите, на что потратили')}</div>
     <div id="catPick">${catGridHTML(cat, kind)}</div>
     <div class="newcat" id="newCat" hidden><input type="text" id="ncName" placeholder="Название категории" maxlength="30">
@@ -1964,7 +2018,7 @@ function renderInc() {
 function budgetSheet() {
   const b = S.settings.budget;
   openSheet('Бюджет на месяц', `<form id="f" class="form">
-    <label class="field"><span>Сколько готовы тратить в месяц, ₽</span><input type="number" inputmode="decimal" id="bAmount" value="${b || ''}" placeholder="Например, 60 000" min="1"></label>
+    <label class="field"><span>Сколько готовы тратить в месяц, ${curSym()}</span><input type="number" inputmode="decimal" id="bAmount" value="${b || ''}" placeholder="Например, 60 000" min="1"></label>
     <p class="note-small" style="margin:0">Life покажет, сколько осталось, и подсветит, когда траты подходят к лимиту.</p>
     <button class="btn primary" type="submit">Сохранить</button>
     ${b ? '<button class="btn" type="button" id="bOff">Убрать бюджет</button>' : ''}</form>`, (body) => {
@@ -2038,7 +2092,7 @@ function recurSheet(id) {
   const ofFn = () => kind === 'inc' ? incOf : catOf;
   openSheet(r ? 'Регулярный платёж' : 'Новый регулярный платёж', `<form id="f" class="form">
     <div class="seg" id="rkSeg"><button type="button" data-v="exp" class="${kind === 'exp' ? 'on' : ''}">Платёж</button><button type="button" data-v="inc" class="${kind === 'inc' ? 'on' : ''}">Поступление</button></div>
-    <label class="amount-in"><input type="text" inputmode="decimal" id="rAmount" placeholder="0" value="${d.amount || ''}" autocomplete="off" aria-label="Сумма"><span>₽</span></label>
+    <label class="amount-in"><input type="text" inputmode="decimal" id="rAmount" placeholder="0" value="${d.amount || ''}" autocomplete="off" aria-label="Сумма"><span>${curSym()}</span></label>
     <input type="text" id="rName" placeholder="Название: квартплата, интернет, зарплата" value="${esc(d.name)}" maxlength="60">
     <div class="sel-cat ${cat ? 'ok' : ''}" id="selCat">${cat ? `${ofFn()(cat).e} ${esc(ofFn()(cat).name)}` : 'Выберите категорию'}</div>
     <div id="catPick" class="cat-compact">${catGridHTML(cat, kind)}</div>
@@ -2108,7 +2162,7 @@ function goalSheet(id) {
   openSheet(g ? g.name : 'Новая цель', `<form id="f" class="form">
     ${g ? `<div class="field"><span>Операции</span>${ops.length ? `<div class="ops" id="opsList">${ops.map((o) => `<div class="row"><span class="grow"><span class="${o.amount >= 0 ? 'amount-plus' : 'amount-minus'}">${o.amount >= 0 ? '+' : '−'}${money(Math.abs(o.amount))}</span><span class="m">${fmtDY(toDate(o.date))}${o.note ? ', ' + esc(o.note) : ''}</span></span><button type="button" class="act" data-op-del="${o.id}" aria-label="Удалить операцию">${I.trash}</button></div>`).join('')}</div>` : '<p class="note-small" style="margin:0">Операций пока нет.</p>'}</div>` : ''}
     <label class="field"><span>Название</span><input type="text" id="gName" value="${esc(d.name)}" placeholder="На что копим" maxlength="60"></label>
-    <div class="two"><label class="field"><span>Нужно, ₽</span><input type="number" inputmode="decimal" id="gTarget" value="${d.target}" min="1"></label>
+    <div class="two"><label class="field"><span>Нужно, ${curSym()}</span><input type="number" inputmode="decimal" id="gTarget" value="${d.target}" min="1"></label>
     <label class="field"><span>К дате</span><input type="date" id="gDeadline" value="${d.deadline || ''}"></label></div>
     <div class="field"><span>Цвет</span><div class="swatches" id="gColors">${GOAL_COLORS.map((x) => `<button type="button" class="swatch ${x === color ? 'on' : ''}" data-c="${x}" style="background:${x}" aria-label="Цвет"></button>`).join('')}</div></div>
     <div class="sticky-save"><button class="btn primary" type="submit">${g ? 'Сохранить' : 'Создать цель'}</button></div>
@@ -2138,7 +2192,7 @@ function opSheet(id, kind) {
   let g = S.goals.find((x) => x.id === id) || S.goals[0];
   openSheet(kind === 'in' ? 'Пополнить' : 'Снять', `<form id="f" class="form">
     ${!id && S.goals.length > 1 ? `<label class="field"><span>Цель</span><select id="oGoal">${S.goals.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></label>` : `<div style="font-weight:600">${esc(g.name)}: ${money(goalSaved(g))} из ${money(g.target)}</div>`}
-    <label class="amount-in"><input type="text" inputmode="decimal" id="oAmount" placeholder="0" autocomplete="off" aria-label="Сумма"><span>₽</span></label>
+    <label class="amount-in"><input type="text" inputmode="decimal" id="oAmount" placeholder="0" autocomplete="off" aria-label="Сумма"><span>${curSym()}</span></label>
     <label class="field"><span>Дата</span><input type="date" id="oDate" value="${todayISO()}"></label>
     <input type="text" id="oNote" placeholder="Комментарий, необязательно" maxlength="80">
     <button class="btn primary" type="submit">${kind === 'in' ? 'Пополнить' : 'Снять'}</button></form>`, (body) => {
@@ -2258,10 +2312,10 @@ RENDER.car = function () {
     const mx = Math.max(...chart.map((f) => fs.cons[f.id].l100), 1);
     html += `<div class="card"><h2>Расход топлива</h2><div class="money-row"><div><div class="lbl">Средний</div><div class="big-num">${fs.avg ? nf1.format(fs.avg) + '<small> л/100 км</small>' : '—'}</div></div>
       <div><div class="lbl">За ${MONTH_NOM[new Date().getMonth()]}</div><div class="big-num muted">${money(fs.month)}</div></div></div>
-      <div class="svc-meta" style="margin-top:8px"><span>${fs.lastPrice ? 'Последняя цена ' + nf2.format(fs.lastPrice) + NB + '₽/л' : ''}</span><span>${fs.rubKm ? '≈' + nf1.format(fs.rubKm) + NB + '₽ на 1 км' : ''}</span></div>
+      <div class="svc-meta" style="margin-top:8px"><span>${fs.lastPrice ? 'Последняя цена ' + nf2.format(fs.lastPrice) + NB + curSym() + '/л' : ''}</span><span>${fs.rubKm ? '≈' + nf1.format(fs.rubKm) + NB + curSym() + ' на 1 км' : ''}</span></div>
       ${chart.length > 1 ? `<div class="fuel-chart" aria-label="Расход по заправкам">${chart.map((f) => { const v = fs.cons[f.id].l100; return `<div class="fc"><span class="v">${nf1.format(v)}</span><span class="b" style="height:${Math.round(v / mx * 100)}%"></span><span class="d">${fmtD(toDate(f.date), { day: 'numeric', month: 'numeric' })}</span></div>`; }).join('')}</div>` : ''}
       ${!fs.avg ? '<p class="note-small" style="margin:8px 0 0;padding:0">Расход считается между двумя заправками до полного бака. Указывайте пробег при каждой заправке.</p>' : ''}</div>`;
-    html += list.length ? `<div class="list">${list.map((f) => { const cn = fs.cons[f.id]; return `<button class="row" data-act="fuel-edit" data-id="${f.id}"><span class="cat-ic">⛽</span><span class="grow"><span class="t">${nf2.format(f.liters || 0)} л${f.price ? ' по ' + nf2.format(f.price) + NB + '₽' : ''}${f.example ? '<span class="tag-ex">пример</span>' : ''}</span><span class="m">${fmtD(toDate(f.date))}${f.km != null ? ', ' + kmf(f.km) : ''}${f.station ? ', ' + esc(f.station) : ''}${!f.full ? ', не полный бак' : ''}${cn ? `, <b>${nf1.format(cn.l100)} л/100</b>` : ''}</span></span><span class="r amt">${money(f.total)}</span></button>`; }).join('')}</div>`
+    html += list.length ? `<div class="list">${list.map((f) => { const cn = fs.cons[f.id]; return `<button class="row" data-act="fuel-edit" data-id="${f.id}"><span class="cat-ic">⛽</span><span class="grow"><span class="t">${nf2.format(f.liters || 0)} л${f.price ? ' по ' + nf2.format(f.price) + NB + curSym() : ''}${f.example ? '<span class="tag-ex">пример</span>' : ''}</span><span class="m">${fmtD(toDate(f.date))}${f.km != null ? ', ' + kmf(f.km) : ''}${f.station ? ', ' + esc(f.station) : ''}${!f.full ? ', не полный бак' : ''}${cn ? `, <b>${nf1.format(cn.l100)} л/100</b>` : ''}</span></span><span class="r amt">${money(f.total)}</span></button>`; }).join('')}</div>`
       : `<div class="card empty"><b>Заправок пока нет</b>Записывайте литры, цену и пробег. Life посчитает расход и сколько стоит километр.<button class="btn sm primary" data-act="new-fuel">Добавить заправку</button></div>`;
   } else if (ui.carSec === 'log') {
     const list = [...S.carLog].sort((a, b) => b.date.localeCompare(a.date) || (b.km || 0) - (a.km || 0));
@@ -2319,7 +2373,7 @@ function svcSheet(id) {
     ${!isNew ? `<div class="card" style="display:grid;gap:10px"><div style="font-weight:600">Отметить замену</div>
       <div class="two"><label class="field"><span>Дата</span><input type="date" id="dDate" value="${todayISO()}"></label>
       <label class="field"><span>Пробег, км</span><input type="number" inputmode="numeric" id="dKm" value="${c.mileage ?? ''}" placeholder="км"></label></div>
-      <label class="field"><span>Стоимость, ₽</span><input type="number" inputmode="decimal" id="dCost" placeholder="Необязательно"></label>
+      <label class="field"><span>Стоимость, ${curSym()}</span><input type="number" inputmode="decimal" id="dCost" placeholder="Необязательно"></label>
       <button type="button" class="btn primary" id="doneBtn">${I.tick}Сделано</button></div>` : ''}
     <label class="field"><span>Название</span><input type="text" id="sName" value="${esc(s.name)}" maxlength="80"></label>
     <div class="two"><label class="field"><span>Интервал, км</span><input type="number" inputmode="numeric" id="sKm" value="${s.km || ''}" placeholder="0 — не считать"></label>
@@ -2357,7 +2411,7 @@ function logSheet(id) {
     <datalist id="svcNames">${S.services.map((s) => `<option value="${esc(s.name)}"></option>`).join('')}</datalist>
     <div class="two"><label class="field"><span>Дата</span><input type="date" id="lDate" value="${d.date}"></label>
     <label class="field"><span>Пробег, км</span><input type="number" inputmode="numeric" id="lKm" value="${d.km ?? ''}"></label></div>
-    <label class="field"><span>Стоимость, ₽</span><input type="number" inputmode="decimal" id="lCost" value="${d.cost || ''}" placeholder="Необязательно"></label>
+    <label class="field"><span>Стоимость, ${curSym()}</span><input type="number" inputmode="decimal" id="lCost" value="${d.cost || ''}" placeholder="Необязательно"></label>
     <label class="field"><span>Комментарий</span><input type="text" id="lNote" value="${esc(d.note)}" placeholder="Марка масла, где делали"></label>
     ${!l ? `<p class="note-small" style="margin:0">Если название совпадает с пунктом регламента, Life обновит дату последней замены. Стоимость попадёт в «Расходы», категория «Ремонт и ТО».</p>` : ''}
     <div class="sticky-save"><button class="btn primary" type="submit">Сохранить</button></div>
@@ -2391,9 +2445,9 @@ function fuelSheet(id) {
   const d = f ? { ...f } : { date: todayISO(), km: S.car.mileage, liters: '', price: last ? last.price : '', total: '', full: true, station: last ? last.station : '' };
   const stations = [...new Set(S.fuel.map((x) => x.station).filter(Boolean))];
   openSheet(f ? 'Заправка' : 'Новая заправка', `<form id="f" class="form">
-    <label class="amount-in"><input type="text" inputmode="decimal" id="fTotal" placeholder="0" value="${d.total || ''}" autocomplete="off" aria-label="Сумма"><span>₽</span></label>
+    <label class="amount-in"><input type="text" inputmode="decimal" id="fTotal" placeholder="0" value="${d.total || ''}" autocomplete="off" aria-label="Сумма"><span>${curSym()}</span></label>
     <div class="two"><label class="field"><span>Литры</span><input type="text" inputmode="decimal" id="fLiters" value="${d.liters || ''}" placeholder="30"></label>
-    <label class="field"><span>Цена за литр, ₽</span><input type="text" inputmode="decimal" id="fPrice" value="${d.price || ''}" placeholder="64,5"></label></div>
+    <label class="field"><span>Цена за литр, ${curSym()}</span><input type="text" inputmode="decimal" id="fPrice" value="${d.price || ''}" placeholder="64,5"></label></div>
     <p class="note-small" id="fCalc" style="margin:-4px 0 0">Заполните любые два поля из трёх, третье посчитается само.</p>
     <div class="two"><label class="field"><span>Пробег, км</span><input type="number" inputmode="numeric" id="fKm" value="${d.km ?? ''}" placeholder="км"></label>
     <label class="field"><span>Дата</span><input type="date" id="fDate" value="${d.date}"></label></div>
@@ -4136,7 +4190,7 @@ async function exportData() {
   storageIndicator(); return true;
 }
 function backupCounts(s) {
-  return [['Заметки', s.notes], ['Планы', s.plans], ['Напоминания', s.reminders], ['Расходы', s.expenses], ['Доходы', s.incomes], ['Тренировки', s.workouts], ['Страницы дневника', s.diary && s.diary.pages]].map(([name, list]) => `<div class="restore-count"><span>${name}</span><b>${(list || []).length}</b></div>`).join('');
+  return [['Заметки', s.notes], ['Планы', s.plans], ['Напоминания', s.reminders], ['Расходы', s.expenses], ['Доходы', s.incomes], ['Долги', s.debts], ['Тренировки', s.workouts], ['Страницы дневника', s.diary && s.diary.pages]].map(([name, list]) => `<div class="restore-count"><span>${name}</span><b>${(list || []).length}</b></div>`).join('');
 }
 let importBusy = false;
 async function importData(f) {
@@ -4674,6 +4728,301 @@ ACT['set-done']=el=>{
  if(label)label.textContent=done+' / '+total;if(bar)bar.style.width=(total?done/total*100:0)+'%';
 };
 
+
+/* ================= Life 2.1 · долги, персонализация, движение ================= */
+function applyPrefs() {
+  const p = prefs();
+  const root = document.documentElement;
+  root.dataset.scale = p.fontScale || 'regular';
+  root.dataset.tabs = p.tabStyle || 'float';
+  root.dataset.haptics = p.haptics === false ? 'off' : 'on';
+  document.body.classList.toggle('layout-focus', p.homeLayout === 'focus');
+}
+function checkDebtReminders() {
+  if (prefs().debtRemind === false || !sec('debts')) return false;
+  const today = todayISO();
+  const lead = Math.max(0, Number(prefs().debtLeadDays) || 0);
+  const msgs = [];
+  (S.debts || []).forEach((d) => {
+    if (!LifeCore.debtOpen(d) || d.remind === false || !d.due) return;
+    const due = toDate(d.due); if (!due) return;
+    const from = isoOf(addDays(due, -lead));
+    if (today < from || d.ping === today) return;
+    d.ping = today;
+    msgs.push((d.direction === 'out' ? 'Отдать: ' : 'Получить: ') + (d.person || 'долг') + ' · ' + money(LifeCore.debtLeft(d)));
+  });
+  if (!msgs.length) return false;
+  const text = msgs.length === 1 ? msgs[0] : 'Срок по долгам: ' + msgs.length;
+  notifyNow('Life: долг', text).then((ok) => { if (!ok && prefs().inAppToast !== false) toast(text); });
+  return true;
+}
+function debtInitial(name) {
+  const t = String(name || '').trim();
+  return (t ? t.charAt(0) : '?').toUpperCase();
+}
+function debtHue(name) {
+  let h = 0; const s = String(name || '');
+  for (let i = 0; i < s.length; i++) h = (h + s.charCodeAt(i) * 17) % 360;
+  return h;
+}
+function debtProgress(d) {
+  const total = Number(d.amount) || 0;
+  const left = LifeCore.debtLeft(d);
+  const paid = Math.max(0, total - left);
+  const pct = total > 0 ? Math.min(100, Math.round(paid / total * 100)) : 0;
+  return { paid, left, pct };
+}
+function debtDuePill(d) {
+  if (!d.due) return '<span class="pill none">Без срока</span>';
+  const n = dayDiff(toDate(d.due), new Date());
+  if (n < 0) return `<span class="pill bad">Просрочен ${Math.abs(n)} ${plural(Math.abs(n), 'день', 'дня', 'дней')}</span>`;
+  if (n === 0) return '<span class="pill warn">Сегодня</span>';
+  if (n === 1) return '<span class="pill warn">Завтра</span>';
+  return `<span class="pill none">${esc(fmtShort(toDate(d.due)))}</span>`;
+}
+function debtCard(d) {
+  const open = LifeCore.debtOpen(d);
+  const prog = debtProgress(d);
+  const who = d.person || 'Без имени';
+  return `<article class="debt-swipe ${open ? '' : 'closed'}" data-id="${esc(d.id)}">
+    <div class="debt-actions">${open ? `<button type="button" data-act="debt-pay" data-id="${esc(d.id)}">Погасить</button>` : ''}</div>
+    <button type="button" class="debt-swipe-in" data-act="debt-open" data-id="${esc(d.id)}">
+      <span class="debt-ava" style="--h:${debtHue(who)}">${esc(debtInitial(who))}</span>
+      <span class="debt-body">
+        <span class="debt-top"><span class="t">${esc(who)}${d.done ? '<span class="tag-ex">закрыт</span>' : ''}</span><span class="debt-left ${d.direction === 'out' ? 'amount-minus' : 'amount-plus'}">${open ? money(prog.left) : money(0)}</span></span>
+        <span class="m">${d.direction === 'out' ? 'Я должен' : 'Мне должны'}${d.note ? ' · ' + esc(d.note) : ''}</span>
+        <span class="debt-meta">${debtDuePill(d)}<span class="debt-paid">погашено ${money(prog.paid)}</span></span>
+        <span class="bar ${open ? '' : 'ok'}"><i style="width:${prog.pct}%"></i></span>
+      </span>
+    </button>
+  </article>`;
+}
+RENDER.debts = function () {
+  const list = S.debts || [];
+  const sum = LifeCore.debtSummary(list, todayISO());
+  const filter = ui.debtFilter || 'open';
+  const people = LifeCore.debtPeople(list);
+  let shown = list.filter((d) => {
+    if (filter === 'in') return LifeCore.debtOpen(d) && d.direction !== 'out';
+    if (filter === 'out') return LifeCore.debtOpen(d) && d.direction === 'out';
+    if (filter === 'done') return !LifeCore.debtOpen(d);
+    return LifeCore.debtOpen(d);
+  });
+  shown = shown.slice().sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.person || '').localeCompare(b.person || '', 'ru'));
+  let html = `<div class="dash-page dash-debts">${head('Долги', 'Кто кому и сколько осталось', plusBtn('new-debt', 'Новый долг'))}`;
+  html += `<section class="debt-hero"><div><span>Мне должны</span><b class="amount-plus">${money(sum.inSum)}</b><small>${sum.inCount} ${plural(sum.inCount, 'долг', 'долга', 'долгов')}</small></div><div><span>Я должен</span><b class="amount-minus">${money(sum.outSum)}</b><small>${sum.outCount} ${plural(sum.outCount, 'долг', 'долга', 'долгов')}</small></div>${sum.overdue ? `<p class="debt-alert">${I.bell}${sum.overdue} ${plural(sum.overdue, 'срок прошёл', 'срока прошли', 'сроков прошло')}</p>` : ''}</section>`;
+  html += `<div class="seg debt-seg">${[['open', 'Открытые'], ['in', 'Мне'], ['out', 'Я должен'], ['done', 'Закрытые']].map(([k, v]) => `<button type="button" data-act="debt-filter" data-sec="${k}" class="${filter === k ? 'on' : ''}">${v}</button>`).join('')}</div>`;
+  if (people.length && filter !== 'done') {
+    html += `<section class="card debt-people"><h2>По людям</h2><div class="ops">${people.slice(0, 6).map((p) => `<div class="row"><span class="debt-ava sm" style="--h:${debtHue(p.name)}">${esc(debtInitial(p.name))}</span><span class="grow"><span class="t">${esc(p.name)}</span><span class="m">${p.inSum ? 'мне должны ' + money(p.inSum) : ''}${p.inSum && p.outSum ? ' · ' : ''}${p.outSum ? 'я должен ' + money(p.outSum) : ''}</span></span></div>`).join('')}</div></section>`;
+  }
+  html += shown.length ? `<div class="debt-list">${shown.map(debtCard).join('')}</div>` : `<div class="card empty debt-empty"><span class="empty-orb">${I.debt}</span><b>${filter === 'done' ? 'Закрытых долгов нет' : 'Долгов нет'}</b><span>${filter === 'done' ? 'Закрытые появятся здесь после полного погашения.' : 'Запишите, кто должен вам или кому должны вы. Частичные платежи уменьшают остаток.'}</span><button class="btn primary" data-act="new-debt">Добавить долг</button></div>`;
+  html += `<p class="note-small">Смахните карточку влево, чтобы внести платёж. Срок попадает в «Сегодня», если напоминание включено.</p></div>`;
+  ui.mounts.push(() => bindDebtSwipe($('#view')));
+  return html;
+};
+function bindDebtSwipe(root) {
+  $$('.debt-swipe', root).forEach((row) => {
+    const inner = $('.debt-swipe-in', row); if (!inner) return;
+    let x0 = null, y0 = 0, dx = 0, lock = null, moved = false;
+    row.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; lock = null; moved = false; inner.style.transition = 'none'; }, { passive: true });
+    row.addEventListener('touchmove', (e) => {
+      if (x0 == null) return;
+      const x = e.touches[0].clientX, y = e.touches[0].clientY;
+      if (!lock) { if (Math.abs(x - x0) < 8 && Math.abs(y - y0) < 8) return; lock = Math.abs(x - x0) > Math.abs(y - y0) ? 'x' : 'y'; }
+      if (lock !== 'x') return;
+      dx = Math.max(-132, Math.min(0, x - x0));
+      if (Math.abs(dx) > 12) moved = true;
+      if (!reduceMotion()) inner.style.transform = `translateX(${dx}px)`;
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+    const end = () => {
+      if (x0 == null) return; x0 = null;
+      inner.style.transition = '';
+      const open = dx < -56;
+      inner.style.transform = open ? 'translateX(-124px)' : '';
+      row.classList.toggle('open', open);
+    };
+    row.addEventListener('touchend', end); row.addEventListener('touchcancel', end);
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.debt-actions')) return;
+      if (moved || row.classList.contains('open')) {
+        e.preventDefault(); e.stopPropagation();
+        inner.style.transform = ''; row.classList.remove('open');
+      }
+    }, true);
+  });
+}
+WIDGET.debts = function () {
+  const sum = LifeCore.debtSummary(S.debts || [], todayISO());
+  return `<button class="card wsm" data-act="tab" data-tab="debts"><span class="wl">${I.debt}Долги</span><span class="wbig sm">${money(sum.inSum)}</span><span class="wfoot">мне должны · я должен ${money(sum.outSum)}</span></button>`;
+};
+function debtSheet(id) {
+  const cur = id ? (S.debts || []).find((d) => d.id === id) : null;
+  if (id && !cur) return;
+  const d = cur ? JSON.parse(JSON.stringify(cur)) : { id: uid(), direction: 'in', person: '', note: '', amount: '', due: '', remind: true, payments: [], done: false, created: new Date().toISOString() };
+  const openPay = () => paySheet(d.id);
+  openSheet(cur ? 'Долг' : 'Новый долг', `<form id="debtForm" class="form">
+    <div class="seg" id="debtDir">${[['in', 'Мне должны'], ['out', 'Я должен']].map(([k, v]) => `<button type="button" data-dir="${k}" class="${d.direction === k ? 'on' : ''}">${v}</button>`).join('')}</div>
+    <label class="field"><span>Кто</span><input id="debtPerson" type="text" maxlength="40" value="${esc(d.person || '')}" placeholder="Имя или бригада" autocomplete="name"></label>
+    <label class="amount-in"><input id="debtAmount" type="text" inputmode="decimal" placeholder="0" value="${d.amount || ''}" aria-label="Сумма" autocomplete="off"><span>${curSym()}</span></label>
+    <label class="field"><span>За что</span><input id="debtNote" type="text" maxlength="80" value="${esc(d.note || '')}" placeholder="Аванс, инструмент, объект…"></label>
+    <div class="two"><label class="field"><span>Срок</span><input id="debtDue" type="date" value="${d.due || ''}"></label>
+      <label class="switch-row"><span>Напомнить</span><span class="switch"><input id="debtRemind" type="checkbox" ${d.remind === false ? '' : 'checked'}><i></i></span></label></div>
+    ${cur && d.payments && d.payments.length ? `<div class="card"><h2>Платежи</h2><div class="ops">${d.payments.slice().reverse().map((p) => `<div class="row"><span class="grow"><span class="t">${money(p.amount)}</span><span class="m">${p.date ? esc(fmtShort(toDate(p.date))) : 'Без даты'}${p.note ? ' · ' + esc(p.note) : ''}</span></span></div>`).join('')}</div></div>` : ''}
+    ${cur && LifeCore.debtOpen(d) ? `<button class="btn primary" type="button" id="debtPayBtn">${I.plus}Внести платёж · осталось ${money(LifeCore.debtLeft(d))}</button>` : ''}
+    <div class="sticky-save"><button class="btn primary" type="submit">Сохранить</button></div>
+    ${cur ? confirmBox('Удалить долг', 'Удалить этот долг и все платежи по нему?') : ''}
+  </form>`, (body) => {
+    let dir = d.direction;
+    $('#debtDir', body).onclick = (e) => { const b = e.target.closest('[data-dir]'); if (!b) return; dir = b.dataset.dir; $$('#debtDir button', body).forEach((x) => x.classList.toggle('on', x === b)); };
+    const payBtn = $('#debtPayBtn', body); if (payBtn) payBtn.onclick = () => { if (saveDebt(false)) openPay(); };
+    $('#delYes', body) && ($('#delYes', body).onclick = () => {
+      const old = S.debts.slice();
+      removeWithUndo('Долг удалён', () => { S.debts = S.debts.filter((x) => x.id !== d.id); }, () => { S.debts = old; });
+      closeSheet();
+    });
+    $('#debtForm', body).onsubmit = (e) => { e.preventDefault(); if (saveDebt(true)) { closeSheet(); toast(cur ? 'Долг обновлён' : 'Долг записан'); } };
+    function saveDebt(close) {
+      const person = $('#debtPerson', body).value.trim();
+      const amount = num($('#debtAmount', body).value);
+      if (!person) { $('#debtPerson', body).focus(); toast('Напишите, кто это'); return false; }
+      if (amount == null || amount <= 0) { $('#debtAmount', body).focus(); toast('Укажите сумму'); return false; }
+      const next = Object.assign({}, cur || d, {
+        id: d.id, direction: dir, person, note: $('#debtNote', body).value.trim(), amount,
+        due: $('#debtDue', body).value, remind: $('#debtRemind', body).checked,
+        payments: (cur && cur.payments) || d.payments || [], done: cur ? cur.done : false
+      });
+      next.done = LifeCore.debtLeft(next) <= 0;
+      const i = S.debts.findIndex((x) => x.id === next.id);
+      if (i < 0) S.debts.unshift(next); else S.debts[i] = next;
+      if (!save()) return false;
+      if (!close) render();
+      return true;
+    }
+    setTimeout(() => { const el = $('#debtPerson', body); if (el && !cur) el.focus(); }, 280);
+  });
+}
+function paySheet(id) {
+  const d = (S.debts || []).find((x) => x.id === id); if (!d) return;
+  const left = LifeCore.debtLeft(d);
+  openSheet('Платёж', `<form id="payForm" class="form">
+    <p class="debt-pay-who">${esc(d.person || 'Долг')} · осталось <b>${money(left)}</b></p>
+    <label class="amount-in"><input id="payAmount" type="text" inputmode="decimal" placeholder="0" value="${left || ''}" aria-label="Сумма платежа" autocomplete="off"><span>${curSym()}</span></label>
+    <div class="chips wrap" id="payQuick">${[left, Math.round(left / 2), left > 1000 ? 1000 : null].filter((n, i, a) => n && a.indexOf(n) === i).map((n) => `<button type="button" class="chip" data-amt="${n}">${money(n)}</button>`).join('')}</div>
+    <label class="field"><span>Дата</span><input id="payDate" type="date" value="${todayISO()}"></label>
+    <label class="field"><span>Комментарий</span><input id="payNote" type="text" maxlength="80" placeholder="Наличные, перевод…"></label>
+    <button class="btn primary" type="submit">Записать платёж</button>
+    <button class="btn" type="button" id="payAll">Закрыть полностью</button>
+  </form>`, (body) => {
+    $('#payQuick', body).onclick = (e) => { const b = e.target.closest('[data-amt]'); if (!b) return; $('#payAmount', body).value = b.dataset.amt; };
+    const commit = (amount) => {
+      const fresh = S.debts.find((x) => x.id === id); if (!fresh) return;
+      const res = LifeCore.applyPayment(fresh, { id: uid(), amount, date: $('#payDate', body).value, note: $('#payNote', body).value.trim() });
+      if (!res.applied) { toast('Сумма должна быть больше нуля'); return; }
+      const i = S.debts.findIndex((x) => x.id === id); S.debts[i] = res.debt;
+      if (!save()) return;
+      closeSheet(); render();
+      toast(res.closed ? 'Долг закрыт' : 'Платёж записан · осталось ' + money(LifeCore.debtLeft(res.debt)));
+    };
+    $('#payForm', body).onsubmit = (e) => { e.preventDefault(); const a = num($('#payAmount', body).value); if (a == null) { $('#payAmount', body).focus(); return; } commit(a); };
+    $('#payAll', body).onclick = () => commit(left);
+  }, { back: () => debtSheet(id) });
+}
+ACT['new-debt'] = () => debtSheet();
+ACT['debt-open'] = (el) => debtSheet(el.dataset.id);
+ACT['debt-pay'] = (el) => paySheet(el.dataset.id);
+ACT['debt-filter'] = (el) => { ui.debtFilter = el.dataset.sec; render(); };
+function focusBoardHTML() {
+  const rows = LifeCore.agenda(S, todayISO()).slice(0, 4);
+  const bits = rows.map((r) => `<button class="focus-item" data-act="search-open" data-kind="${r.kind}" data-id="${esc(r.id)}" data-obj="${esc(r.obj || '')}"><b>${esc(r.title)}</b><span>${esc(r.label)}${r.time ? ' · ' + esc(r.time) : ''}</span></button>`).join('');
+  return `<section class="focus-board"><div class="focus-head"><b>На сегодня</b><button class="link" data-act="today">Все дела</button></div>${bits || '<p>Свободный день. Можно добавить план, напоминание или долг.</p>'}<button class="btn primary" data-act="today-add">${I.plus}Добавить дело</button></section>`;
+}
+const lifeHome = RENDER.home;
+RENDER.home = function () {
+  let html = lifeHome();
+  const p = prefs();
+  html = html.replace('dash-page dash-home', 'dash-page dash-home layout-' + (p.homeLayout || 'widgets') + (p.showSaveChip === false ? ' hide-save' : ''));
+  if (p.homeLayout === 'focus') html = html.replace(/<\/div>\s*$/, focusBoardHTML() + '</div>');
+  return html;
+};
+const lifeToday = DETAIL.today;
+DETAIL.today = function () {
+  let html = lifeToday();
+  const allow = prefs().todayBlocks || PREF_DEFAULT.todayBlocks;
+  const map = { 'Просрочено': 'overdue', 'По времени': 'timed', 'Без времени': 'untimed' };
+  html = html.replace(/<section class="agenda-group">([\s\S]*?)<\/section>/g, (full, inner) => {
+    const name = (inner.match(/<h2>([^<]+)/) || [])[1];
+    const key = map[name];
+    return key && allow.indexOf(key) < 0 ? '' : full;
+  });
+  return html.replace('detail-top', 'detail-top life-today-screen');
+};
+const lifeNotif = DETAIL.notifcfg;
+DETAIL.notifcfg = function () {
+  const p = prefs();
+  return lifeNotif() + `<section class="card"><h2>Когда напоминать</h2>
+    <div class="field"><span>Сигнал о деле</span><div class="seg col" id="leadSeg">${[[0, 'В момент'], [15, 'За 15 мин'], [60, 'За час'], [1440, 'За день']].map(([k, v]) => `<button type="button" data-pref="remindLead" data-v="${k}" class="${Number(p.remindLead) === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+    <label class="switch-row"><span>Текст внутри Life, если нет системного уведомления</span><span class="switch"><input id="toastPref" type="checkbox" ${p.inAppToast === false ? '' : 'checked'}><i></i></span></label>
+    <div class="field"><span>Долги со сроком</span><div class="seg">${[[0, 'В день срока'], [1, 'За день'], [3, 'За 3 дня']].map(([k, v]) => `<button type="button" data-pref="debtLeadDays" data-v="${k}" class="${Number(p.debtLeadDays) === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+    <label class="switch-row"><span>Напоминать о долгах</span><span class="switch"><input id="debtRemindPref" type="checkbox" ${p.debtRemind === false ? '' : 'checked'}><i></i></span></label>
+  </section>`;
+};
+function personalHTML() {
+  const p = prefs(); const st = S.settings;
+  const blocks = [['overdue', 'Просрочено'], ['timed', 'По времени'], ['untimed', 'Без времени']];
+  return `<div class="detail-top">${backBtn('Настройки')}</div>${head('Персонализация', 'Life подстраивается под вас', '')}
+    <section class="card"><h2>Деньги и даты</h2>
+      <div class="field"><span>Валюта</span><div class="chips wrap">${Object.entries({ RUB: '₽ Рубль', USD: '$ Доллар', EUR: '€ Евро', KZT: '₸ Тенге', BYN: 'Br Бел. рубль' }).map(([k, v]) => `<button type="button" class="chip ${p.currency === k ? 'on' : ''}" data-pref="currency" data-v="${k}">${v}</button>`).join('')}</div></div>
+      <label class="switch-row"><span>Показывать копейки</span><span class="switch"><input id="decPref" type="checkbox" ${p.moneyDecimals === 2 ? 'checked' : ''}><i></i></span></label>
+      <div class="field"><span>Формат даты</span><div class="seg">${[['long', '24 ноября'], ['short', '24 нояб.'], ['numeric', '24.11']].map(([k, v]) => `<button type="button" data-pref="dateStyle" data-v="${k}" class="${p.dateStyle === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+    </section>
+    <section class="card"><h2>Экран</h2>
+      <div class="field"><span>Размер текста</span><div class="seg">${[['compact', 'Компакт'], ['regular', 'Обычный'], ['large', 'Крупный']].map(([k, v]) => `<button type="button" data-pref="fontScale" data-v="${k}" class="${p.fontScale === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+      <div class="field"><span>Нижняя панель</span><div class="seg">${[['float', 'Плавающая'], ['dock', 'Классическая']].map(([k, v]) => `<button type="button" data-pref="tabStyle" data-v="${k}" class="${p.tabStyle === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+      <div class="field"><span>Главная</span><div class="seg">${[['widgets', 'Виджеты'], ['focus', 'Сначала день'], ['compact', 'Плотнее']].map(([k, v]) => `<button type="button" data-pref="homeLayout" data-v="${k}" class="${p.homeLayout === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+      <label class="switch-row"><span>Строка «сохранено» на главной</span><span class="switch"><input id="saveChipPref" type="checkbox" ${p.showSaveChip === false ? '' : 'checked'}><i></i></span></label>
+      <label class="switch-row"><span>Отклик кнопок</span><span class="switch"><input id="hapticPref" type="checkbox" ${p.haptics === false ? '' : 'checked'}><i></i></span></label>
+      <div class="field"><span>Блоки «Сегодня»</span><div class="sec-feats">${blocks.map(([k, v]) => `<label class="feat"><input type="checkbox" data-today-block="${k}" ${p.todayBlocks.indexOf(k) >= 0 ? 'checked' : ''}><span>${v}</span></label>`).join('')}</div></div>
+    </section>
+    <section class="card"><h2>Цвет</h2>
+      <div class="swatches">${ACCENTS.map((a) => `<button type="button" class="swatch ${st.accent === a.id ? 'on' : ''}" data-set="accent" data-v="${a.id}" style="background:${a.c}" aria-label="${a.name}"></button>`).join('')}<label class="swatch custom-swatch ${st.accent === 'custom' ? 'on' : ''}" style="background:${st.accent === 'custom' && st.accentHex ? st.accentHex : '#888'}"><input type="color" id="accentPick" value="${st.accent === 'custom' && st.accentHex ? st.accentHex : accentHex()}" aria-label="Свой цвет"></label></div>
+      <p class="note-small">Тема, фон и стекло — в студии оформления. Разделы и их порядок — в «Разделах».</p>
+      <div class="btn-row"><button class="btn sm" data-act="visual-studio">Студия</button><button class="btn sm" data-act="settings-sections">Разделы</button></div>
+    </section>`;
+}
+DETAIL.personal = () => personalHTML();
+ACT.personal = () => push({ type: 'personal' });
+const lifeSettings = DETAIL.settings;
+DETAIL.settings = function () {
+  return lifeSettings().replace('<div class="list">', '<div class="list"><button class="row big" data-act="personal"><span class="sec-ic">' + I.gear + '</span><span class="grow"><span class="t">Персонализация</span><span class="m">Валюта, даты, главная, размер текста</span></span><span class="chev">' + I.right + '</span></button>');
+};
+const openFound = ACT['search-open'];
+ACT['search-open'] = (el) => { if (el.dataset.kind === 'debt') return debtSheet(el.dataset.id); return openFound(el); };
+const agendaDone = ACT['agenda-done'];
+ACT['agenda-done'] = (el) => { if (el.dataset.kind === 'debt') return paySheet(el.dataset.id); return agendaDone(el); };
+document.addEventListener('click', (e) => {
+  const pref = e.target.closest('[data-pref]');
+  if (!pref) return;
+  const key = pref.dataset.pref; let v = pref.dataset.v;
+  if (key === 'remindLead' || key === 'debtLeadDays') v = Number(v);
+  S.settings.prefs = Object.assign(prefs(), { [key]: v });
+  save(); applyTheme(); render();
+});
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 'decPref') { S.settings.prefs = Object.assign(prefs(), { moneyDecimals: t.checked ? 2 : 0 }); save(); render(); }
+  else if (t.id === 'toastPref') { S.settings.prefs = Object.assign(prefs(), { inAppToast: t.checked }); save(); }
+  else if (t.id === 'debtRemindPref') { S.settings.prefs = Object.assign(prefs(), { debtRemind: t.checked }); save(); }
+  else if (t.id === 'saveChipPref') { S.settings.prefs = Object.assign(prefs(), { showSaveChip: t.checked }); save(); render(); }
+  else if (t.id === 'hapticPref') { S.settings.prefs = Object.assign(prefs(), { haptics: t.checked }); save(); applyPrefs(); }
+  else if (t.id === 'accentPick') { S.settings.accent = 'custom'; S.settings.accentHex = t.value; save(); applyTheme(); render(); }
+  else if (t.matches('[data-today-block]')) {
+    const blocks = prefs().todayBlocks.filter((k) => k !== t.dataset.todayBlock);
+    if (t.checked) blocks.push(t.dataset.todayBlock);
+    S.settings.prefs = Object.assign(prefs(), { todayBlocks: blocks });
+    save();
+  }
+});
 
 /* Fixed compact plans. */
 RENDER.plans=function(){

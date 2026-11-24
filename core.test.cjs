@@ -40,6 +40,52 @@ test('search handles case, ё, multiple words and disabled sections', () => {
   const s = state(); s.notes = [{ id: '1', title: 'Ёлка', body: 'Купить домой' }]; s.plans = [{ id: '2', title: 'Купить ёлку', date: '2026-12-01' }];
   assert.equal(core.search(s, 'ЕЛКА домой').length, 1); assert.equal(core.search(s, 'купить').length, 2); s.settings.sections.notes = false; assert.equal(core.search(s, 'купить').length, 1);
 });
+test('v2 backup migrates to v3 and keeps notes', () => {
+  const s = state(); s.notes = [{ id: 'n1', title: 'Каска', body: 'Белая' }];
+  const m = core.migrateState(s);
+  assert.equal(m.v, 3); assert.equal(s.v, 2); assert.deepEqual(m.notes, s.notes);
+  assert.deepEqual(m.debts, []); assert.equal(m.settings.migratedFrom, 2); assert.deepEqual(m.settings.prefs, {});
+  assert.equal(core.validateState(m).v, 3);
+});
+test('partial repayment reduces the balance and closes the debt', () => {
+  const debt = { id: 'd1', direction: 'in', person: 'Игорь', amount: 1000, payments: [{ id: 'p0', amount: 200 }] };
+  assert.equal(core.debtLeft(debt), 800); assert.equal(core.debtOpen(debt), true);
+  const part = core.applyPayment(debt, { id: 'p1', amount: 300, date: '2026-11-01' });
+  assert.equal(part.applied, 300); assert.equal(core.debtLeft(part.debt), 500); assert.equal(debt.payments.length, 1);
+  const over = core.applyPayment(part.debt, { id: 'p2', amount: 900, date: '2026-11-02' });
+  assert.equal(over.applied, 500); assert.equal(over.closed, true); assert.equal(core.debtLeft(over.debt), 0); assert.equal(core.debtOpen(over.debt), false);
+});
+test('debt totals split who owes whom and count overdue', () => {
+  const list = [
+    { id: 'a', direction: 'in', person: 'Игорь', amount: 1000, due: '2026-10-01', payments: [{ id: 'p', amount: 250 }] },
+    { id: 'b', direction: 'out', person: 'Игорь', amount: 400, due: '2026-12-01', payments: [] },
+    { id: 'c', direction: 'in', person: 'Олег', amount: 100, due: '2026-10-01', done: true, payments: [] }
+  ];
+  const sum = core.debtSummary(list, '2026-11-01');
+  assert.equal(sum.inSum, 750); assert.equal(sum.outSum, 400); assert.equal(sum.overdue, 1); assert.equal(sum.closed, 1);
+  assert.deepEqual(core.debtPeople(list).map((p) => p.name), ['Игорь']);
+});
+test('agenda includes an open due debt and skips a future or silenced one', () => {
+  const s = state(); s.settings.sections.debts = true;
+  s.debts = [
+    { id: 'now', direction: 'out', person: 'Бригада', amount: 500, due: '2026-10-30', payments: [] },
+    { id: 'later', direction: 'in', person: 'Позже', amount: 500, due: '2026-11-02', payments: [] },
+    { id: 'quiet', direction: 'in', person: 'Тихо', amount: 500, due: '2026-10-01', remind: false, payments: [] }
+  ];
+  assert.deepEqual(core.agenda(s, '2026-10-30').map((r) => r.id), ['now']);
+});
+test('search finds a debt by person and respects a disabled section', () => {
+  const s = state(); s.settings.sections.debts = true;
+  s.debts = [{ id: 'd', direction: 'in', person: 'Ёжиков', amount: 10, note: 'перфоратор', payments: [] }];
+  assert.equal(core.search(s, 'ежиков перфоратор')[0].kind, 'debt');
+  s.settings.sections.debts = false; assert.equal(core.search(s, 'ежиков').length, 0);
+});
+test('broken debt payments and a future schema are rejected', () => {
+  const s = state(); s.v = 3; s.debts = [{ id: 'd', payments: [{ amount: 1 }] }];
+  assert.throws(() => core.validateState(s));
+  assert.throws(() => core.validateState({ v: 4, settings: {} }));
+  assert.throws(() => core.validateState({ v: 3, settings: { prefs: [] } }));
+});
 test('restore remaps media references and preserves text', () => {
   const s = state(); s.notes = [{ id: 'n', title: 'old', photos: ['old'] }]; s.diary = { pages: [{ drawing: 'drawing', items: [{ kind: 'video', ref: 'video' }] }] };
   assert.deepEqual(core.mediaRefs(s).sort(), ['drawing', 'old', 'video']); core.remapMedia(s, { old: 'new', drawing: 'new-d', video: 'new-v' });

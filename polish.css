@@ -1,0 +1,211 @@
+/* Life 2.1 — iPhone design layer. Loaded after appearance.css. */
+:root {
+  --r-lg: 24px;
+  --r-md: 16px;
+  --ease-spring: cubic-bezier(.22, 1.15, .36, 1);
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+
+html, body { overflow-x: hidden; }
+body { font-size: 17px; letter-spacing: -.011em; }
+#app { padding-bottom: calc(var(--tabbar) + var(--sab) + 36px); }
+
+html[data-scale="compact"] body { font-size: 15.5px; }
+html[data-scale="large"] body { font-size: 18.5px; }
+html[data-scale="large"] .head h1 { font-size: 34px; }
+html[data-scale="compact"] .head h1 { font-size: 26px; }
+
+.head h1 { font-size: 32px; letter-spacing: -.03em; }
+.head .sub, .dash-intro { font-size: 15px !important; letter-spacing: 0 !important; color: var(--ink-2); line-height: 1.35; }
+.dash-kicker { font-size: 12px !important; letter-spacing: .12em !important; }
+.dash-page { gap: 16px; }
+.dash-page > .head { margin-bottom: 2px; }
+
+.card, .list, .note-card, .debt-swipe, .bubbles-card {
+  border-radius: var(--v-radius, 24px);
+}
+.card { padding: 18px; }
+.row, .row.big { min-height: 60px; }
+.row .t { font-size: 16.5px; letter-spacing: -.015em; }
+.row .m, .note-card .b { font-size: 14.5px; line-height: 1.35; }
+.icon-btn, .back-btn, .tabbar button, .chip, .seg button, .btn { min-height: 44px; }
+.btn { border-radius: 16px; font-size: 16.5px; }
+.btn.primary { box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent); }
+.chip { min-height: 40px; }
+
+/* Floating tab bar */
+html[data-tabs="float"] .tabbar,
+html[data-visual][data-tabs="float"] .tabbar {
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(var(--sab) + 8px);
+  width: auto;
+  padding: 4px 4px 4px;
+  border: 1px solid var(--v-line, var(--line));
+  border-radius: 28px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .16);
+  background: color-mix(in srgb, var(--bg) 94%, var(--surface));
+}
+html[data-tabs="float"] .tabbar button { font-size: 11px; min-height: 52px; border-radius: 22px; padding: 4px 0 2px; }
+html[data-tabs="float"] .tabbar button.on { background: var(--accent-soft); }
+html[data-tabs="float"] .tabbar button span {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px;
+}
+html[data-tabs="float"] #app { padding-bottom: calc(74px + var(--sab) + 28px); }
+html[data-tabs="float"].plans-screen #app { padding-bottom: calc(74px + var(--sab) + 12px); }
+html[data-tabs="dock"] .tabbar button span { font-size: 11px; }
+
+.sheet {
+  border-radius: 28px 28px 0 0;
+  transition: transform .46s var(--ease-spring);
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, .18);
+}
+.sheet-head h3 { font-size: 22px; letter-spacing: -.02em; }
+.scrim { transition: opacity .28s ease; }
+
+.view.anim-fade { animation: lifeRise .42s var(--ease-out); }
+.view.anim-in { animation: lifeIn .4s var(--ease-spring); }
+.view.anim-back { animation: lifeBack .36s var(--ease-out); }
+@keyframes lifeRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes lifeIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes lifeBack { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
+
+.dash-page > * { animation: lifeRise .48s var(--ease-out) both; }
+.dash-page > *:nth-child(2) { animation-delay: .04s; }
+.dash-page > *:nth-child(3) { animation-delay: .08s; }
+.dash-page > *:nth-child(4) { animation-delay: .12s; }
+.dash-page > *:nth-child(n+5) { animation-delay: .16s; }
+
+.check.on { animation: lifePop .38s var(--ease-spring); }
+@keyframes lifePop { 0% { transform: scale(.72); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.bar i { transition: width .55s var(--ease-out); }
+
+.empty, .debt-empty {
+  gap: 10px; padding: 28px 18px 22px;
+}
+.empty-orb, .empty b { color: var(--ink); }
+.empty-orb {
+  width: 64px; height: 64px; border-radius: 22px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.empty-orb svg { width: 30px; height: 30px; }
+
+/* Today hub */
+.life-today {
+  min-height: 92px; border-radius: 26px; padding: 18px 16px;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.life-today b { font-size: 22px; letter-spacing: -.03em; }
+.life-today small { font-size: 13.5px; }
+.life-count { font-size: 32px; font-variant-numeric: tabular-nums; }
+.life-search { min-height: 76px; border-radius: 26px; }
+.life-hub-row { align-items: stretch; }
+.agenda-group h2 { font-size: 18px; letter-spacing: -.02em; }
+.agenda-row { padding: 14px 12px; gap: 12px; }
+.agenda-open b { font-size: 16px; }
+.agenda-open span { font-size: 13px; }
+.agenda-check { width: 32px; height: 32px; }
+
+.dash-stat { border-radius: 22px; padding: 16px 12px; }
+.dash-stat > span { font-size: 13px !important; }
+.dash-stat > b { font-size: 28px !important; }
+.dash-stat > small { font-size: 12px !important; }
+.dash-vehicle-title, .dash-training-hero h2 { letter-spacing: -.03em; }
+.dash-quick b, .visual-entry { font-size: 14px !important; }
+.visual-entry { padding-top: 4px; padding-bottom: 8px; }
+.wsm .wbig { font-size: 40px; }
+.wsm .wl, .wsm .wfoot { font-size: 13px; }
+.note-card { border-radius: 22px; min-height: 0; }
+.dash-notes .note-card .t { font-size: 18px; }
+
+.layout-focus .wgrid, .layout-focus .w-edit-link, .hide-save .life-save { display: none; }
+.layout-compact .wgrid { gap: 8px; }
+.layout-compact .wsm { min-height: 124px; padding: 12px; }
+.layout-compact .card { padding: 14px; }
+
+.focus-board {
+  display: grid; gap: 10px; padding: 16px; border-radius: 26px;
+  background: var(--v-surface, var(--surface)); border: 1px solid var(--v-line, var(--line));
+}
+.focus-head, .focus-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.focus-item {
+  width: 100%; text-align: left; border: 0; background: var(--surface-2); color: inherit;
+  border-radius: 16px; padding: 12px 14px; min-height: 56px;
+}
+.focus-item b { display: block; font-size: 16px; }
+.focus-item span { display: block; color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+.focus-board > p { margin: 0; color: var(--ink-2); }
+
+/* Debts */
+.debt-hero {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  padding: 6px; border-radius: 28px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 18%, var(--surface)), var(--surface));
+  border: 1px solid var(--v-line, var(--line));
+}
+.debt-hero > div { padding: 14px 12px 12px; min-width: 0; }
+.debt-hero span { display: block; color: var(--ink-2); font-size: 13px; font-weight: 650; }
+.debt-hero b { display: block; margin: 6px 0 4px; font: 650 26px/1.1 var(--font-display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.debt-hero small { color: var(--ink-3); font-size: 12.5px; }
+.debt-alert {
+  grid-column: 1 / -1; margin: 0 8px 8px; display: flex; align-items: center; gap: 8px;
+  background: var(--warn-soft); color: var(--warn); border-radius: 14px; padding: 10px 12px; font-weight: 700; font-size: 14px;
+}
+.debt-alert svg { width: 18px; height: 18px; flex-shrink: 0; }
+.debt-seg { overflow: auto; scrollbar-width: none; }
+.debt-seg::-webkit-scrollbar { display: none; }
+.debt-seg button { white-space: nowrap; font-size: 13.5px; padding: 0 8px; }
+.debt-list { display: grid; gap: 10px; }
+.debt-swipe { position: relative; overflow: hidden; background: transparent; border-radius: 24px; box-shadow: var(--shadow); }
+.debt-actions { position: absolute; inset: 0 0 0 auto; width: 124px; display: flex; background: var(--bad); }
+.debt-actions button {
+  width: 100%; border: 0; background: transparent; color: white; font-weight: 750; font-size: 15px;
+}
+.debt-swipe-in {
+  position: relative; width: 100%; display: flex; align-items: flex-start; gap: 12px;
+  text-align: left; border: 0; background: var(--surface); color: inherit;
+  padding: 14px; min-height: 92px; border-radius: 24px;
+  transition: transform .32s var(--ease-spring);
+}
+.debt-body { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.debt-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.debt-top .t { font-weight: 750; font-size: 17px; min-width: 0; overflow-wrap: anywhere; }
+.debt-ava {
+  width: 46px; height: 46px; border-radius: 16px; flex-shrink: 0; display: grid; place-items: center;
+  font-weight: 750; color: white; background: hsl(var(--h, 220) 62% 46%);
+}
+.debt-ava.sm { width: 36px; height: 36px; border-radius: 12px; font-size: 14px; }
+.debt-body .m { color: var(--ink-2); font-size: 13.5px; }
+.debt-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.debt-paid { color: var(--ink-3); font-size: 12px; font-weight: 650; }
+.debt-left { font-weight: 750; font-variant-numeric: tabular-nums; font-size: 15px; text-align: right; flex-shrink: 0; white-space: nowrap; }
+html[data-tabs="float"] .toast { bottom: calc(92px + var(--sab)); }
+.debt-people .row { background: transparent; }
+.debt-pay-who { margin: 0; font-size: 16px; }
+.custom-swatch { overflow: hidden; display: grid; place-items: center; }
+.custom-swatch input { opacity: 0; width: 44px; height: 44px; border: 0; padding: 0; }
+
+.skel {
+  height: 14px; border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-2), color-mix(in srgb, var(--surface) 40%, var(--surface-2)), var(--surface-2));
+  background-size: 200% 100%; animation: skel 1.2s ease-in-out infinite;
+}
+@keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+html[data-haptics="off"] button:active { transform: none !important; }
+html[data-motion="off"] .dash-page > *,
+html[data-motion="off"] .view,
+html[data-motion="off"] .check.on,
+html[data-motion="off"] .debt-swipe-in,
+html[data-motion="off"] .skel { animation: none !important; transition: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-page > *, .view, .check.on, .sheet, .bar i, .debt-swipe-in, .skel {
+    animation: none !important; transition: none !important;
+  }
+}
+@media (max-width: 360px) {
+  .debt-hero b { font-size: 22px; }
+  .head h1 { font-size: 28px; }
+  html[data-tabs="float"] .tabbar button { font-size: 10px; }
+}
