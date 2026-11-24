@@ -132,6 +132,20 @@ test('finance period, safe-to-spend and section merge keep the records', () => {
   assert.deepEqual(merged.order, ['notes', 'bank']); assert.equal(merged.sections.notes, true);
   assert.equal(merged.prefs.financePeriod, 'month');
 });
+test('month agenda groups dates and expands a weekly repeat', () => {
+  const plans = [
+    { id: 'w', title: 'Планёрка', date: '2026-11-03', time: '09:00', repeat: 'week', priority: 'high', done: false },
+    { id: 'once', title: 'Сдача', date: '2026-11-12', time: '18:00', repeat: 'none', done: true },
+    { id: 'old', title: 'Со вторника', date: '2026-10-27', time: '08:00', repeat: 'week', done: false }
+  ];
+  const month = core.monthAgenda(plans, '2026-11');
+  assert.deepEqual(month.days.find((d) => d.date === '2026-11-03').items.map((i) => i.id), ['old', 'w']);
+  assert.deepEqual(month.days.filter((d) => d.items.some((i) => i.id === 'w')).map((d) => d.date), ['2026-11-03', '2026-11-10', '2026-11-17', '2026-11-24']);
+  const virt = month.days.find((d) => d.date === '2026-11-10').items.find((i) => i.id === 'w');
+  assert.equal(virt.virtual, true); assert.equal(virt.priority, 'high');
+  assert.equal(month.days.find((d) => d.date === '2026-11-12').items[0].done, true);
+  assert.equal(core.planOccurrences({ id: 'd', title: 'Каждый день', date: '2026-11-28', repeat: 'day', done: false }, '2026-11-01', '2026-11-30').map((i) => i.date).join(','), '2026-11-28,2026-11-29,2026-11-30');
+});
 test('search finds a plan by a subtask', () => {
   const s = state(); s.plans = [{ id: 'p', title: 'Склад', date: '2026-11-24', note: '', subtasks: [{ id: 's', title: 'перфоратор', done: false }] }];
   assert.equal(core.search(s, 'перфоратор')[0].id, 'p');

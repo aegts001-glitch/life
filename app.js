@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '2.2.0';
+const LIFE_VERSION = '2.3.0';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -459,11 +459,12 @@ function openSheet(title, html, mount, opts = {}) {
 function closeSheet() {
   if (!sheetOpen) return; sheetOpen = false;
   const scrim = $('#scrim'), sh = $('#sheet');
+  sh.classList.remove('dragging'); sh.style.willChange = 'auto';
   scrim.classList.remove('show'); sh.classList.remove('show'); sh.style.transform = '';
   document.documentElement.classList.remove('no-scroll');
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   const cb = sheetOnClose; sheetOnClose = null; sheetBack = null; if (cb) cb();
-  setTimeout(() => { if (!sheetOpen) { scrim.hidden = true; sh.hidden = true; $('#sheetBody').innerHTML = ''; } }, 330);
+  setTimeout(() => { if (!sheetOpen) { scrim.hidden = true; sh.hidden = true; $('#sheetBody').innerHTML = ''; } }, motionOn() ? 280 : 0);
 }
 /* Подтверждение внутри листа */
 const confirmBox = (btnText, question, yesText = 'Удалить') => `<button class="btn danger" type="button" data-act="ask-del">${btnText}</button><div class="confirm" id="delBox" hidden><p>${question}</p><div class="btn-row"><button type="button" class="btn sm" data-act="cancel-del">Отмена</button><button type="button" class="btn sm danger" id="delYes">${yesText}</button></div></div>`;
@@ -4418,24 +4419,34 @@ document.addEventListener('keydown', (e) => {
     else { v.style.transform = ''; v.style.opacity = ''; }
   });
 })();
-/* Потянуть лист вниз — закрыть, с инерцией */
+/* Потянуть лист вниз — закрыть. Только transform, без чтения вёрстки в движении. */
 (() => {
-  const sh = $('#sheet'); let y0 = null, dy = 0, dragging = false, lastY = 0, lastT = 0, vy = 0;
+  const sh = $('#sheet'); const scrim = $('#scrim');
+  let y0 = null, dy = 0, dragging = false, lastY = 0, lastT = 0, vy = 0, raf = 0, pending = 0;
+  const paint = () => { raf = 0; sh.style.transform = `translate3d(0,${pending}px,0)`; if (scrim) scrim.style.opacity = String(Math.max(0.15, 1 - pending / 420)); };
   sh.addEventListener('touchstart', (e) => {
     const inHead = !!e.target.closest('.sheet-head'); const body = $('#sheetBody');
-    if (!inHead && (body.scrollTop > 0 || e.target.closest('input, textarea, select, .chips, .emoji-row, .p-strip'))) { y0 = null; return; }
+    if (!inHead && (body.scrollTop > 0 || e.target.closest('input, textarea, select, .chips, .emoji-row, .p-strip, .p-grid'))) { y0 = null; return; }
     y0 = e.touches[0].clientY; dy = 0; dragging = false; lastY = y0; lastT = performance.now(); vy = 0;
   }, { passive: true });
   sh.addEventListener('touchmove', (e) => {
     if (y0 == null) return; const y = e.touches[0].clientY; const d = y - y0; const now = performance.now();
     vy = (y - lastY) / Math.max(1, now - lastT); lastY = y; lastT = now;
-    if (!dragging) { if (d > 8) { dragging = true; sh.style.transition = 'none'; } else if (d < -4) { y0 = null; return; } }
-    if (dragging) { dy = Math.max(0, d); const rubber = dy > 240 ? 240 + (dy - 240) * 0.35 : dy; sh.style.transform = `translate3d(0,${rubber}px,0)`; if (e.cancelable) e.preventDefault(); }
+    if (!dragging) { if (d > 8) { dragging = true; sh.classList.add('dragging'); sh.style.willChange = 'transform'; sh.style.transition = 'none'; } else if (d < -4) { y0 = null; return; } }
+    if (!dragging) return;
+    dy = Math.max(0, d); pending = dy > 220 ? 220 + (dy - 220) * 0.28 : dy;
+    if (!raf) raf = requestAnimationFrame(paint);
+    if (e.cancelable) e.preventDefault();
   }, { passive: false });
-  sh.addEventListener('touchend', () => {
-    if (y0 == null) return; y0 = null; sh.style.transition = motionOn() ? 'transform .42s cubic-bezier(.2,.9,.2,1)' : '';
-    if (dragging && (dy > 110 || vy > 0.7)) closeSheet(); else sh.style.transform = ''; dragging = false;
-  });
+  const end = () => {
+    if (y0 == null) return; y0 = null; cancelAnimationFrame(raf); raf = 0;
+    sh.style.willChange = 'auto'; sh.classList.remove('dragging'); if (scrim) scrim.style.opacity = '';
+    sh.style.transition = motionOn() ? 'transform .32s cubic-bezier(.2,.9,.2,1)' : 'none';
+    if (dragging && (dy > 96 || vy > 0.65)) closeSheet(); else sh.style.transform = '';
+    dragging = false;
+  };
+  sh.addEventListener('touchend', end, { passive: true });
+  sh.addEventListener('touchcancel', end, { passive: true });
 })();
 /* Просмотр фото */
 (() => {
@@ -5151,14 +5162,14 @@ function installMotion() {
 }
 const PLAN_SLOTS = [['morning', 'Утро'], ['day', 'День'], ['evening', 'Вечер'], ['night', 'Ночь'], ['none', 'Без времени']];
 function planFocusDay() { return ui.planFocus && /^\d{4}-\d{2}-\d{2}$/.test(ui.planFocus) ? ui.planFocus : todayISO(); }
-function planCard(p) {
+function planCard(p, virtual) {
   const subs = p.subtasks || [];
   const subDone = subs.filter((s) => s.done).length;
   const tags = (p.tags || []).slice(0, 3).map((t) => `<i>${esc(t)}</i>`).join('');
-  return `<article class="p-swipe ${p.done ? 'done' : ''} pri-${p.priority || 'mid'}" data-id="${esc(p.id)}">
-    <div class="p-actions"><button type="button" data-act="toggle-plan" data-id="${esc(p.id)}">Готово</button><button type="button" data-act="plan-del" data-id="${esc(p.id)}">Удалить</button></div>
+  return `<article class="p-swipe ${p.done && !virtual ? 'done' : ''} pri-${p.priority || 'mid'}" data-id="${esc(p.id)}">
+    <div class="p-actions">${virtual ? '' : `<button type="button" data-act="toggle-plan" data-id="${esc(p.id)}">Готово</button>`}<button type="button" data-act="plan-del" data-id="${esc(p.id)}">Удалить</button></div>
     <div class="p-card">
-      <button type="button" class="check ${p.done ? 'on' : ''}" data-act="toggle-plan" data-id="${esc(p.id)}" aria-label="${p.done ? 'Вернуть' : 'Выполнено'}">${p.done ? I.tick : ''}</button>
+      ${virtual ? `<span class="check repeat-mark" aria-hidden="true">${I.repeat}</span>` : `<button type="button" class="check ${p.done ? 'on' : ''}" data-act="toggle-plan" data-id="${esc(p.id)}" aria-label="${p.done ? 'Вернуть' : 'Выполнено'}">${p.done ? I.tick : ''}</button>`}
       <button type="button" class="p-open" data-act="edit-plan" data-id="${esc(p.id)}">
         <span class="t">${p.time ? `<em>${esc(p.time)}</em>` : ''}${esc(p.title)}</span>
         <span class="m"><i class="dot cat-${p.cat || 'life'}"></i>${p.priority === 'high' ? 'важное' : p.priority === 'low' ? 'когда-нибудь' : 'обычное'}${p.repeat && p.repeat !== 'none' ? ' · повтор' : ''}${subs.length ? ` · ${subDone}/${subs.length}` : ''}${p.note ? ' · ' + esc(p.note) : ''}</span>
@@ -5168,11 +5179,56 @@ function planCard(p) {
     </div>
   </article>`;
 }
+function monthPlanHTML(day, all) {
+  const key = ui.planMonthKey && /^\d{4}-\d{2}$/.test(ui.planMonthKey) ? ui.planMonthKey : day.slice(0, 7);
+  ui.planMonthKey = key;
+  const agenda = LifeCore.monthAgenda(all, key);
+  const byDate = {};
+  agenda.days.forEach((d) => { byDate[d.date] = d; });
+  const [y, m] = key.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const off = (first.getDay() + 6) % 7;
+  const count = new Date(y, m, 0).getDate();
+  let cells = '';
+  for (let i = 0; i < off; i++) cells += '<span class="p-cell is-empty"></span>';
+  for (let n = 1; n <= count; n++) {
+    const iso = key + '-' + pad(n);
+    const bucket = byDate[iso];
+    const dots = bucket ? bucket.items.slice(0, 3).map((it) => `<i class="pri-${it.priority || 'mid'}"></i>`).join('') : '';
+    cells += `<button type="button" class="p-cell ${iso === day ? 'on' : ''} ${iso === todayISO() ? 'today' : ''}" data-act="plan-focus" data-day="${iso}"><b>${n}</b><span class="p-dots">${dots}</span>${bucket ? `<em>${bucket.count}</em>` : ''}</button>`;
+  }
+  const selected = byDate[day] && day.slice(0, 7) === key ? byDate[day].items : [];
+  let html = `<section class="p-month" id="pMonth"><div class="month-nav"><button type="button" class="icon-btn" data-act="plan-month-shift" data-dir="-1" aria-label="Предыдущий месяц">${I.left}</button><b>${cap(MONTH_NOM[m - 1])} ${y}</b><button type="button" class="icon-btn" data-act="plan-month-shift" data-dir="1" aria-label="Следующий месяц">${I.right}</button></div><div class="p-wd">${['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'].map((w) => `<span>${w}</span>`).join('')}</div><div class="p-grid">${cells}</div></section>`;
+  html += `<div class="section-label"><span>${day.slice(0, 7) === key ? dayTitle(day) : 'Выберите день'}</span><button type="button" class="link" data-act="new-plan" data-date="${day.slice(0, 7) === key ? day : key + '-01'}">Добавить</button></div>`;
+  html += selected.length ? `<div class="p-time">${selected.map((o) => { const p = all.find((x) => x.id === o.id); return p ? planCard(p, o.virtual) : ''; }).join('')}</div>` : `<div class="card p-empty"><b>В этот день пусто</b><span>Удерживайте день или нажмите «Добавить».</span></div>`;
+  html += `<div class="section-label"><span>Весь месяц</span><span>${agenda.total}</span></div>`;
+  html += agenda.days.length ? agenda.days.map((bucket) => `<div class="day-head"><button type="button" class="link" data-act="plan-focus" data-day="${bucket.date}">${cap(fmtShort(toDate(bucket.date)))}</button></div><div class="list">${bucket.items.map((o) => `<button type="button" class="row" data-act="edit-plan" data-id="${esc(o.id)}"><span class="dot pri-${o.priority}"></span><span class="grow"><span class="t">${o.time ? esc(o.time) + ' ' : ''}${esc(o.title)}</span><span class="m">${o.virtual ? 'повтор' : o.done ? 'готово' : 'план'}</span></span></button>`).join('')}</div>`).join('') : `<div class="card p-empty"><b>В месяце нет планов</b><span>Повторы тоже появятся в свои дни.</span></div>`;
+  return html;
+}
+function weekPlanHTML(week, filter) {
+  let html = '';
+  week.forEach((iso) => {
+    let items = plansOn(iso);
+    if (filter === 'done') items = items.filter((o) => o.done);
+    else if (filter === 'high') items = items.filter((o) => o.plan.priority === 'high' && !o.done);
+    else if (filter !== 'all') items = items.filter((o) => !o.done);
+    if (!items.length) return;
+    html += `<div class="section-label"><span>${cap(fmtShort(toDate(iso)))}</span></div><div class="p-time">${items.map((o) => planCard(o.plan, o.virtual)).join('')}</div>`;
+  });
+  return html || `<div class="card p-empty"><b>Неделя свободна</b><span>Планы и повторы появятся по дням.</span></div>`;
+}
+function plansOn(iso) {
+  const items = [];
+  (S.plans || []).forEach((p) => LifeCore.planOccurrences(p, iso, iso).forEach((o) => items.push(Object.assign({ plan: p }, o))));
+  return items.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+}
 function renderPlanStudio() {
   const day = planFocusDay();
   const all = S.plans || [];
-  const dated = all.filter((p) => p.date === day);
-  const prog = LifeCore.planProgress(dated);
+  const scope = ui.planScope === 'week' || ui.planScope === 'month' ? ui.planScope : 'day';
+  const datedItems = plansOn(day);
+  const dated = datedItems.map((o) => o.plan).filter((p, i, arr) => arr.indexOf(p) === i);
+  const prog = LifeCore.planProgress(datedItems.map((o) => ({ done: o.done })));
   const filter = ui.planBoard || 'open';
   const mode = ui.planMode === 'time' ? 'time' : 'list';
   const fold = (prefs().planFold) || {};
@@ -5180,11 +5236,12 @@ function renderPlanStudio() {
   const anchor = toDate(day);
   const monday = addDays(anchor, -((anchor.getDay() + 6) % 7));
   for (let i = 0; i < 7; i++) week.push(isoOf(addDays(monday, i)));
-  const weekPlans = all.filter((p) => week.includes(p.date));
-  const weekProg = LifeCore.planProgress(weekPlans);
+  const weekItems = [];
+  week.forEach((iso) => plansOn(iso).forEach((o) => weekItems.push(o)));
+  const weekProg = LifeCore.planProgress(weekItems.map((o) => ({ done: o.done })));
   const around = [];
   for (let i = -10; i <= 10; i++) around.push(isoOf(addDays(anchor, i)));
-  const shown = dated.filter((p) => filter === 'all' ? true : filter === 'done' ? p.done : filter === 'high' ? p.priority === 'high' && !p.done : !p.done);
+  const shown = datedItems.filter((o) => filter === 'all' ? true : filter === 'done' ? o.done : filter === 'high' ? (o.plan.priority === 'high' && !o.done) : !o.done);
   const circ = 188.5;
   const dash = (circ * (1 - prog.ratio)).toFixed(1);
   let html = `<div class="dash-page p-page">`;
@@ -5192,20 +5249,24 @@ function renderPlanStudio() {
   const dayLine = prog.total ? `из ${prog.total} ${plural(prog.total, 'дело', 'дела', 'дел')}` : 'пока пусто';
   const weekLine = weekProg.total ? `На неделе ${weekProg.done} из ${weekProg.total}` : 'На этой неделе тихо';
   html += `<section class="p-hero"><svg class="p-ring" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="30" class="bg"/><circle cx="36" cy="36" r="30" class="fg" style="stroke-dasharray:${circ};stroke-dashoffset:${dash}"/></svg><div><span class="p-kicker">День</span><b class="p-num" data-count="${prog.done}">${prog.done}</b><span>${dayLine}</span><small>${weekLine}</small></div></section>`;
-  html += `<div class="p-strip" id="pStrip">${around.map((iso) => { const dt = toDate(iso); const n = all.filter((p) => p.date === iso && !p.done).length; return `<button type="button" class="p-day ${iso === day ? 'on' : ''} ${iso === todayISO() ? 'today' : ''}" data-act="plan-focus" data-day="${iso}"><small>${WD_SHORT[dt.getDay()]}</small><b>${dt.getDate()}</b>${n ? `<i>${n}</i>` : ''}</button>`; }).join('')}</div>`;
+  if (scope !== 'month') html += `<div class="p-strip" id="pStrip">${around.map((iso) => { const dt = toDate(iso); const n = plansOn(iso).filter((o) => !o.done).length; return `<button type="button" class="p-day ${iso === day ? 'on' : ''} ${iso === todayISO() ? 'today' : ''}" data-act="plan-focus" data-day="${iso}"><small>${WD_SHORT[dt.getDay()]}</small><b>${dt.getDate()}</b>${n ? `<i>${n}</i>` : ''}</button>`; }).join('')}</div>`;
+  html += `<div class="seg p-scope">${[['day', 'День'], ['week', 'Неделя'], ['month', 'Месяц']].map(([k, n]) => `<button type="button" data-act="plan-scope" data-scope="${k}" class="${scope === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  if (scope === 'month') html += monthPlanHTML(day, all);
+  else if (scope === 'week') html += weekPlanHTML(week, filter);
+  else {
   html += `<div class="p-tools"><div class="chips">${[['open', 'Открытые'], ['high', 'Важные'], ['all', 'Все'], ['done', 'Готово']].map(([k, n]) => `<button type="button" class="chip ${filter === k ? 'on' : ''}" data-act="plan-board" data-f="${k}">${n}</button>`).join('')}</div><div class="seg"><button type="button" data-act="plan-mode" data-mode="list" class="${mode === 'list' ? 'on' : ''}">Группы</button><button type="button" data-act="plan-mode" data-mode="time" class="${mode === 'time' ? 'on' : ''}">Лента</button></div></div>`;
-  if (!dated.length) html += `<div class="card p-empty"><span class="empty-orb">${I.plans}</span><b>Этот день свободен</b><span>Напишите внизу «завтра в 9 купить диски» — Life сам поймёт день и время.</span></div>`;
+  if (!datedItems.length) html += `<div class="card p-empty"><span class="empty-orb">${I.plans}</span><b>Этот день свободен</b><span>Напишите внизу «завтра в 9 купить диски» — Life сам поймёт день и время.</span></div>`;
   else if (!shown.length) html += `<div class="card p-empty"><span class="empty-orb">${I.tick}</span><b>${filter === 'done' ? 'Готовых дел нет' : 'Всё сделано'}</b><span>Фильтр можно сменить или добавить новый план.</span></div>`;
   else if (mode === 'time') {
-    const rows = shown.slice().sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99') || (a.order || 0) - (b.order || 0));
-    html += `<div class="p-time" data-slot="time">${rows.map(planCard).join('')}</div>`;
+    html += `<div class="p-time" data-slot="time">${shown.map((o) => planCard(o.plan, o.virtual)).join('')}</div>`;
   } else {
     PLAN_SLOTS.forEach(([slot, name]) => {
-      const rows = shown.filter((p) => LifeCore.planSlot(p.time) === slot).sort((a, b) => (a.time || '').localeCompare(b.time || '') || (a.order || 0) - (b.order || 0));
+      const rows = shown.filter((o) => LifeCore.planSlot(o.time) === slot);
       if (!rows.length) return;
       const closed = !!fold[slot];
-      html += `<section class="p-group ${closed ? 'shut' : ''}"><button type="button" class="p-group-h" data-act="plan-fold" data-slot="${slot}"><b>${name}</b><span>${rows.length}</span></button><div class="p-group-b" data-slot="${slot}" ${closed ? 'hidden' : ''}>${rows.map(planCard).join('')}</div></section>`;
+      html += `<section class="p-group ${closed ? 'shut' : ''}"><button type="button" class="p-group-h" data-act="plan-fold" data-slot="${slot}"><b>${name}</b><span>${rows.length}</span></button><div class="p-group-b" data-slot="${slot}" ${closed ? 'hidden' : ''}>${rows.map((o) => planCard(o.plan, o.virtual)).join('')}</div></section>`;
     });
+  }
   }
   const goals = all.filter((p) => !p.date && p.month === day.slice(0, 7));
   if (goals.length) html += `<div class="section-label"><span>Цели месяца</span></div><div class="list">${goals.map(planRow).join('')}</div>`;
@@ -5275,6 +5336,31 @@ function bindPlanBoard(root) {
       card.addEventListener('pointermove', move); card.addEventListener('pointerup', up);
     });
   });
+  const month = $('#pMonth', root);
+  if (month) {
+    let x0 = null, dx = 0, lock = null, hold = null, held = null;
+    month.addEventListener('touchstart', (e) => {
+      const cell = e.target.closest('.p-cell');
+      x0 = e.touches[0].clientX; dx = 0; lock = null;
+      if (cell && cell.dataset.day) { held = cell; hold = setTimeout(() => { held = null; planSheet(null, { date: cell.dataset.day }); }, 460); }
+    }, { passive: true });
+    month.addEventListener('touchmove', (e) => {
+      if (x0 == null) return;
+      dx = e.touches[0].clientX - x0;
+      if (Math.abs(dx) > 8) { clearTimeout(hold); hold = null; }
+      if (!lock) lock = Math.abs(dx) > 12 ? 'x' : 'y';
+      if (lock === 'x' && motionOn()) month.style.transform = `translate3d(${dx * 0.35}px,0,0)`;
+    }, { passive: true });
+    const endMonth = () => {
+      clearTimeout(hold); hold = null;
+      if (x0 == null) return; x0 = null; month.style.transform = '';
+      if (lock === 'x' && Math.abs(dx) > 48) {
+        const btn = document.createElement('button'); btn.dataset.dir = dx < 0 ? '1' : '-1'; ACT['plan-month-shift'](btn);
+      }
+    };
+    month.addEventListener('touchend', endMonth, { passive: true });
+    month.addEventListener('touchcancel', endMonth, { passive: true });
+  }
   const form = $('#planQuick', root);
   if (form) form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -5292,10 +5378,26 @@ ACT['plan-fold'] = (el) => {
 };
 ACT['plan-board'] = (el) => { ui.planBoard = el.dataset.f; render(); };
 ACT['plan-mode'] = (el) => { ui.planMode = el.dataset.mode; render(); };
+ACT['plan-scope'] = (el) => { ui.planScope = el.dataset.scope; if (el.dataset.scope === 'month') ui.planMonthKey = planFocusDay().slice(0, 7); render(motionOn() ? 'anim-fade' : ''); };
+ACT['plan-month-shift'] = (el) => {
+  const key = ui.planMonthKey || planFocusDay().slice(0, 7);
+  const [y, m] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1 + Number(el.dataset.dir), 1);
+  ui.planMonthKey = dt.getFullYear() + '-' + pad(dt.getMonth() + 1);
+  const want = Math.min(Number(planFocusDay().slice(8, 10)) || 1, new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate());
+  ui.planFocus = ui.planMonthKey + '-' + pad(want);
+  ui.planScope = 'month';
+  render(motionOn() ? 'anim-fade' : '');
+};
 ACT['plan-del'] = (el) => {
   const p = S.plans.find((x) => x.id === el.dataset.id); if (!p) return;
   const i = S.plans.indexOf(p);
-  removeWithUndo('План удалён', () => { S.plans.splice(i, 1); }, () => { S.plans.splice(i, 0, p); });
+  const row = el.closest('.p-swipe');
+  const drop = () => removeWithUndo('План удалён', () => { S.plans.splice(i, 1); }, () => { S.plans.splice(i, 0, p); });
+  if (!row || !motionOn()) { drop(); return; }
+  row.style.willChange = 'transform, opacity';
+  const anim = row.animate([{ transform: 'none', opacity: 1 }, { transform: 'translate3d(28px,0,0)', opacity: 0 }], { duration: 160, easing: 'ease-out' });
+  anim.onfinish = () => { row.style.willChange = 'auto'; drop(); };
 };
 
 /* Fixed compact plans. */
