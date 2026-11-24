@@ -338,5 +338,43 @@
     if (st.prefs.financePeriod !== 'week' && st.prefs.financePeriod !== 'custom') st.prefs.financePeriod = 'month';
     return st;
   }
-  return { validateState, createStore, nextRepeat, agenda, search, mediaRefs, remapMedia, migrateState, debtLeft, debtOpen, debtSummary, debtPeople, applyPayment, currencySymbol, shiftISO, parsePlanText, planSlot, planProgress, migratePlan, migratePlans, planNextDate, advancePlan, periodBounds, financeSnapshot, mergeFinanceSettings };
+  function planOccurrences(plan, rangeStart, rangeEnd) {
+    if (!plan || typeof plan.date !== 'string' || plan.date.length < 10) return [];
+    const repeat = plan.repeat && plan.repeat !== 'none' && !plan.done;
+    const out = [];
+    const add = (date) => {
+      if (date >= rangeStart && date <= rangeEnd) out.push({ id: plan.id, date, virtual: date !== plan.date, title: plan.title || '', time: plan.time || '', priority: plan.priority || 'mid', done: !!(plan.done && date === plan.date) });
+    };
+    if (!repeat) { add(plan.date); return out; }
+    let cursor = plan.date; let guard = 0;
+    while (cursor < rangeStart && guard++ < 400) {
+      const next = planNextDate(plan, cursor);
+      if (!next || next <= cursor) return out;
+      cursor = next;
+    }
+    while (cursor <= rangeEnd && guard++ < 500) {
+      add(cursor);
+      const next = planNextDate(plan, cursor);
+      if (!next || next <= cursor) break;
+      cursor = next;
+    }
+    return out;
+  }
+  function monthAgenda(plans, monthKey) {
+    if (!/^\d{4}-\d{2}$/.test(monthKey || '')) throw new Error('Нужен месяц');
+    const start = monthKey + '-01';
+    const [y, m] = monthKey.split('-').map(Number);
+    const end = monthKey + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0');
+    const grouped = {};
+    (plans || []).forEach((plan) => {
+      planOccurrences(plan, start, end).forEach((item) => { (grouped[item.date] = grouped[item.date] || []).push(item); });
+    });
+    const days = Object.keys(grouped).sort().map((date) => ({
+      date,
+      count: grouped[date].length,
+      items: grouped[date].sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99') || a.title.localeCompare(b.title, 'ru'))
+    }));
+    return { start, end, days, total: days.reduce((n, day) => n + day.count, 0) };
+  }
+  return { validateState, createStore, nextRepeat, agenda, search, mediaRefs, remapMedia, migrateState, debtLeft, debtOpen, debtSummary, debtPeople, applyPayment, currencySymbol, shiftISO, parsePlanText, planSlot, planProgress, migratePlan, migratePlans, planNextDate, advancePlan, periodBounds, financeSnapshot, mergeFinanceSettings, planOccurrences, monthAgenda };
 });
