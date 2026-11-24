@@ -171,6 +171,8 @@ html[data-tabs="dock"] .p-quick { bottom: calc(var(--tabbar) + var(--sab) + 8px)
 .fin-segs button.on { background: var(--surface); color: var(--ink); }
 .chips, .p-strip, .seg { background-clip: padding-box; }
 .p-quick { overflow: hidden; border-radius: 18px; }
+.sheet { overflow: hidden; }
+.sheet.dragging, html[data-visual] .sheet.dragging { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none !important; transition: none !important; will-change: transform; }
 .fin-flow { display: flex; align-items: flex-end; gap: 14px; height: 112px; }
 .fin-flow span { flex: 1; max-width: 84px; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 4px; position: relative; padding-bottom: 18px; }
 .fin-flow i { display: block; width: 16px; height: calc(100% - 18px); border-radius: 6px 6px 3px 3px; transform-origin: bottom; }

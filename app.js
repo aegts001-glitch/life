@@ -459,11 +459,12 @@ function openSheet(title, html, mount, opts = {}) {
 function closeSheet() {
   if (!sheetOpen) return; sheetOpen = false;
   const scrim = $('#scrim'), sh = $('#sheet');
+  sh.classList.remove('dragging'); sh.style.willChange = 'auto';
   scrim.classList.remove('show'); sh.classList.remove('show'); sh.style.transform = '';
   document.documentElement.classList.remove('no-scroll');
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   const cb = sheetOnClose; sheetOnClose = null; sheetBack = null; if (cb) cb();
-  setTimeout(() => { if (!sheetOpen) { scrim.hidden = true; sh.hidden = true; $('#sheetBody').innerHTML = ''; } }, 330);
+  setTimeout(() => { if (!sheetOpen) { scrim.hidden = true; sh.hidden = true; $('#sheetBody').innerHTML = ''; } }, motionOn() ? 280 : 0);
 }
 /* Подтверждение внутри листа */
 const confirmBox = (btnText, question, yesText = 'Удалить') => `<button class="btn danger" type="button" data-act="ask-del">${btnText}</button><div class="confirm" id="delBox" hidden><p>${question}</p><div class="btn-row"><button type="button" class="btn sm" data-act="cancel-del">Отмена</button><button type="button" class="btn sm danger" id="delYes">${yesText}</button></div></div>`;
@@ -4418,24 +4419,34 @@ document.addEventListener('keydown', (e) => {
     else { v.style.transform = ''; v.style.opacity = ''; }
   });
 })();
-/* Потянуть лист вниз — закрыть, с инерцией */
+/* Потянуть лист вниз — закрыть. Только transform, без чтения вёрстки в движении. */
 (() => {
-  const sh = $('#sheet'); let y0 = null, dy = 0, dragging = false, lastY = 0, lastT = 0, vy = 0;
+  const sh = $('#sheet'); const scrim = $('#scrim');
+  let y0 = null, dy = 0, dragging = false, lastY = 0, lastT = 0, vy = 0, raf = 0, pending = 0;
+  const paint = () => { raf = 0; sh.style.transform = `translate3d(0,${pending}px,0)`; if (scrim) scrim.style.opacity = String(Math.max(0.15, 1 - pending / 420)); };
   sh.addEventListener('touchstart', (e) => {
     const inHead = !!e.target.closest('.sheet-head'); const body = $('#sheetBody');
-    if (!inHead && (body.scrollTop > 0 || e.target.closest('input, textarea, select, .chips, .emoji-row, .p-strip'))) { y0 = null; return; }
+    if (!inHead && (body.scrollTop > 0 || e.target.closest('input, textarea, select, .chips, .emoji-row, .p-strip, .p-grid'))) { y0 = null; return; }
     y0 = e.touches[0].clientY; dy = 0; dragging = false; lastY = y0; lastT = performance.now(); vy = 0;
   }, { passive: true });
   sh.addEventListener('touchmove', (e) => {
     if (y0 == null) return; const y = e.touches[0].clientY; const d = y - y0; const now = performance.now();
     vy = (y - lastY) / Math.max(1, now - lastT); lastY = y; lastT = now;
-    if (!dragging) { if (d > 8) { dragging = true; sh.style.transition = 'none'; } else if (d < -4) { y0 = null; return; } }
-    if (dragging) { dy = Math.max(0, d); const rubber = dy > 240 ? 240 + (dy - 240) * 0.35 : dy; sh.style.transform = `translate3d(0,${rubber}px,0)`; if (e.cancelable) e.preventDefault(); }
+    if (!dragging) { if (d > 8) { dragging = true; sh.classList.add('dragging'); sh.style.willChange = 'transform'; sh.style.transition = 'none'; } else if (d < -4) { y0 = null; return; } }
+    if (!dragging) return;
+    dy = Math.max(0, d); pending = dy > 220 ? 220 + (dy - 220) * 0.28 : dy;
+    if (!raf) raf = requestAnimationFrame(paint);
+    if (e.cancelable) e.preventDefault();
   }, { passive: false });
-  sh.addEventListener('touchend', () => {
-    if (y0 == null) return; y0 = null; sh.style.transition = motionOn() ? 'transform .42s cubic-bezier(.2,.9,.2,1)' : '';
-    if (dragging && (dy > 110 || vy > 0.7)) closeSheet(); else sh.style.transform = ''; dragging = false;
-  });
+  const end = () => {
+    if (y0 == null) return; y0 = null; cancelAnimationFrame(raf); raf = 0;
+    sh.style.willChange = 'auto'; sh.classList.remove('dragging'); if (scrim) scrim.style.opacity = '';
+    sh.style.transition = motionOn() ? 'transform .32s cubic-bezier(.2,.9,.2,1)' : 'none';
+    if (dragging && (dy > 96 || vy > 0.65)) closeSheet(); else sh.style.transform = '';
+    dragging = false;
+  };
+  sh.addEventListener('touchend', end, { passive: true });
+  sh.addEventListener('touchcancel', end, { passive: true });
 })();
 /* Просмотр фото */
 (() => {
