@@ -113,6 +113,25 @@ test('repeating plan keeps a finished copy and moves the next date', () => {
   const once = core.advancePlan({ id: 'q', title: 'Разовое', date: '2026-11-24', done: false });
   assert.equal(once.repeated, false); assert.equal(once.plan.done, true); assert.equal(once.archive, null);
 });
+test('finance period, safe-to-spend and section merge keep the records', () => {
+  assert.deepEqual(core.periodBounds('week', '2026-11-24'), { start: '2026-11-23', end: '2026-11-29', mode: 'week' });
+  assert.equal(core.periodBounds('month', '2026-11-24').start, '2026-11-01');
+  assert.equal(core.periodBounds('custom', '2026-11-24', { start: '2026-11-20', end: '2026-11-10' }).start, '2026-11-10');
+  const range = { start: '2026-11-01', end: '2026-11-30' };
+  const snap = core.financeSnapshot({
+    incomes: [{ id: 'i', amount: 1000, date: '2026-11-02' }],
+    expenses: [{ id: 'e', amount: 200, date: '2026-11-10', rec: 'net' }],
+    recurring: [{ id: 'net', kind: 'exp', amount: 200, start: '2026-11-10', freq: 'month', last: '2026-11-10', name: 'Интернет' }, { id: 'rent', kind: 'exp', amount: 300, start: '2026-11-20', freq: 'month', name: 'Квартира' }],
+    debts: [{ id: 'old', direction: 'out', amount: 100, due: '2026-10-01', payments: [] }, { id: 'now', direction: 'out', amount: 50, due: '2026-11-18', payments: [] }, { id: 'mine', direction: 'in', amount: 80, due: '2026-11-18', payments: [] }]
+  }, range);
+  assert.equal(snap.income, 1000); assert.equal(snap.spent, 200); assert.equal(snap.balance, 800);
+  assert.equal(snap.mandatorySum, 300); assert.equal(snap.debtDue, 150); assert.equal(snap.safe, 350);
+  assert.equal(snap.timeline.some((x) => x.id === 'net'), false);
+  const merged = core.mergeFinanceSettings({ sections: { bank: false, debts: true, notes: true }, order: ['debts', 'notes', 'bank'], prefs: {} });
+  assert.equal(merged.sections.bank, true); assert.equal(merged.sections.debts, true);
+  assert.deepEqual(merged.order, ['notes', 'bank']); assert.equal(merged.sections.notes, true);
+  assert.equal(merged.prefs.financePeriod, 'month');
+});
 test('search finds a plan by a subtask', () => {
   const s = state(); s.plans = [{ id: 'p', title: 'Склад', date: '2026-11-24', note: '', subtasks: [{ id: 's', title: 'перфоратор', done: false }] }];
   assert.equal(core.search(s, 'перфоратор')[0].id, 'p');

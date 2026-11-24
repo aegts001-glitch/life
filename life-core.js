@@ -263,5 +263,80 @@
     next.done = !next.done;
     return { plan: next, repeated: false, archive: null };
   }
-  return { validateState, createStore, nextRepeat, agenda, search, mediaRefs, remapMedia, migrateState, debtLeft, debtOpen, debtSummary, debtPeople, applyPayment, currencySymbol, shiftISO, parsePlanText, planSlot, planProgress, migratePlan, migratePlans, planNextDate, advancePlan };
+  function isoFromDate(dt) {
+    const p = (n) => String(n).padStart(2, '0');
+    return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate());
+  }
+  function periodBounds(mode, today, custom) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(today || '')) throw new Error('Нужна дата');
+    if (mode === 'custom' && custom && /^\d{4}-\d{2}-\d{2}$/.test(custom.start || '') && /^\d{4}-\d{2}-\d{2}$/.test(custom.end || '')) {
+      const start = custom.start <= custom.end ? custom.start : custom.end;
+      const end = custom.start <= custom.end ? custom.end : custom.start;
+      return { start, end, mode: 'custom' };
+    }
+    const [y, m, d] = today.split('-').map(Number);
+    if (mode === 'week') {
+      const dt = new Date(y, m - 1, d);
+      const start = new Date(y, m - 1, d - ((dt.getDay() + 6) % 7));
+      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+      return { start: isoFromDate(start), end: isoFromDate(end), mode: 'week' };
+    }
+    const last = new Date(y, m, 0).getDate();
+    const p = (n) => String(n).padStart(2, '0');
+    return { start: y + '-' + p(m) + '-01', end: y + '-' + p(m) + '-' + p(last), mode: 'month' };
+  }
+  function occurrence(start, freq, k) {
+    if (freq === 'week') return shiftISO(start, 7 * k);
+    const [y, m, d] = start.split('-').map(Number);
+    const months = freq === 'year' ? 12 * k : k;
+    const dt = new Date(y, m - 1 + months, 1);
+    dt.setDate(Math.min(d, new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate()));
+    return isoFromDate(dt);
+  }
+  function financeSnapshot(s, range) {
+    const expenses = (s.expenses || []).filter((x) => x.date >= range.start && x.date <= range.end);
+    const incomes = (s.incomes || []).filter((x) => x.date >= range.start && x.date <= range.end);
+    const sum = (list) => round2(list.reduce((a, x) => a + (Number(x.amount) || 0), 0));
+    const spent = sum(expenses), income = sum(incomes), balance = round2(income - spent);
+    const bills = [];
+    (s.recurring || []).forEach((r) => {
+      if (!r || r.kind === 'inc' || !r.start || !(Number(r.amount) > 0)) return;
+      for (let k = 0; k < 240; k++) {
+        const date = occurrence(r.start, r.freq || 'month', k);
+        if (date > range.end) break;
+        if (date < range.start) continue;
+        if (r.last && date <= r.last) continue;
+        if ((s.expenses || []).some((e) => e.rec === r.id && e.date === date)) continue;
+        bills.push({ id: r.id, name: r.name || 'Платёж', amount: round2(r.amount), date, kind: 'bill' });
+      }
+    });
+    const debtItems = (s.debts || []).filter((d) => debtOpen(d) && d.direction === 'out' && d.due && d.due <= range.end);
+    const debtDue = round2(debtItems.reduce((a, d) => a + debtLeft(d), 0));
+    const mandatorySum = round2(bills.reduce((a, x) => a + x.amount, 0));
+    const cats = {};
+    expenses.forEach((x) => { cats[x.cat || 'other'] = (cats[x.cat || 'other'] || 0) + (Number(x.amount) || 0); });
+    const categories = Object.entries(cats).map(([cat, amount]) => ({ cat, amount: round2(amount) })).sort((a, b) => b.amount - a.amount);
+    const flow = [];
+    for (let iso = range.start, guard = 0; iso <= range.end && guard < 42; iso = shiftISO(iso, 1), guard++) {
+      flow.push({
+        date: iso,
+        income: sum(incomes.filter((x) => x.date === iso)),
+        spent: sum(expenses.filter((x) => x.date === iso))
+      });
+    }
+    const timeline = bills.concat(debtItems.map((d) => ({ id: d.id, name: d.person || 'Долг', amount: debtLeft(d), date: d.due < range.start ? range.start : d.due, kind: 'debt', overdue: d.due < range.start })))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, 'ru'));
+    return { income, spent, balance, mandatorySum, debtDue, safe: round2(income - spent - mandatorySum - debtDue), categories, flow, timeline };
+  }
+  function mergeFinanceSettings(settings) {
+    const st = JSON.parse(JSON.stringify(settings || {}));
+    st.sections = Object.assign({}, st.sections);
+    if (st.sections.debts && st.sections.bank === false) st.sections.bank = true;
+    st.sections.debts = !!st.sections.bank;
+    if (Array.isArray(st.order)) st.order = st.order.filter((id) => id !== 'debts');
+    st.prefs = Object.assign({ financePeriod: 'month' }, st.prefs);
+    if (st.prefs.financePeriod !== 'week' && st.prefs.financePeriod !== 'custom') st.prefs.financePeriod = 'month';
+    return st;
+  }
+  return { validateState, createStore, nextRepeat, agenda, search, mediaRefs, remapMedia, migrateState, debtLeft, debtOpen, debtSummary, debtPeople, applyPayment, currencySymbol, shiftISO, parsePlanText, planSlot, planProgress, migratePlan, migratePlans, planNextDate, advancePlan, periodBounds, financeSnapshot, mergeFinanceSettings };
 });

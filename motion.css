@@ -140,6 +140,44 @@ button, .p-card, .note-card { position: relative; }
 .p-quick input { flex: 1; min-width: 0; }
 html[data-tabs="dock"] .p-quick { bottom: calc(var(--tabbar) + var(--sab) + 8px); }
 
+.fin-hero { display: grid; gap: 8px; padding: 4px 2px 0; }
+.fin-balance { font: 650 40px/1 var(--font-display); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.fin-split { display: flex; gap: 16px; color: var(--ink-2); font-size: 14px; }
+.fin-split b { display: block; font-size: 16px; }
+.fin-safe { display: grid; gap: 2px; background: var(--surface); border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow); }
+.fin-safe span { color: var(--ink-2); font-size: 13px; font-weight: 700; }
+.fin-safe b { font: 650 22px/1.1 var(--font-display); }
+.fin-safe small { color: var(--ink-3); font-size: 12px; }
+.fin-segs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; position: sticky; top: calc(var(--sat) + 36px); z-index: 4; padding: 6px 0; background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.fin-segs button { min-height: 40px; border: 0; border-radius: 999px; padding: 0 2px; background: var(--surface); font-weight: 750; font-size: 13px; }
+.fin-segs button.on { background: var(--accent); color: var(--on-accent); }
+.fin-flow { display: flex; align-items: flex-end; gap: 14px; height: 112px; }
+.fin-flow span { flex: 1; max-width: 84px; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 4px; position: relative; padding-bottom: 18px; }
+.fin-flow i { display: block; width: 16px; height: calc(100% - 18px); border-radius: 6px 6px 3px 3px; transform-origin: bottom; }
+.fin-flow small { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 11px; color: var(--ink-3); }
+.fin-flow i.in { background: var(--ok); }
+.fin-flow i.out { background: var(--bad); }
+.fin-owe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fin-owe button { border: 0; text-align: left; background: var(--surface); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); display: grid; gap: 4px; }
+.fin-owe span { color: var(--ink-2); font-size: 13px; font-weight: 700; }
+.fin-owe b { font: 650 20px/1.1 var(--font-display); }
+.fin-time { display: grid; gap: 8px; }
+.fin-when { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; text-align: left; min-height: 52px; padding: 4px 0; }
+.fin-when .grow { flex: 1; min-width: 0; display: grid; }
+.fin-when small { color: var(--ink-2); }
+.fin-when em { font-style: normal; font-weight: 750; color: var(--warn); }
+.fin-dot-debt { background: var(--warn); }
+.fin-dot-bill { background: var(--bad); }
+.fin-piggy { width: 100%; border: 0; text-align: left; display: flex; align-items: center; gap: 10px; }
+.fin-piggy .grow { flex: 1; display: grid; }
+.fin-piggy small { color: var(--ink-2); }
+.fin-ic-out { background: var(--bad-soft); color: var(--bad); }
+.fin-ic-in { background: var(--ok-soft); color: var(--ok); }
+.fin-ic-bill { background: var(--bad-soft); color: var(--bad); }
+.fin-ic-debt { background: var(--warn-soft); color: var(--warn); }
+.amount-minus { color: var(--bad); }
+.amount-plus { color: var(--ok); }
+
 html[data-motion="off"] .view,
 html[data-motion="off"] .p-page > *,
 html[data-motion="off"] .dash-page > *,

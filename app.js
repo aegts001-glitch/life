@@ -57,7 +57,7 @@ const nf2 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
 const PREF_DEFAULT = {
   currency: 'RUB', dateStyle: 'long', moneyDecimals: 0,
   homeLayout: 'widgets', fontScale: 'regular', tabStyle: 'float',
-  showSaveChip: true, todayBlocks: ['overdue', 'timed', 'untimed'],
+  showSaveChip: true, todayBlocks: ['overdue', 'timed', 'untimed'], financePeriod: 'month',
   remindLead: 0, debtRemind: true, debtLeadDays: 0, inAppToast: true, haptics: true
 };
 function prefs() {
@@ -152,13 +152,12 @@ const SECTION_DEFS = {
   notes: { name: 'Заметки', icon: 'notes', desc: 'Работа, учёба, жизнь, фото' },
   reminders: { name: 'Напоминания', tab: 'Сигнал', icon: 'bell', desc: 'С сигналом в Календаре iPhone' },
   plans: { name: 'Планы', icon: 'plans', desc: 'Месяц в пузырях дней' },
-  bank: { name: 'Деньги', icon: 'bank', desc: 'Расходы, доходы, платежи, копилка' },
+  bank: { name: 'Финансы', tab: 'Финансы', icon: 'bank', desc: 'Доходы, расходы, платежи и долги' },
   car: { name: 'Авто', icon: 'car', desc: 'Регламент, заправки, история' },
   objects: { name: 'Объекты', icon: 'building', desc: 'Замечания, обходы, подрядчики' },
   food: { name: 'Питание', icon: 'food', desc: 'Еда, калории и БЖУ, вода, вес' },
   sport: { name: 'Тренировки', icon: 'dumbbell', desc: 'Турник, бег, бокс, зал, рекорды' },
-  diary: { name: 'Дневник', icon: 'book', desc: 'Книжка: текст, фото, видео, рисунки' },
-  debts: { name: 'Долги', icon: 'debt', desc: 'Кто должен мне и кому должен я' }
+  diary: { name: 'Дневник', icon: 'book', desc: 'Книжка: текст, фото, видео, рисунки' }
 };
 const FEATURE_DEFS = {
   income: { sec: 'bank', name: 'Доходы' }, recurring: { sec: 'bank', name: 'Регулярные платежи' }, piggy: { sec: 'bank', name: 'Копилка' },
@@ -170,7 +169,7 @@ const WIDGETS = {
   food: { name: 'Питание сегодня', sec: 'food' }, sport: { name: 'Тренировки', sec: 'sport' }, reminders: { name: 'Ближайшие напоминания', sec: 'reminders' }, plans: { name: 'Планы на сегодня', sec: 'plans' },
   expenses: { name: 'Деньги за месяц', sec: 'bank' }, objects: { name: 'Объекты: сроки', sec: 'objects' }, car: { name: 'Машина', sec: 'car' },
   bank: { name: 'Копилка', sec: 'bank', feat: 'piggy' }, notes: { name: 'Последние заметки', sec: 'notes' },
-  debts: { name: 'Долги', sec: 'debts' }
+  debts: { name: 'Долги', sec: 'bank' }
 };
 const QUICK_DEFS = {
   'new-note': { name: 'Заметка', icon: 'notes', sec: 'notes' }, 'new-rem': { name: 'Напомнить', icon: 'bell', sec: 'reminders' },
@@ -180,7 +179,7 @@ const QUICK_DEFS = {
   'quick-deposit': { name: 'В копилку', icon: 'bank', sec: 'bank', feat: 'piggy' },
   'add-food': { name: 'Еда', icon: 'food', sec: 'food' }, 'start-workout': { name: 'Тренировка', icon: 'dumbbell', sec: 'sport' },
   'add-weight': { name: 'Вес', icon: 'scale', sec: 'food' }, 'd-new': { name: 'Запись', icon: 'book', sec: 'diary' },
-  'new-debt': { name: 'Долг', icon: 'debt', sec: 'debts' }
+  'new-debt': { name: 'Долг', icon: 'debt', sec: 'bank' }
 };
 
 /* ================= Данные ================= */
@@ -199,7 +198,7 @@ function seed() {
     settings: {
       name: '', theme: 'auto', accent: 'blue', wallpaper: 'dots', icon: 'light', budget: null,
       sections: { notes: true, reminders: true, plans: true, bank: true, car: true, objects: false, food: true, sport: true, diary: false, debts: true },
-      order: ['plans', 'food', 'bank', 'debts', 'sport', 'notes', 'car', 'reminders', 'objects'],
+      order: ['plans', 'food', 'bank', 'sport', 'notes', 'car', 'reminders', 'objects'],
       features: { income: true, recurring: true, piggy: true, fuel: true, photos: true },
       prefs: Object.assign({}, PREF_DEFAULT),
       quick: ['add-food', 'start-workout', 'new-exp', 'new-plan', 'new-note'],
@@ -223,6 +222,8 @@ function normalize(s) {
   const st = s.settings = Object.assign({}, d.settings, s.settings || {});
   st.sections = Object.assign({}, d.settings.sections, st.sections || {});
   st.sections.diary = false;
+  if (st.sections.debts && st.sections.bank === false) st.sections.bank = true;
+  st.sections.debts = !!st.sections.bank;
   st.features = Object.assign({}, d.settings.features, st.features || {});
   st.prefs = Object.assign({}, PREF_DEFAULT, st.prefs || {});
   if (!Array.isArray(st.prefs.todayBlocks)) st.prefs.todayBlocks = PREF_DEFAULT.todayBlocks.slice();
@@ -522,6 +523,7 @@ function render(anim) {
   if (typeof lifeFrame === 'function') requestAnimationFrame(lifeFrame);
 }
 function go(tab) {
+  if (tab === 'debts') { ui.finSeg = 'debts'; tab = 'bank'; }
   if (tab !== 'home' && !sec(tab)) tab = 'home';
   if (sheetOpen) closeSheet();
   if (tab !== 'home') ui.homeEdit = false;
@@ -2232,7 +2234,13 @@ function opSheet(id, kind) {
     setTimeout(() => $('#oAmount', body).focus(), 320);
   });
 }
-ACT.money = (el) => { ui.money = el.dataset.sec; if (ui.tab !== 'bank' || ui.stack.length) go('bank'); else render(); };
+ACT.money = (el) => {
+  const map = { exp: 'ops', inc: 'ops', rec: 'bills', bank: 'home' };
+  ui.finSeg = map[el.dataset.sec] || ui.finSeg || 'home';
+  if (el.dataset.sec === 'inc') ui.finOps = 'in';
+  if (el.dataset.sec === 'exp') ui.finOps = 'out';
+  if (ui.tab !== 'bank' || ui.stack.length) go('bank'); else render();
+};
 ACT['new-exp'] = () => entrySheet('exp');
 ACT['edit-exp'] = (el) => entrySheet('exp', el.dataset.id);
 ACT['new-inc'] = () => entrySheet('inc');
@@ -4354,8 +4362,10 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('change', (e) => {
   const t = e.target;
-  if (t.matches('[data-sec-toggle]')) {
-    S.settings.sections[t.dataset.secToggle] = t.checked; save(); render();
+    if (t.matches('[data-sec-toggle]')) {
+    S.settings.sections[t.dataset.secToggle] = t.checked;
+    if (t.dataset.secToggle === 'bank') S.settings.sections.debts = t.checked;
+    save(); render();
     toast(t.checked ? `Раздел «${SECTION_DEFS[t.dataset.secToggle].name}» включён` : `Раздел «${SECTION_DEFS[t.dataset.secToggle].name}» скрыт. Данные сохранены.`); return;
   }
   if (t.matches('[data-feat-toggle]')) { S.settings.features[t.dataset.featToggle] = t.checked; save(); render(); return; }
@@ -4459,7 +4469,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 window.addEventListener('pagehide', save);
-window.addEventListener('hashchange', () => { const t = location.hash.slice(1); if (t && t !== ui.tab && (t === 'home' || SECTION_DEFS[t])) go(t); });
+window.addEventListener('hashchange', () => { let t = location.hash.slice(1); if (t === 'debts') { ui.finSeg = 'debts'; t = 'bank'; } if (t && t !== ui.tab && (t === 'home' || SECTION_DEFS[t])) go(t); });
 
 /* ================= Life 1.7: сегодня, поиск, сохранение ================= */
 function safeLocal(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
@@ -4773,7 +4783,7 @@ function applyPrefs() {
   document.body.classList.toggle('layout-focus', p.homeLayout === 'focus');
 }
 function checkDebtReminders() {
-  if (prefs().debtRemind === false || !sec('debts')) return false;
+  if (prefs().debtRemind === false || !sec('bank')) return false;
   const today = todayISO();
   const lead = Math.max(0, Number(prefs().debtLeadDays) || 0);
   const msgs = [];
@@ -4831,7 +4841,7 @@ function debtCard(d) {
     </button>
   </article>`;
 }
-RENDER.debts = function () {
+function debtBoard() {
   const list = S.debts || [];
   const sum = LifeCore.debtSummary(list, todayISO());
   const filter = ui.debtFilter || 'open';
@@ -4843,17 +4853,16 @@ RENDER.debts = function () {
     return LifeCore.debtOpen(d);
   });
   shown = shown.slice().sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.person || '').localeCompare(b.person || '', 'ru'));
-  let html = `<div class="dash-page dash-debts">${head('Долги', 'Кто кому и сколько осталось', plusBtn('new-debt', 'Новый долг'))}`;
-  html += `<section class="debt-hero"><div><span>Мне должны</span><b class="amount-plus">${money(sum.inSum)}</b><small>${sum.inCount} ${plural(sum.inCount, 'долг', 'долга', 'долгов')}</small></div><div><span>Я должен</span><b class="amount-minus">${money(sum.outSum)}</b><small>${sum.outCount} ${plural(sum.outCount, 'долг', 'долга', 'долгов')}</small></div>${sum.overdue ? `<p class="debt-alert">${I.bell}${sum.overdue} ${plural(sum.overdue, 'срок прошёл', 'срока прошли', 'сроков прошло')}</p>` : ''}</section>`;
+  let html = `<section class="debt-hero"><div><span>Мне должны</span><b class="amount-plus">${money(sum.inSum)}</b><small>${sum.inCount} ${plural(sum.inCount, 'долг', 'долга', 'долгов')}</small></div><div><span>Я должен</span><b class="amount-minus">${money(sum.outSum)}</b><small>${sum.outCount} ${plural(sum.outCount, 'долг', 'долга', 'долгов')}</small></div>${sum.overdue ? `<p class="debt-alert">${I.bell}${sum.overdue} ${plural(sum.overdue, 'срок прошёл', 'срока прошли', 'сроков прошло')}</p>` : ''}</section>`;
   html += `<div class="seg debt-seg">${[['open', 'Открытые'], ['in', 'Мне'], ['out', 'Я должен'], ['done', 'Закрытые']].map(([k, v]) => `<button type="button" data-act="debt-filter" data-sec="${k}" class="${filter === k ? 'on' : ''}">${v}</button>`).join('')}</div>`;
   if (people.length && filter !== 'done') {
     html += `<section class="card debt-people"><h2>По людям</h2><div class="ops">${people.slice(0, 6).map((p) => `<div class="row"><span class="debt-ava sm" style="--h:${debtHue(p.name)}">${esc(debtInitial(p.name))}</span><span class="grow"><span class="t">${esc(p.name)}</span><span class="m">${p.inSum ? 'мне должны ' + money(p.inSum) : ''}${p.inSum && p.outSum ? ' · ' : ''}${p.outSum ? 'я должен ' + money(p.outSum) : ''}</span></span></div>`).join('')}</div></section>`;
   }
   html += shown.length ? `<div class="debt-list">${shown.map(debtCard).join('')}</div>` : `<div class="card empty debt-empty"><span class="empty-orb">${I.debt}</span><b>${filter === 'done' ? 'Закрытых долгов нет' : 'Долгов нет'}</b><span>${filter === 'done' ? 'Закрытые появятся здесь после полного погашения.' : 'Запишите, кто должен вам или кому должны вы. Частичные платежи уменьшают остаток.'}</span><button class="btn primary" data-act="new-debt">Добавить долг</button></div>`;
-  html += `<p class="note-small">Смахните карточку влево, чтобы внести платёж. Срок попадает в «Сегодня», если напоминание включено.</p></div>`;
+  html += `<p class="note-small">Смахните карточку влево, чтобы внести платёж. Срок попадает в «Сегодня», если напоминание включено.</p>`;
   ui.mounts.push(() => bindDebtSwipe($('#view')));
   return html;
-};
+}
 function bindDebtSwipe(root) {
   $$('.debt-swipe', root).forEach((row) => {
     const inner = $('.debt-swipe-in', row); if (!inner) return;
@@ -5304,6 +5313,77 @@ RENDER.plans=function(){
 };
 
 /* ================= Запуск ================= */
+function financeRange() {
+  const mode = prefs().financePeriod === 'week' || prefs().financePeriod === 'custom' ? prefs().financePeriod : 'month';
+  return LifeCore.periodBounds(mode, todayISO(), { start: prefs().financeFrom, end: prefs().financeTo });
+}
+function financePack() {
+  return { expenses: S.expenses, incomes: S.incomes, recurring: S.recurring, debts: S.debts };
+}
+function renderFinance() {
+  const range = financeRange();
+  const snap = LifeCore.financeSnapshot(financePack(), range);
+  const seg = ['home', 'ops', 'bills', 'debts'].includes(ui.finSeg) ? ui.finSeg : 'home';
+  const label = range.mode === 'week' ? 'Неделя' : range.mode === 'custom' ? 'Свой период' : 'Месяц';
+  const maxFlow = Math.max(1, ...snap.flow.map((d) => Math.max(d.income, d.spent)));
+  let html = `<div class="dash-page fin-page">${head('Финансы', label + ' · ' + fmtShort(toDate(range.start)) + ' — ' + fmtShort(toDate(range.end)), plusBtn('fin-add', 'Добавить'))}`;
+  html += `<section class="fin-hero"><span class="p-kicker">Остаток</span><b class="fin-balance ${snap.balance < 0 ? 'amount-minus' : 'amount-plus'}" data-count-money="${snap.balance}">${money(snap.balance)}</b><div class="fin-split"><span>Доходы <b class="amount-plus">${money(snap.income)}</b></span><span>Расходы <b class="amount-minus">${money(snap.spent)}</b></span></div><div class="fin-safe"><span>Можно потратить</span><b class="${snap.safe < 0 ? 'amount-minus' : ''}">${money(snap.safe)}</b><small>доходы − расходы − платежи − долги к сроку</small></div></section>`;
+  html += `<div class="seg fin-period">${[['week', 'Неделя'], ['month', 'Месяц'], ['custom', 'Свой']].map(([k, n]) => `<button type="button" data-act="fin-period" data-v="${k}" class="${range.mode === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  if (range.mode === 'custom') html += `<div class="two fin-dates"><label class="field"><span>С</span><input type="date" id="finFrom" value="${esc(range.start)}"></label><label class="field"><span>По</span><input type="date" id="finTo" value="${esc(range.end)}"></label></div>`;
+  html += `<div class="fin-segs">${[['home', 'Обзор'], ['ops', 'Операции'], ['bills', 'Платежи'], ['debts', 'Долги']].map(([k, n]) => `<button type="button" data-act="fin-seg" data-seg="${k}" class="${seg === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  if (seg === 'home') {
+    const bars = snap.flow.filter((d) => d.income || d.spent);
+    const barH = (v) => v ? Math.max(0.14, v / maxFlow).toFixed(3) : '0';
+    html += `<section class="card"><h2>Движение денег</h2>${bars.length ? `<div class="fin-flow">${bars.map((d) => `<span title="${esc(d.date)}"><i class="in" style="transform:scaleY(${barH(d.income)})"></i><i class="out" style="transform:scaleY(${barH(d.spent)})"></i><small>${toDate(d.date).getDate()}</small></span>`).join('')}</div><p class="note-small">Зелёный — доход, красный — расход.</p>` : `<div class="empty"><b>В этом периоде тихо</b><span>Доходы и расходы появятся столбцами.</span></div>`}</section>`;
+    if (snap.categories.length) {
+      const max = snap.categories[0].amount;
+      html += `<section class="card"><h2>Куда ушли деньги</h2><div class="cat-bars">${snap.categories.slice(0, 6).map((t) => { const c = catOf(t.cat); return `<div class="cat-bar"><span class="e">${c.e}</span><span class="grow"><span class="nm"><span>${esc(c.name)}</span><b>${money(t.amount)}</b></span><span class="bar"><i style="width:${Math.max(4, t.amount / max * 100)}%"></i></span></span></div>`; }).join('')}</div></section>`;
+    }
+    const sum = LifeCore.debtSummary(S.debts || [], todayISO());
+    html += `<section class="fin-owe"><button type="button" data-act="fin-seg" data-seg="debts"><span>Я должен</span><b class="amount-minus">${money(sum.outSum)}</b></button><button type="button" data-act="fin-seg" data-seg="debts"><span>Мне должны</span><b class="amount-plus">${money(sum.inSum)}</b></button></section>`;
+    html += `<section class="card"><h2>Сроки</h2>${snap.timeline.length ? `<div class="fin-time">${snap.timeline.slice(0, 8).map((item) => `<button type="button" class="fin-when" data-act="${item.kind === 'debt' ? 'debt-open' : 'edit-recur'}" data-id="${esc(item.id)}"><span class="dot ${item.kind === 'debt' ? 'fin-dot-debt' : 'fin-dot-bill'}"></span><span class="grow"><b>${esc(item.name)}</b><small>${item.overdue ? 'просрочено' : fmtShort(toDate(item.date))} · ${item.kind === 'debt' ? 'долг' : 'платёж'}</small></span><em>${money(item.amount)}</em></button>`).join('')}</div>` : `<div class="empty"><b>Ближайших платежей нет</b><span>Обязательные платежи и долги со сроком встанут сюда.</span></div>`}</section>`;
+    if (feat('piggy') || (S.goals || []).length) {
+      const saved = (S.goals || []).reduce((s, g) => s + goalSaved(g), 0);
+      html += `<button class="card fin-piggy" data-act="fin-goals"><span class="grow"><b>Копилка</b><small>${(S.goals || []).length ? money(saved) + ' отложено' : 'Целей пока нет'}</small></span><span class="chev">${I.right}</span></button>`;
+    }
+  } else if (seg === 'ops') {
+    const ops = ui.finOps || 'all';
+    const rows = []
+      .concat((S.expenses || []).filter((x) => x.date >= range.start && x.date <= range.end).map((x) => Object.assign({ kind: 'out' }, x)))
+      .concat((feat('income') || (S.incomes || []).length) ? (S.incomes || []).filter((x) => x.date >= range.start && x.date <= range.end).map((x) => Object.assign({ kind: 'in' }, x)) : [])
+      .filter((x) => ops === 'all' || (ops === 'in' ? x.kind === 'in' : x.kind === 'out'))
+      .sort((a, b) => b.date.localeCompare(a.date) || (b.t || 0) - (a.t || 0));
+    html += `<div class="seg">${[['all', 'Все'], ['out', 'Расходы'], ['in', 'Доходы']].map(([k, n]) => `<button type="button" data-act="fin-ops" data-v="${k}" class="${ops === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+    html += rows.length ? `<div class="list">${rows.map((x) => { const c = x.kind === 'in' ? incOf(x.cat) : catOf(x.cat); return `<button class="row" data-act="${x.kind === 'in' ? 'edit-inc' : 'edit-exp'}" data-id="${esc(x.id)}"><span class="cat-ic">${c.e}</span><span class="grow"><span class="t">${esc(c.name)}</span><span class="m">${fmtShort(toDate(x.date))}${x.note ? ' · ' + esc(x.note) : ''}</span></span><span class="r amt ${x.kind === 'in' ? 'pos' : 'amount-minus'}">${x.kind === 'in' ? '+' : '−'}${money(x.amount)}</span></button>`; }).join('')}</div>` : `<div class="card empty"><b>Операций нет</b><span>Нажмите «+», чтобы записать доход или расход.</span></div>`;
+  } else if (seg === 'bills') html += renderRec();
+  else html += debtBoard();
+  html += `</div>`;
+  ui.mounts.push(() => {
+    $$('[data-count-money]').forEach((el) => {
+      const to = Number(el.dataset.countMoney);
+      if (!motionOn() || !Number.isFinite(to)) { el.textContent = money(to); return; }
+      const t0 = performance.now();
+      const step = (now) => { const p = Math.min(1, (now - t0) / 520); el.textContent = money(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+      el.textContent = money(0); requestAnimationFrame(step);
+    });
+    const from = $('#finFrom'), to = $('#finTo');
+    const apply = () => { if (!from.value || !to.value) return; S.settings.prefs = Object.assign(prefs(), { financePeriod: 'custom', financeFrom: from.value, financeTo: to.value }); save(); render(); };
+    if (from) from.onchange = apply; if (to) to.onchange = apply;
+  });
+  return html;
+}
+ACT['fin-seg'] = (el) => { ui.finSeg = el.dataset.seg; render(); };
+ACT['fin-ops'] = (el) => { ui.finOps = el.dataset.v; render(); };
+ACT['fin-period'] = (el) => { S.settings.prefs = Object.assign(prefs(), { financePeriod: el.dataset.v }); save(); render(); };
+ACT['fin-add'] = () => openSheet('Добавить', `<div class="list fin-add">
+  <button class="row big" data-act="new-exp"><span class="sec-ic fin-ic-out">${I.receipt}</span><span class="grow"><span class="t">Расход</span><span class="m">Покупка, дорога, обед</span></span></button>
+  <button class="row big" data-act="new-inc"><span class="sec-ic fin-ic-in">${I.income}</span><span class="grow"><span class="t">Доход</span><span class="m">Зарплата, подработка, возврат</span></span></button>
+  <button class="row big" data-act="new-recur"><span class="sec-ic fin-ic-bill">${I.repeat}</span><span class="grow"><span class="t">Обязательный платёж</span><span class="m">Квартплата, связь, подписка</span></span></button>
+  <button class="row big" data-act="new-debt"><span class="sec-ic fin-ic-debt">${I.debt}</span><span class="grow"><span class="t">Долг</span><span class="m">Кто должен мне или кому должен я</span></span></button>
+  ${feat('piggy') ? `<button class="row big" data-act="goal-new"><span class="sec-ic">${I.bank}</span><span class="grow"><span class="t">Цель в копилку</span><span class="m">Откладывать на что-то конкретное</span></span></button>` : ''}
+</div>`);
+ACT['fin-goals'] = () => { ui.finSeg = 'home'; openSheet('Копилка', `<div class="form">${renderGoals()}<button class="btn" data-act="goal-new">Новая цель</button></div>`); };
+
 function start() {
   S = load();
   if (STORE.state.blocked) { showStorageRecovery(); return; }
@@ -5317,8 +5397,11 @@ function start() {
   $('#sheetBack').addEventListener('click', () => { if (sheetBack) sheetBack(); });
   applyTheme();
   RENDER.plans = renderPlanStudio;
+  RENDER.bank = renderFinance;
   installMotion();
-  const t = location.hash.slice(1); ui.tab = (t === 'home' || (SECTION_DEFS[t] && sec(t))) ? t : 'home';
+  let t = location.hash.slice(1);
+  if (t === 'debts') { ui.finSeg = 'debts'; t = 'bank'; }
+  ui.tab = (t === 'home' || (SECTION_DEFS[t] && sec(t))) ? t : 'home';
   runRecurring(true);
   if (S.settings.pin) showLock('unlock');
   render(); applyIcon(); save();
