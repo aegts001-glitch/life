@@ -270,3 +270,7 @@ dialog::backdrop { animation-duration:var(--life-motion,200ms); }
   #main:has(.calendar-layout) .heading .eyebrow { display:none; }
   .calendar-layout { gap:12px; }
 }
+@media(max-width:660px) {
+  /* Keep the fixed translucent dock in its own layer when the page animates. */
+  .shell nav { transform:translateZ(0); isolation:isolate; }
+}
