@@ -9,59 +9,33 @@ const { execFile } = require('node:child_process');
 const run = require('node:util').promisify(execFile);
 
 function exercise() {
-  const mark = document.createElement('output');
-  mark.id = 'smoke-result';
-  document.body.append(mark);
-  const click = selector => {
-    const button = document.querySelector(selector);
-    if (!button) throw Error('Missing ' + selector);
-    button.click();
-  };
+  const mark=document.createElement('output'); mark.id='smoke-result'; document.body.append(mark);
+  const $=selector=>{const el=document.querySelector(selector);if(!el)throw Error('Missing '+selector);return el;};
+  const click=selector=>$(selector).click();
+  const input=(selector,value)=>{const el=$(selector);el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));};
   try {
-    const state = window.__life.S;
-    if (!state.settings.onboarded) {
-      state.settings.onboarded = true;
-      for (const key of ['plans','notes','bank','car','food','sport','reminders','objects']) state.settings.sections[key] = true;
-      state.notes.push({ id:'test-note', title:'Поездка', body:'Билеты', cat:'life', photos:[], updated:new Date().toISOString() });
-      localStorage.setItem('life.v1', JSON.stringify(state));
-      location.reload();
-      return;
-    }
-    click('.desk-directory [data-tab="plans"]');
-    if (!document.documentElement.classList.contains('plans-screen') || document.documentElement.scrollHeight > innerHeight + 1) throw Error('Calendar overflow');
-    const days = document.querySelectorAll('.compact-plans [data-act="plan-day"]');
-    if (days.length < 28 || days[12].getBoundingClientRect().height < 1) throw Error('Calendar layout');
-    days[12].click();
-    const input = document.querySelector('#planQuickText');
-    input.value = 'Проверка рабочего стола';
-    input.form.requestSubmit();
-    if (!document.querySelector('#view').textContent.includes(input.value)) throw Error('Creating plan on selected day');
-    click('#view [data-act="back"]');
-    if (!document.querySelector('.compact-plans')) throw Error('Back to month');
-    click('#tabbarNav [data-tab="home"]');
-    click('.desk-head [data-act="global-search"]');
-    const query = document.querySelector('#globalSearch');
-    query.value = 'Поездка';
-    query.dispatchEvent(new Event('input',{bubbles:true}));
-    click('[data-act="desk-save-query"]');
-    click('#view [data-act="back"]');
-    click('[data-act="desk-query"]');
-    if (!document.querySelector('#globalResults [data-kind="note"]')) throw Error('Saved collection');
-    click('#tabbarNav [data-tab="home"]');
-    for (const id of ['bank','car','food','notes','reminders','objects','sport']) {
-      click('.desk-directory [data-tab="'+id+'"]');
-      click('.desk-record-link');
-      if (!document.querySelector('#deskRecordQuery')) throw Error('Catalog '+id);
-      click('#tabbarNav [data-tab="home"]');
-    }
-    click('.desk-directory [data-tab="food"]');
-    if (document.querySelectorAll('.desk-week button').length !== 7) throw Error('Food week');
-    click('#tabbarNav [data-tab="home"]');
-    click('.desk-directory [data-tab="notes"]');
-    click('[data-act="desk-note-layout"]');
-    if (!document.querySelector('#noteList.desk-note-list') || !JSON.parse(localStorage.getItem('life.v1')).settings.prefs.noteLayout) throw Error('Note layout');
-    mark.textContent = 'PASS';
-  } catch (error) { mark.textContent = error.stack || String(error); }
+    if ($('h1').textContent!=='Сегодня') throw Error('Home');
+    click('#nav [data-route=calendar]');
+    if(document.querySelector('.bubbles-card')||document.querySelectorAll('.calendar .day').length<28)throw Error('Calendar grid');
+    document.querySelectorAll('.calendar .day')[11].click();
+    const date=$('.day[aria-pressed="true"]').dataset.value;
+    click('.cal-tools [data-action=add]');
+    if($('[name=date]').value!==date)throw Error('Selected day not applied');
+    input('[name=title]','Проверка новой версии');
+    $('#entry-form').requestSubmit();
+    if(!$('#main').textContent.includes('Проверка новой версии'))throw Error('Task not visible');
+    click('#nav [data-route=search]');
+    input('#query','новой версии');
+    click('#results [data-action=open]');
+    if($('#sheet-title').textContent!=='Проверка новой версии')throw Error('Search result opens wrong record');
+    click('#sheet [data-action=close]');
+    click('#nav [data-route=areas]');
+    if(document.querySelectorAll('.area').length<8)throw Error('Missing sections');
+    const value=JSON.parse(localStorage.getItem('life.v1'));
+    if(value.plans[0].date!==date)throw Error('Task not stored');
+    if(document.documentElement.scrollWidth>window.innerWidth+1)throw Error('Page overflows viewport');
+    mark.textContent='PASS';
+  } catch(error){mark.textContent=error.stack||String(error);}
 }
 
 test('Chrome workspace flows', {timeout:90000}, async () => {
@@ -82,7 +56,7 @@ test('Chrome workspace flows', {timeout:90000}, async () => {
     await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
     const url = 'http://127.0.0.1:'+server.address().port+'/?selftest';
     for (const size of ['390,844','1366,900']) {
-    const {stdout} = await run(process.env.CHROME_BIN || 'google-chrome', ['--headless','--disable-gpu','--disable-dev-shm-usage','--disable-background-networking','--window-size='+size,'--virtual-time-budget=6000','--user-data-dir='+path.join(profile,size),'--dump-dom',url], {maxBuffer:8*1024*1024,timeout:80000});
+    const {stdout} = await run(process.env.CHROME_BIN || 'google-chrome', ['--headless','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disable-background-networking','--window-size='+size,'--virtual-time-budget=6000','--user-data-dir='+path.join(profile,size),'--dump-dom',url], {maxBuffer:8*1024*1024,timeout:80000});
     const result = stdout.match(/<output id="smoke-result">([\s\S]*?)<\/output>/);
     assert.equal(result && result[1], 'PASS', size + ' ' + (result && result[1]));
     }
