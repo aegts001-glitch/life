@@ -36,9 +36,41 @@ function write(fn){
  if(!store.write(next))throw new Error('Не удалось сохранить запись. Освободите место и повторите.');
  S=next;originRaw=store.state.raw;return result;
 }
-function applyTheme(){
- const saved=S.settings.theme;
- document.documentElement.dataset.theme=['dark','light'].includes(saved)?saved:'auto';
+const lookSpec={
+ text:[90,118,100,1,'Размер текста','%'],
+ spacing:[80,120,100,1,'Масштаб отступов','%'],
+ glass:[68,100,88,1,'Плотность стекла','%'],
+ motion:[0,380,205,5,'Длительность переходов',' мс'],
+ hue:[0,360,163,1,'Оттенок акцента','°']
+};
+const wallpapers=[['plain','Чистый'],['mist','Дымка'],['warm','Тёплый']];
+const legacyHues={blue:223,pine:163,amber:39,berry:341,sky:199,graphite:211,orange:20,lime:132};
+function appearance(custom={}){
+ const persisted=S.settings.prefs?.appearanceV4||{};
+ const values={};
+ for(const [key,[min,max,initial]] of Object.entries(lookSpec)){
+  const n=Number(custom[key]??persisted[key]??(key==='hue'?legacyHues[S.settings.accent]:undefined)??initial);
+  values[key]=Number.isFinite(n)?Math.min(max,Math.max(min,Math.round(n))):initial;
+ }
+ const wallpaper=custom.wallpaper??persisted.wallpaper;
+ values.wallpaper=wallpapers.some(([id])=>id===wallpaper)?wallpaper:'mist';
+ return values;
+}
+function applyTheme(custom={}){
+ const saved=custom.theme??S.settings.theme,root=document.documentElement,look=appearance(custom);
+ root.dataset.theme=['dark','light'].includes(saved)?saved:'auto';
+ root.dataset.wallpaper=look.wallpaper;
+ const preview=main.querySelector('.appearance-preview');if(preview)preview.dataset.wallpaper=look.wallpaper;
+ root.dataset.lifeMotion=look.motion?'on':'off';
+ for(const [name,value] of Object.entries({
+  '--life-text-scale':look.text/100,'--life-density':look.spacing/100,'--life-glass':look.glass+'%',
+  '--life-motion':look.motion+'ms','--life-accent-hue':look.hue
+ }))root.style.setProperty(name,value);
+}
+function saveAppearance(patch){
+ const next=appearance(patch);
+ write(s=>{s.settings.prefs??={};s.settings.prefs.appearanceV4=next;});
+ applyTheme();
 }
 function showToast(message,undo){
  clearTimeout(showToast.timer);
@@ -56,14 +88,30 @@ function applyRoute(){
  ui.kind=Object.hasOwn(defs,raw[1])&&defs[raw[1]].area===name?raw[1]:'';
  ui.route=tabs.some(t=>t[0]===name)||Object.hasOwn(areas,name)||name==='settings'?name:'today';
 }
-function go(r,selector){
- if(r===ui.route&&!r.includes('/')){main.focus();return;}
- if(location.hash!=='#'+r)history.pushState(null,'','#'+r);
- applyRoute();render();window.scrollTo(0,0);
- if(selector)$(selector)?.focus();else main.focus({preventScroll:true});
+let displayedHash=location.hash;
+function transitionRoute(){
+ const changed=displayedHash!==location.hash;
+ displayedHash=location.hash;
+ main.classList.remove('route-enter');
+ applyRoute();render();
+ if(changed&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&appearance().motion){
+  void main.offsetWidth;
+  main.classList.add('route-enter');
+ }
+ return changed;
 }
-window.addEventListener('popstate',()=>{applyRoute();render();});
-window.addEventListener('hashchange',()=>{applyRoute();render();});
+main.addEventListener('animationend',()=>main.classList.remove('route-enter'));
+function go(r,keyboard=false,selector){
+ if(r===ui.route&&!r.includes('/')){
+  if(keyboard)main.focus({preventScroll:true});return;
+ }
+ if(location.hash!=='#'+r)history.pushState(null,'','#'+r);
+ if(transitionRoute())window.scrollTo(0,0);
+ if(keyboard)(selector?$(selector):main)?.focus({preventScroll:true});
+}
+const handleHistory=()=>{if(location.hash!==displayedHash)transitionRoute();};
+window.addEventListener('popstate',handleHistory);
+window.addEventListener('hashchange',handleHistory);
 const heading=(k,title,sub,action='')=>'<header class="heading"><div><p class="eyebrow">'+esc(k)+'</p><h1>'+esc(title)+'</h1>'+(sub?'<p>'+esc(sub)+'</p>':'')+'</div>'+action+'</header>';
 const add=(label='Записать',kind)=>'<button type="button" class="primary" data-action="add"'+(kind?' data-kind="'+kind+'"':'')+'>'+ic('plus')+esc(label)+'</button>';
 const empty=(text,description='')=>'<div class="empty"><strong>'+esc(text)+'</strong>'+esc(description)+'</div>';
@@ -139,9 +187,15 @@ function area(key){
  return '<section class="card"><div class="card-head"><h2>'+esc(defs[k].name)+'</h2><button class="subtle" type="button" data-action="add" data-kind="'+k+'">'+ic('plus')+'Добавить</button></div>'+rows(items,'Пока нет записей','')+'</section>';
  }).join('')+'</div>'+advanced;
 }
+function savedQueries(){
+ const values=S.settings.prefs?.savedQueries;
+ return Array.isArray(values)?[...new Set(values.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))].slice(0,16):[];
+}
 function resultMarkup(){
- const q=ui.search.trim(),result=M.query(S,q,ui.searchKind);
- return (!q&&!ui.searchKind)?empty('Найдите любую запись','Поиск по названию, тексту, тегам и разделам.'):card('Результаты',result,'Ничего не найдено','Измените запрос или фильтр.');
+ const q=ui.search.trim(),result=M.query(S,q,ui.searchKind),saved=savedQueries(),selected=saved.includes(q);
+ const collections=saved.length?'<section class="query-collections"><h2>Подборки</h2><div class="filters">'+saved.map(x=>chip(x,'open-query',x,x===q,'search')).join('')+'</div></section>':'';
+ const save=q?'<div class="query-toolbar"><button type="button" class="subtle" data-action="save-query">'+ic(selected?'check':'plus')+(selected?'Убрать из подборок':'Сохранить подборку')+'</button></div>':'';
+ return collections+save+((!q&&!ui.searchKind)?empty('Найдите любую запись','Поиск по названию, тексту, тегам и разделам.'):card('Результаты',result,'Ничего не найдено','Измените запрос или фильтр.'));
 }
 function search(){
  return heading('Весь Life','Поиск','Напишите то, что помните о записи.')+
@@ -154,9 +208,12 @@ const formItem=(name,label,value='',type='text',config={})=>{
  return '<label class="form-item'+(type==='checkbox'?' checklabel':'')+'"><span>'+esc(label)+'</span>'+control+'</label>';
 };
 function settings(){
- const themes=[['auto','Как в системе'],['light','Светлая'],['dark','Тёмная']];
- return heading('Личное пространство','Настройки','Записи хранятся в браузере. Сохраните копию перед сменой телефона.')+
- '<div class="account"><section class="card note"><h2>Внешний вид</h2><form id="profile">'+formItem('name','Имя',S.settings.name||'')+formItem('theme','Тема',S.settings.theme||'auto','text',{options:themes})+'<div class="form-actions"><button type="submit" class="primary">Сохранить</button></div></form></section><section class="card note settings-list"><h2>Данные и доступ</h2><p class="muted">Резервная копия сохраняет записи и фотографии. Видео сохраняются отдельно.</p><div class="tools"><button type="button" class="subtle" data-action="export">Скачать копию</button><button type="button" class="subtle" data-action="restore">Восстановить</button>'+legacyLink('', 'Код-пароль и другие настройки')+'</div></section><section class="card note"><h2>Life 4.0</h2><p class="muted">Работает на этом устройстве. Синхронизации между устройствами нет.</p></section></div>';
+ const themes=[['auto','Как в системе'],['light','Светлая'],['dark','Тёмная']],look=appearance();
+ const ranges=Object.entries(lookSpec).map(([key,[min,max,,step,label,suffix]])=>
+  '<div class="range-row"><label class="range-label" for="look-'+key+'">'+label+'</label><output for="look-'+key+'">'+look[key]+suffix+'</output><input id="look-'+key+'" type="range" data-look="'+key+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+look[key]+'" style="--range-progress:'+((look[key]-min)/(max-min)*100)+'%"></div>').join('');
+ const presets=wallpapers.map(([value,label])=>'<button type="button" class="swatch" data-action="wallpaper" data-value="'+value+'" aria-pressed="'+(look.wallpaper===value)+'"><i aria-hidden="true"></i>'+label+'</button>').join('');
+ return heading('Личное пространство','Настройки','Настрой Life под себя. Изменения внешнего вида сохраняются на этом устройстве.')+
+ '<div class="account"><section class="card note appearance-card"><div class="appearance-intro"><h2>Внешний вид</h2><button type="button" class="subtle" data-action="reset-look">Сбросить</button></div><div class="appearance-preview" data-wallpaper="'+look.wallpaper+'"><div><small>ПРЕДПРОСМОТР</small><strong>Мой Life</strong><span>Перейти к делам на сегодня</span></div><span class="appearance-dot">'+ic('check')+'</span></div><div class="appearance-controls">'+ranges+'</div><h3>Фон</h3><div class="preset-grid">'+presets+'</div><form id="profile">'+grid(formItem('name','Имя',S.settings.name||'')+formItem('theme','Тема',S.settings.theme||'auto','text',{options:themes}))+'<div class="form-actions"><button type="submit" class="primary">Сохранить имя и тему</button></div></form></section><section class="card note settings-list"><h2>Данные и доступ</h2><p class="muted">Резервная копия сохраняет записи и фотографии. Видео сохраняются отдельно.</p><div class="tools"><button type="button" class="subtle" data-action="export">Скачать копию</button><button type="button" class="subtle" data-action="restore">Восстановить</button>'+legacyLink('', 'Код-пароль и другие настройки')+'</div></section><section class="card note"><h2>Life 4.1</h2><p class="muted">Работает на этом устройстве. Синхронизации между устройствами нет.</p></section></div>';
 }
 function render(){
  if(!unlocked||store.state.blocked)return;
@@ -191,7 +248,7 @@ function editSheet(kind,record,carry){
  const fields={
  plan:()=>first('title','Что нужно сделать?')+grid(dateInput(editing?(x.date||''):date)+f('time','Время',x.time||'','time'))+more(f('priority','Приоритет',x.priority||'mid','text',{options:priorities})+f('repeat','Повтор',x.repeat||'none','text',{options:repeats})+f('tags','Теги через запятую',(x.tags||[]).join(', '))+f('subtasks','Подзадачи, по одной на строку',(x.subtasks||[]).map(z=>z.title).join('\n'),'textarea')+note()),
  note:()=>first('title','Заголовок')+f('body','Текст',x.body||'','textarea')+f('photos','Добавить фото','','file'),
- reminder:()=>first('title','О чём напомнить?')+grid(dateInput(x.at?M.dated(x.at):date)+f('time','Время',remTime,'time',{required:true}))+more(f('repeat','Повтор',x.repeat||'none','text',{options:[...repeats,['year','Каждый год']]})+note()),
+ reminder:()=>first('title','О чём напомнить?')+grid(dateInput(x.at?M.dated(x.at):date)+f('time','Время',remTime,'time',{required:true}))+'<p class="muted">Чтобы получить сигнал на iPhone, после сохранения добавьте событие в «Календарь».</p>'+more(f('repeat','Повтор',x.repeat||'none','text',{options:[...repeats,['year','Каждый год']]})+note()),
  expense:()=>first('amount','Сумма, '+currency,x.amount||'','number')+grid(dateInput()+f('cat','Категория',x.cat||'other'))+note(),
  income:()=>first('amount','Сумма, '+currency,x.amount||'','number')+grid(dateInput()+f('cat','Категория',x.cat||'other'))+note(),
  debt:()=>first('person','Кто?')+grid(f('amount','Сумма, '+currency,x.amount||'','number',{required:true})+f('due','Срок',x.due||'','date')+f('direction','Тип',x.direction||'in','text',{options:[['in','Мне должны'],['out','Я должен']]})+f('remind','Показывать в повестке',x.remind!==false,'checkbox'))+note(),
@@ -284,7 +341,7 @@ async function handleEdit(form){
  const parent=record?.parent||v.parent;
  try{write(next=>{M.edit(next,{kind,recordId:x.id,parent,patch});});}
  catch(e){await Promise.allSettled(added.map(id=>dbAccess('readwrite',db=>db.delete(id))));throw e;}
- sheet.close();render();showToast(record?'Изменения сохранены':'Запись сохранена');
+ sheet.close();render();showToast(record?'Изменения сохранены':kind==='reminder'?'Сохранено в Life. Сигнал iPhone настраивается отдельно.':'Запись сохранена');
 }
 const editingPlan=x=>!!x.id;
 async function showMedia(r,holder){
@@ -404,18 +461,25 @@ document.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b)return;
  try{
  const route=b.dataset.route;
- if(route){go(route);return;}
+ if(route){go(route,e.detail===0);return;}
  const {action,value,kind,id,parent,occurrence}=b.dataset;
  if(!unlocked&&!['close','restore','restore-confirm','export-raw'].includes(action))return;
  if(action==='day'){
-  ui.date=value;ui.month=value.slice(0,7);history.replaceState(null,'','#calendar/'+value);render();main.querySelector('[data-action=day][aria-pressed=true]')?.focus();return;
+  ui.date=value;ui.month=value.slice(0,7);history.replaceState(null,'','#calendar/'+value);displayedHash=location.hash;render();if(e.detail===0)main.querySelector('.day[aria-pressed=true]')?.focus();return;
  }
  if(action==='month'){
   const d=M.localDate(ui.month+'-01');d.setMonth(d.getMonth()+Number(value));ui.month=M.dateKey(d).slice(0,7);ui.date=ui.month+'-01';
-  history.replaceState(null,'','#calendar/'+ui.date);render();main.querySelector('[data-action=month][data-value="'+value+'"]')?.focus();return;
+  history.replaceState(null,'','#calendar/'+ui.date);displayedHash=location.hash;render();if(e.detail===0)main.querySelector('[data-action=month][data-value="'+value+'"]')?.focus();return;
  }
- if(action==='filter'){go((ui.route==='plans'?'tasks':ui.route)+(value?'/'+value:'/'));return;}
- if(action==='search-kind'){ui.searchKind=value;render();main.querySelector('[data-action=search-kind][aria-pressed=true]')?.focus();return;}
+ if(action==='filter'){go((ui.route==='plans'?'tasks':ui.route)+(value?'/'+value:'/'),e.detail===0);return;}
+ if(action==='search-kind'){ui.searchKind=value;render();if(e.detail===0)main.querySelector('[data-action=search-kind][aria-pressed=true]')?.focus();return;}
+ if(action==='open-query'){ui.search=value;ui.searchKind='';render();if(e.detail===0)$('#query')?.focus();return;}
+ if(action==='save-query'){
+  const q=ui.search.trim().slice(0,120);if(!q)return;
+  const list=savedQueries(),exists=list.includes(q);
+  write(s=>{s.settings.prefs??={};s.settings.prefs.savedQueries=exists?list.filter(x=>x!==q):[q,...list].slice(0,16);});
+  $('#results').innerHTML=resultMarkup();if(e.detail===0)main.querySelector('[data-action=save-query]')?.focus();showToast(exists?'Подборка удалена':'Подборка сохранена');return;
+ }
  if(action==='add'){ui.sheetMode=areas[ui.route]?'domain':'';editSheet(kind);return;}
  if(action==='capture-kind'){editSheet(value,null,sheet.querySelector('#initial')?.type==='text'?sheet.querySelector('#initial').value:undefined);return;}
  if(action==='open'){const r=getRecord(kind,id,parent,occurrence);if(r)details(r);return;}
@@ -435,14 +499,24 @@ document.addEventListener('click',async e=>{
   showToast('Запись удалена',()=>{if(originRaw!==expected)throw new Error('В записях уже есть новые изменения');write(s=>{const owner=r.parent?s.objects.find(o=>o.id===r.parent):s;M.get(owner,defs[r.kind].list).push(removed);});});return;
  }
  if(action==='water'){const date=today();write(s=>{s.food.waterMl[date]=(Number(s.food.waterMl[date])||0)+200;});render();showToast('Добавлено 200 мл',()=>write(s=>{s.food.waterMl[date]=Math.max(0,(Number(s.food.waterMl[date])||0)-200);}));return;}
+ if(action==='wallpaper'){saveAppearance({wallpaper:value});main.querySelectorAll('.swatch').forEach(el=>el.setAttribute('aria-pressed',String(el===b)));return;}
+ if(action==='reset-look'){const defaults=Object.fromEntries(Object.entries(lookSpec).map(([k,spec])=>[k,spec[2]]));saveAppearance({...defaults,wallpaper:'mist'});render();if(e.detail===0)main.querySelector('[data-action=reset-look]')?.focus();showToast('Оформление возвращено к исходному');return;}
  if(action==='export'){await backup();return;}
  if(action==='export-raw'){download('life-исходные-данные.txt',String(originRaw||''),'text/plain');return;}
  if(action==='restore'){restore();return;}
  if(action==='restore-confirm'){b.disabled=true;await applyRestore();if(b.isConnected)b.disabled=false;}
  }catch(err){showToast(err.message);}
 });
-document.addEventListener('input',e=>{if(e.target.id==='query'){ui.search=e.target.value;$('#results').innerHTML=resultMarkup();}});
+document.addEventListener('input',e=>{
+ const {target:t}=e,key=t.dataset.look;
+ if(t.id==='query'){ui.search=t.value;$('#results').innerHTML=resultMarkup();}
+ if(Object.hasOwn(lookSpec,key)){
+  applyTheme({[key]:t.value});t.style.setProperty('--range-progress',((+t.value-+t.min)/(+t.max-+t.min)*100)+'%');t.closest('.range-row').querySelector('output').textContent=t.value+lookSpec[key][5];
+ }
+});
 document.addEventListener('change',e=>{
+ const key=e.target.dataset.look;
+ if(Object.hasOwn(lookSpec,key)){try{saveAppearance({[key]:e.target.value});}catch(err){applyTheme();render();showToast(err.message);}return;}
  const id=e.target.dataset.subtask;if(!id||!ui.detail)return;
  try{const r=ui.detail;write(s=>{const p=s.plans.find(x=>x.id===r.x.id),sub=p?.subtasks.find(x=>x.id===id);if(!sub)throw new Error('Подзадача не найдена');sub.done=e.target.checked;});ui.detail=getRecord('plan',r.x.id);render();}catch(err){e.target.checked=!e.target.checked;showToast(err.message);}
 });
