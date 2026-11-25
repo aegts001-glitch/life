@@ -51,3 +51,38 @@ test('calendar geometry cannot be overwritten by generic pressed-button transfor
  const css=fs.readFileSync(__dirname+'/appearance.css','utf8');
  assert.match(css,/\.compact-plans \.bub\{[^}]*transform:none!important;[^}]*transition:none!important/);
 });
+
+const model = require('./life-model.js');
+test('remake preserves legacy records and unknown fields in the original state format', () => {
+ const s=model.hydrate({v:2,settings:{sections:{},prefs:{},pin:{hash:'test'}},notes:[{id:'photo',photos:['m1'],title:'Ёлка'}],plans:[{id:'p1',title:'План',date:'2026-11-25',subtasks:[{id:'sub1',title:'1',done:false,legacyExtra:{preserve:true}}]}],objects:[{id:'o1',name:'Площадка',walks:[{id:'w1',title:'Обход'}]}],extra:{owner:'keep'}});
+ model.edit(s,{kind:'note',recordId:'photo',patch:{body:'Новый текст'}});
+ assert.equal(s.v,3);
+ assert.deepEqual(s.notes[0].photos,['m1']);
+ assert.equal(s.settings.pin.hash,'test');
+ assert.deepEqual(s.extra,{owner:'keep'});
+ assert.deepEqual(s.plans[0].subtasks[0].legacyExtra,{preserve:true});
+ assert.equal(model.title(model.records(s,'walk')[0]),'Обход');
+ assert.equal(model.query(s,'елка')[0].x.id,'photo');
+ assert.equal(model.KEY,'life.v1');
+});
+test('agenda includes repeat occurrences, overdue reminders and undated Inbox; completion advances a series', () => {
+ const s=model.seed();
+ s.plans.push({id:'weekly',title:'Встреча',date:'2026-11-18',time:'08:00',repeat:'week',subtasks:[]},{id:'inbox',title:'Задача без даты',date:null,repeat:'none',subtasks:[]});
+ s.reminders.push({id:'old',title:'Позвонить',at:model.localDate('2026-11-23','16:15').toISOString(),repeat:'none'});
+ assert.equal(model.day(s,'2026-11-25')[0].x.id,'weekly');
+ assert.equal(model.day(s,'2026-11-25')[0].occurrence,true);
+ assert.equal(model.overdue(s,'2026-11-25').length,2);
+ assert.equal(model.inbox(s)[0].x.id,'inbox');
+ model.complete(s,model.records(s,'plan')[0]);
+ assert.equal(s.plans.find(x=>x.id==='weekly').date,'2026-11-25');
+ assert.ok(s.plans.some(x=>x.done&&x.date==='2026-11-18'));
+});
+test('default entry point and offline shell are independent of the old bubble UI', () => {
+ const html=fs.readFileSync(__dirname+'/index.html','utf8'),css=fs.readFileSync(__dirname+'/life-next.css','utf8'),sw=fs.readFileSync(__dirname+'/sw.js','utf8');
+ assert.match(html,/life-next\.js\?v=4\.0\.0/);
+ assert.doesNotMatch(html,/bub|src="app\.js/);
+ assert.match(css,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
+ assert.match(css,/prefers-reduced-motion:reduce/);
+ for(const file of ['index.html','life-model.js','life-next.css','life-next.js','legacy.html'])assert.match(sw,new RegExp(file.replace('.','\\.')));
+ assert.match(sw,/rel==='legacy\.html'\?'legacy\.html':'index\.html'/);
+});
