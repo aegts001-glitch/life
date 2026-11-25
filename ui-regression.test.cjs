@@ -79,7 +79,7 @@ test('agenda includes repeat occurrences, overdue reminders and undated Inbox; c
 });
 test('default entry point and offline shell are independent of the old bubble UI', () => {
  const html=fs.readFileSync(__dirname+'/index.html','utf8'),css=fs.readFileSync(__dirname+'/life-next.css','utf8'),sw=fs.readFileSync(__dirname+'/sw.js','utf8');
- assert.match(html,/life-next\.js\?v=4\.0\.0/);
+ const script=html.match(/life-next\.js\?v=\d+\.\d+\.\d+/)?.[0];assert.ok(script);assert.ok(sw.includes(script));
  assert.doesNotMatch(html,/bub|src="app\.js/);
  assert.match(css,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
  assert.match(css,/prefers-reduced-motion:reduce/);
