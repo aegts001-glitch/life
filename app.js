@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const LIFE_VERSION = '2.3.0';
+const LIFE_VERSION = '3.0.0';
 /* ================= Иконки ================= */
 const svg = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {
@@ -508,16 +508,21 @@ function renderTabbar() {
 function currentHTML() {
   const top = ui.stack[ui.stack.length - 1];
   if (top) return DETAIL[top.type](top);
-  return (RENDER[ui.tab] || RENDER.home)();
+  const content = (RENDER[ui.tab] || RENDER.home)();
+  if (ui.tab === 'home' || ui.tab === 'plans') return content;
+  const section = SECTION_DEFS[ui.tab];
+  return '<nav class="desk-path" aria-label="Путь"><button data-act="tab" data-tab="home">Рабочий стол</button>' + I.right + '<span>' + esc(section.name) + '</span><button class="desk-record-link" data-act="desk-records">Каталог</button><button class="desk-tools" data-act="desk-commands" aria-label="Команды раздела">' + I.more + '</button></nav>' + content;
 }
 function render(anim) {
   if (STORE.state.blocked) { showStorageRecovery(); return; }
   ui.mounts = [];
   const el = $('#view');
   const top = ui.stack[ui.stack.length - 1]; const ed = !!(top && top.type === 'deditor');
-  const root = document.documentElement; root.classList.toggle('fixed-screen', ed || (!top && ui.tab === 'diary')); root.classList.toggle('editor-screen', ed); root.classList.remove('plans-screen');
+  const root = document.documentElement; root.classList.toggle('fixed-screen', ed || (!top && ui.tab === 'diary')); root.classList.toggle('editor-screen', ed); root.classList.toggle('plans-screen', !top && ui.tab === 'plans');
+  root.dataset.section = ui.tab;
   el.innerHTML = `<div class="view ${anim || ''}">${currentHTML()}</div>`;
   renderTabbar();
+  deskRail();
   hydratePhotos(el);
   const ms = ui.mounts; ui.mounts = []; ms.forEach((f) => f());
   storageIndicator();
@@ -1593,6 +1598,7 @@ const PLAN_FILTERS = { all: 'Все', free: 'Свободные', busy: 'С пл
 RENDER.plans = function () {
   const m = planMonth(); const mk = monthKey(m); const isCur = mk === todayISO().slice(0, 7);
   const all = S.plans.filter((p) => p.month === mk);
+  const calendarDays = new Map(LifeCore.monthAgenda(S.plans, mk).days.map(day => [day.date, day.items]));
   const done = all.filter((p) => p.done).length;
   const goals = all.filter((p) => !p.date);
   const days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
@@ -1600,13 +1606,13 @@ RENDER.plans = function () {
   const counts = { all: days, free: 0, busy: 0 };
   // Раскладка считается сразу, чтобы страница открывалась за один проход вёрстки
   const W = bubW(); const off = (m.getDay() + 6) % 7;
-  const dayInfo = Array.from({ length: days }, (_, i) => { const iso = `${mk}-${pad(i + 1)}`; return { n: all.filter((p) => p.date === iso).length, today: iso === todayISO() }; });
+  const dayInfo = Array.from({ length: days }, (_, i) => { const iso = `${mk}-${pad(i + 1)}`; return { n: (calendarDays.get(iso) || []).length, today: iso === todayISO() }; });
   const geo = bubGeo(W, off, dayInfo, goals.length);
   const pv = ui.planView; const view = { k: 1, tx: 0, ty: 0 };
   if (pv && pv.mk === mk && Math.abs(pv.W - W) < 2) { Object.assign(view, { W, H: geo.H, k: pv.k, tx: pv.tx, ty: pv.ty }); clampView(view); }
   let bubs = '';
   for (let d = 1; d <= days; d++) {
-    const iso = `${mk}-${pad(d)}`; const ps = all.filter((p) => p.date === iso).sort((a, b) => (a.time || '99').localeCompare(b.time || '99')); const dt = new Date(m.getFullYear(), m.getMonth(), d);
+    const iso = `${mk}-${pad(d)}`; const ps = calendarDays.get(iso) || []; const dt = new Date(m.getFullYear(), m.getMonth(), d);
     const isToday = iso === todayISO(); const past = dayDiff(dt, new Date()) < 0; const wd = dt.getDay();
     const allDone = ps.length && ps.every((p) => p.done); const free = !ps.length && (!past || isToday);
     if (free) counts.free++; if (ps.length) counts.busy++;
@@ -1894,7 +1900,7 @@ function togglePlan(id, el) {
 ACT['new-plan'] = (el) => planSheet(null, el && el.dataset.goal ? { date: null, month: monthKey(planMonth()) } : { date: (el && el.dataset.date) || todayISO() });
 ACT['edit-plan'] = (el) => { if (el.dataset.goal && Date.now() < BUB.suppress) return; planSheet(el.dataset.id); };
 ACT['toggle-plan'] = (el) => togglePlan(el.dataset.id, el);
-ACT['plan-day'] = (el) => { if (Date.now() < BUB.suppress) return; planDaySheet(el.dataset.day); };
+ACT['plan-day'] = (el) => { if (Date.now() < BUB.suppress) return; ui.planFocus = el.dataset.day; ui.planBoard = 'all'; ui.planScope = 'day'; push({ type: 'planAgenda' }); };
 ACT['plan-month'] = (el) => { const m = planMonth(); ui.planMonth = new Date(m.getFullYear(), m.getMonth() + (+el.dataset.dir), 1); render('anim-fade'); };
 
 /* ================= Деньги ================= */
@@ -4528,11 +4534,16 @@ function renderGlobalResults() {
   if (!globalQuery.trim()) { el.innerHTML = '<div class="card empty"><b>Вспомните слово — Life найдёт запись</b>Например: «масло», «отпуск» или номер квартиры.</div>'; return; }
   const rows = LifeCore.search(S, globalQuery);
   el.innerHTML = rows.length ? `<p class="note-small">${rows.length === 100 ? 'Первые 100 результатов — уточните запрос' : 'Найдено: ' + rows.length}</p><div class="list">${rows.map((r) => `<button class="row big" data-act="search-open" data-kind="${r.kind}" data-id="${esc(r.id)}" data-obj="${esc(r.obj || '')}" data-index="${r.index ?? ''}"><span class="grow"><span class="t">${esc(r.title)}</span><span class="m">${esc(r.sub)}</span></span><span class="chev">${I.right}</span></button>`).join('')}</div>` : '<div class="card empty"><b>Ничего не найдено</b>Попробуйте другое слово или включите нужный раздел.</div>';
+  el.insertAdjacentHTML('afterbegin', '<button class="desk-query-save" data-act="desk-save-query">' + (savedQueries().includes(globalQuery.trim()) ? 'Убрать из подборок' : 'Сохранить подборку') + '</button>');
 }
 document.addEventListener('input', (e) => { if (e.target.id === 'globalSearch') { globalQuery = e.target.value; renderGlobalResults(); } });
 ACT['search-open'] = (el) => {
   const id = el.dataset.id;
   switch (el.dataset.kind) {
+    case 'food': return ACT['food-entry'](el);
+    case 'service': return svcSheet(id);
+    case 'fuel': return fuelSheet(id);
+    case 'object': return ACT['obj-open'](el);
     case 'note': return noteSheet(id);
     case 'plan': return planSheet(id);
     case 'reminder': return remSheet(id);
@@ -4991,13 +5002,115 @@ function focusBoardHTML() {
   const bits = rows.map((r) => `<button class="focus-item" data-act="search-open" data-kind="${r.kind}" data-id="${esc(r.id)}" data-obj="${esc(r.obj || '')}"><b>${esc(r.title)}</b><span>${esc(r.label)}${r.time ? ' · ' + esc(r.time) : ''}</span></button>`).join('');
   return `<section class="focus-board"><div class="focus-head"><b>На сегодня</b><button class="link" data-act="today">Все дела</button></div>${bits || '<p>Свободный день. Можно добавить план, напоминание или долг.</p>'}<button class="btn primary" data-act="today-add">${I.plus}Добавить дело</button></section>`;
 }
-const lifeHome = RENDER.home;
+
+const widgetHome = RENDER.home;
+DETAIL.widgets = () => '<div class="detail-top">' + backBtn('Рабочий стол') + '</div>' + widgetHome();
+ACT.widgets = () => push({ type: 'widgets' });
+
+const deskGroups = [
+  ['Организация', ['plans', 'notes', 'reminders']],
+  ['Повседневное', ['bank', 'car', 'objects']],
+  ['Здоровье', ['sport', 'food']]
+];
+function deskGroupsHTML() {
+  return deskGroups.map(([name, ids]) => {
+    const enabled = ids.filter(sec);
+    if (!enabled.length) return '';
+    const links = enabled.map(id => {
+      const d = SECTION_DEFS[id];
+      return `<button type="button" data-act="tab" data-tab="${id}" ${ui.tab === id ? 'aria-current="page"' : ''}><span class="desk-icon di-${id}">${I[d.icon]}</span><span>${d.name}</span></button>`;
+    }).join('');
+    return `<section class="desk-group"><h3>${name}</h3><div>${links}</div></section>`;
+  }).join('');
+}
+function deskRail() {
+  const rail = $('#deskRail');
+  rail.innerHTML = `<button class="desk-brand" data-act="tab" data-tab="home"><span>◒</span> Life</button>
+    <button class="desk-rail-home" data-act="tab" data-tab="home" ${ui.tab === 'home' ? 'aria-current="page"' : ''}>${I.home} Рабочий стол</button>
+    <button class="desk-rail-home" data-act="global-search">${I.search} Поиск</button>
+    ${deskGroupsHTML()}
+    <button class="desk-rail-home rail-settings" data-act="settings">${I.gear} Настройки</button>`;
+}
+const deskKinds = {
+  bank: [['expense','Расходы'],['income','Доходы'],['debt','Долги'],['goal','Цели']],
+  car: [['service','Регламент'],['fuel','Заправки'],['carlog','Обслуживание']],
+  notes: [['note','Заметки']], reminders: [['reminder','Напоминания']], plans: [['plan','Планы']],
+  sport: [['workout','Тренировки']], food: [['food','Приёмы пищи']],
+  objects: [['object','Объекты'],['remark','Замечания']]
+};
+ACT['desk-records'] = () => {
+  if (sheetOpen) closeSheet();
+  push({ type: 'records', section: ui.tab, query: '', kind: '', limit: 40 });
+};
+function recordList(page) {
+  const kinds = page.kind ? [page.kind] : deskKinds[page.section].map(x => x[0]);
+  const rows = LifeCore.search(S, page.query, { kinds }).sort((a,b) => a.title.localeCompare(b.title,'ru',{numeric:true}));
+  const items = rows.slice(0,page.limit).map(r =>
+    '<button class="desk-record" data-act="search-open" data-id="'+esc(r.id)+'" data-kind="'+esc(r.kind)+'" data-obj="'+esc(r.obj || '')+'"><span><b>'+esc(r.title)+'</b><small>'+esc(r.sub)+'</small></span>'+I.right+'</button>').join('');
+  return '<p class="note-small">Записей: '+rows.length+'</p>'+items+(rows.length > page.limit ? '<button class="btn" data-act="desk-next">Показать ещё</button>' : '');
+}
+DETAIL.records = page => {
+  ui.mounts.push(() => {
+    $('#deskRecordQuery').oninput = e => { page.query = e.target.value; page.limit = 40; $('#deskRecordRows').innerHTML = recordList(page); };
+  });
+  return '<div class="detail-top">'+backBtn(SECTION_DEFS[page.section].name)+'</div>'+head('Каталог записей',SECTION_DEFS[page.section].name,'')+
+    '<label class="search">'+I.search+'<input type="search" id="deskRecordQuery" aria-label="Поиск в разделе" placeholder="Найти в разделе" value="'+esc(page.query)+'"></label>'+
+    (deskKinds[page.section].length > 1 ? '<div class="chips">'+[['','Все'],...deskKinds[page.section]].map(([id,label]) => '<button class="chip '+(id===page.kind?'on':'')+'" data-act="desk-kind" data-kind="'+id+'">'+label+'</button>').join('')+'</div>' : '')+
+    '<div id="deskRecordRows">'+recordList(page)+'</div>';
+};
+ACT['desk-kind'] = el => { const page = ui.stack[ui.stack.length-1]; page.kind = el.dataset.kind; page.limit = 40; render(); };
+ACT['desk-next'] = () => { const page = ui.stack[ui.stack.length-1]; page.limit += 40; $('#deskRecordRows').innerHTML = recordList(page); };
+const deskCommands = {
+  notes: [['new-note','Новая заметка']],
+  reminders: [['new-rem','Новое напоминание'],['cal-all','Экспорт в календарь']],
+  bank: [['new-exp','Расход'],['new-inc','Доход'],['new-debt','Долг'],['new-recur','Обязательный платёж']],
+  car: [['mileage','Обновить пробег'],['svc','Добавить пункт обслуживания'],['new-fuel','Заправка']],
+  food: [['add-food','Записать еду'],['add-weight','Записать вес'],['weights','История веса']],
+  sport: [['start-workout','Начать или продолжить тренировку']],
+  objects: [['obj-new','Новый объект']]
+};
+ACT['desk-commands'] = () => {
+  const commands = (deskCommands[ui.tab] || []).filter(([key]) => key !== 'new-fuel' || feat('fuel'));
+  openSheet(SECTION_DEFS[ui.tab].name, '<div class="desk-commands">' + commands.map(([act,label]) =>
+    '<button data-act="desk-run" data-command="' + act + '">' + I.plus + label + '</button>').join('') +
+    '<button data-act="desk-records">' + I.notes + 'Каталог записей</button><button data-act="desk-run" data-command="global-search">' + I.search + 'Поиск по Life</button></div>');
+};
+ACT['desk-run'] = el => {
+  const command = el.dataset.command;
+  if (command !== 'global-search' && !(deskCommands[ui.tab] || []).some(([key]) => key === command)) return;
+  closeSheet(); ACT[command](el);
+};
+function savedQueries() {
+  const values = S.settings.prefs && S.settings.prefs.savedQueries;
+  return Array.isArray(values) ? values.filter(v => typeof v === 'string' && v.trim()) : [];
+}
+ACT['desk-query'] = el => { globalQuery = el.dataset.query; push({ type: 'search' }); };
+ACT['desk-save-query'] = () => {
+  const q = globalQuery.trim();
+  if (!q) return;
+  const list = savedQueries();
+  const exists = list.includes(q);
+  S.settings.prefs = Object.assign(prefs(), { savedQueries: exists ? list.filter(x => x !== q) : list.concat(q) });
+  if (save()) toast(exists ? 'Подборка убрана' : 'Подборка на рабочем столе');
+  renderGlobalResults();
+};
+function deskRow(r) {
+  return `<button class="desk-row" data-act="search-open" data-kind="${esc(r.kind)}" data-id="${esc(r.id)}" data-obj="${esc(r.obj || '')}"><time>${esc(r.date < todayISO() ? fmtShort(toDate(r.date)) : r.time || 'Сегодня')}</time><span><b>${esc(r.title)}</b><small>${esc(r.label)}</small></span>${I.right}</button>`;
+}
 RENDER.home = function () {
-  let html = lifeHome();
-  const p = prefs();
-  html = html.replace('dash-page dash-home', 'dash-page dash-home layout-' + (p.homeLayout || 'widgets') + (p.showSaveChip === false ? ' hide-save' : ''));
-  if (p.homeLayout === 'focus') html = html.replace(/<\/div>\s*$/, focusBoardHTML() + '</div>');
-  return html;
+  const now = new Date(), today = isoOf(now);
+  const rows = LifeCore.agenda(S, today);
+  const queries = savedQueries();
+  const groups = deskGroupsHTML();
+  return `<div class="desk-home">
+    <header class="desk-head"><h1>Рабочий стол</h1><div><button class="icon-btn" data-act="global-search" aria-label="Поиск">${I.search}</button><button class="icon-btn" data-act="settings" aria-label="Настройки">${I.gear}</button></div></header>
+    <section class="desk-cover"><div class="desk-waves" aria-hidden="true"></div><div class="desk-cover-content"><span>${cap(WD_LONG[now.getDay()])}</span><h2>${fmtD(now, { day: 'numeric', month: 'long' })}</h2><button data-act="today">Повестка дня ${I.right}</button></div></section>
+    <div class="desk-columns"><div class="desk-column"><section class="desk-block"><header><h2>На очереди</h2><button class="link" data-act="today">Все · ${rows.length}</button></header>
+    ${rows.slice(0,4).map(deskRow).join('') || '<p>На сегодня дел со сроком нет.</p>'}
+    <div class="desk-capture">${sec('plans') ? '<button data-act="new-plan">'+I.plus+' План</button>' : ''}${sec('notes') ? '<button data-act="new-note">'+I.notes+' Заметка</button>' : ''}${sec('reminders') ? '<button data-act="new-rem">'+I.bell+' Напомнить</button>' : ''}</div></section>
+    <section class="desk-block"><header><h2>Мои подборки</h2><button class="link" data-act="global-search">Найти</button></header>${queries.length ? '<div class="desk-tags">'+queries.map(q => '<button data-act="desk-query" data-query="'+esc(q)+'">'+I.search+esc(q)+'</button>').join('')+'</div>' : '<p>Сохраните запрос в поиске, чтобы собирать связанные заметки, планы и расходы в одном месте.</p>'}</section>
+    <button class="desk-widget-link" data-act="widgets">${I.home} Мои виджеты ${I.right}</button></div>
+    <section class="desk-block desk-directory"><header><h2>Разделы</h2><button class="link" data-act="settings-sections">Изменить</button></header>${groups || '<p>Выберите разделы для своего рабочего стола.</p>'}</section></div></div>`;
 };
 const lifeToday = DETAIL.today;
 DETAIL.today = function () {
@@ -5141,7 +5254,7 @@ function installMotion() {
   let y0 = null, pull = 0, armed = false;
   document.addEventListener('touchstart', (e) => {
     if (sheetOpen || lockShown() || viewerOpen() || window.scrollY > 1) { y0 = null; return; }
-    if (e.target.closest('input, textarea, select, .p-strip, .chips')) return;
+    if (e.target.closest('input, textarea, select, .p-strip, .chips, .compact-plans')) return;
     y0 = e.touches[0].clientY; pull = 0; armed = false;
   }, { passive: true });
   document.addEventListener('touchmove', (e) => {
@@ -5365,7 +5478,8 @@ function bindPlanBoard(root) {
   if (form) form.addEventListener('submit', (e) => {
     e.preventDefault();
     const raw = $('#planQuickText', root).value.trim(); if (!raw) { $('#planQuickText', root).focus(); return; }
-    const parsed = LifeCore.parsePlanText(raw, todayISO());
+    const explicitDay = /^(?:сегодня|завтра|послезавтра|через\s+\d+\s+(?:день|дня|дней))(?:\s|$)/i.test(raw);
+    const parsed = LifeCore.parsePlanText(raw, explicitDay ? todayISO() : planFocusDay());
     if (!parsed.title) { toast('Добавьте, что сделать'); return; }
     const item = LifeCore.migratePlan({ id: uid(), title: parsed.title, date: parsed.date, month: parsed.date.slice(0, 7), time: parsed.time, cat: 'life', done: false, note: '', order: S.plans.length + 1 });
     S.plans.push(item); save(); ui.planFocus = parsed.date; render(); toast(parsed.date === todayISO() ? 'Добавлено на сегодня' : 'Добавлено на ' + fmtShort(toDate(parsed.date)));
@@ -5498,7 +5612,7 @@ function start() {
   $('#restSkip').addEventListener('click', stopRest); $('#restPlus').addEventListener('click', () => { REST.until += 30000; });
   $('#sheetBack').addEventListener('click', () => { if (sheetBack) sheetBack(); });
   applyTheme();
-  RENDER.plans = renderPlanStudio;
+  DETAIL.planAgenda = () => '<div class="detail-top">' + backBtn('Карта месяца') + '</div>' + renderPlanStudio();
   RENDER.bank = renderFinance;
   installMotion();
   let t = location.hash.slice(1);

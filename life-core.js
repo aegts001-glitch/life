@@ -138,10 +138,10 @@
     return out.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99:99').localeCompare(b.time || '99:99') || a.title.localeCompare(b.title));
   }
   const clean = (x) => String(x || '').toLocaleLowerCase('ru').replace(/ё/g, 'е');
-  function search(s, query) {
-    const words = clean(query).trim().split(/\s+/).filter(Boolean); if (!words.length) return [];
+  function search(s, query, options = {}) {
+    const words = clean(query).trim().split(/\s+/).filter(Boolean); if (!words.length && !options.kinds) return [];
     const out = [], on = s.settings.sections;
-    const add = (kind, id, title, sub, text, extra) => { if (words.every((w) => clean(title + ' ' + sub + ' ' + text).includes(w))) out.push(Object.assign({ kind, id, title: title || 'Без названия', sub }, extra || {})); };
+    const add = (kind, id, title, sub, text, extra) => { if ((!options.kinds || options.kinds.includes(kind)) && words.every((w) => clean(title + ' ' + sub + ' ' + text).includes(w))) out.push(Object.assign({ kind, id, title: title || 'Без названия', sub }, extra || {})); };
     if (on.notes) (s.notes || []).forEach((n) => add('note', n.id, n.title, 'Заметка', n.body));
     if (on.plans) (s.plans || []).forEach((p) => add('plan', p.id, p.title, 'План · ' + (p.date || p.month || ''), [p.note, ...(p.tags || []), ...(p.subtasks || []).map((s) => s && s.title)].join(' ')));
     if (on.reminders) (s.reminders || []).forEach((r) => add('reminder', r.id, r.title, 'Напоминание', r.note));
@@ -150,10 +150,16 @@
     if (on.debts) (s.debts || []).forEach((d) => add('debt', d.id, d.person || d.title || 'Долг', (d.direction === 'out' ? 'Я должен' : 'Мне должны') + ' · ' + debtLeft(d) + ' ' + sym, [d.note, d.title, d.due].join(' ')));
     if (on.bank) (s.goals || []).forEach((g) => add('goal', g.id, g.name, 'Копилка', g.note));
     if (on.objects) (s.objects || []).forEach((o) => (o.remarks || []).forEach((r) => add('remark', r.id, r.text, o.name + ' · ' + (r.unit || ''), r.section + ' ' + r.floor, { obj: o.id })));
+    if (on.food) ((s.food && s.food.entries) || []).forEach(x => add('food', x.id, x.name, 'Питание · ' + x.date, x.meal));
+    if (on.objects) (s.objects || []).forEach(o => add('object', o.id, o.name, 'Объект', o.address || ''));
+    if (on.car) {
+      (s.services || []).forEach(x => add('service', x.id, x.name, 'Регламент авто', x.lastDate || ''));
+      (s.fuel || []).forEach(x => add('fuel', x.id, x.station || 'Заправка', 'Заправка · ' + x.date, [x.liters, x.total, x.km].join(' ')));
+    }
     if (on.car) (s.carLog || []).forEach((x) => add('carlog', x.id, x.name || x.title || 'Обслуживание', 'Машина · ' + (x.date || ''), JSON.stringify(x)));
     if (on.diary && s.diary) (s.diary.pages || []).forEach((p, index) => add('diary', p.id, p.title || 'Страница дневника', 'Дневник · ' + (p.date || ''), [p.text, ...(p.items || []).map((x) => x.text || '')].join(' '), { index }));
     if (on.sport) (s.workouts || []).forEach((w) => add('workout', w.id, w.title, 'Тренировка', (w.items || []).map((i) => i.name).join(' ')));
-    return out.slice(0, 100);
+    return options.kinds ? out : out.slice(0, 100);
   }
   function mediaRefs(s) {
     const ids = new Set();
