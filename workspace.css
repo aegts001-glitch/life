@@ -19,7 +19,7 @@
 .desk-waves {pointer-events:none;position:absolute;inset:-25% -12% -45% 40%;transform:rotate(-17deg);border-radius:50%;background:repeating-radial-gradient(ellipse at 94% 95%,transparent 0 10px,#abffee45 11px,transparent 12px 16px),radial-gradient(ellipse at 80% 80%,#77d7ae76,transparent 62%);mask-image:linear-gradient(90deg,transparent,#000 38%)}
 @media(prefers-reduced-motion:no-preference) {
  html[data-motion="on"] .desk-waves {animation:deskTide 18s ease-in-out infinite alternate}
- html[data-motion="on"].plans-screen .bubbles:not(.zoomed) .bub-in {animation:bubFloat var(--dur,7s) ease-in-out var(--dl,0s) infinite alternate!important}
+ html[data-motion="on"][data-bubble-motion="on"].plans-screen .bubbles:not(.zoomed) .bub-in {animation:bubFloat var(--dur,7s) ease-in-out var(--dl,0s) infinite alternate!important}
 }
 @keyframes deskTide {to{transform:translate3d(3%,4%,0) rotate(-11deg)}}
 .desk-columns,.desk-column {display:grid;gap:14px;align-content:start;min-width:0}
@@ -77,3 +77,25 @@ html.plans-screen .compact-plans .today .bub-c {border-color:var(--accent)}
 .desk-record {display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--desk-surface);color:var(--ink);border:0;border-bottom:1px solid var(--desk-line);width:100%;padding:13px 16px;text-align:left}
 .desk-record:first-of-type {border-radius:var(--desk-radius) var(--desk-radius) 0 0}.desk-record:last-of-type {border-radius:0 0 var(--desk-radius) var(--desk-radius)}
 .desk-record b,.desk-record small {display:block;overflow-wrap:anywhere}.desk-record small {color:var(--ink-2);margin-top:4px}.desk-record>svg {width:18px;height:18px;flex:none}
+
+.desk-note-tools,.desk-repeat {display:flex;align-items:center;gap:12px}.desk-note-tools {justify-content:space-between;color:var(--ink-2);font-size:.82em}
+.desk-note-tools button {border:1px solid var(--desk-line);background:var(--desk-surface);color:var(--ink);border-radius:12px;padding:8px 12px;min-height:38px}
+#noteList.desk-note-list {display:grid;grid-template-columns:1fr;gap:4px}
+#noteList.desk-note-list .note-card {min-height:0;padding:12px 16px;border-radius:12px}
+#noteList.desk-note-list .b {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+#noteList.desk-note-list .note-photos {display:none}
+.desk-week {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.desk-week button {display:grid;justify-items:center;gap:4px;border:1px solid var(--desk-line);border-radius:12px;background:var(--desk-surface);color:var(--ink);padding:7px 2px}
+.desk-week button[aria-current] {border-color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,var(--surface))}.desk-week button:disabled {opacity:.4}
+.desk-week small {color:var(--ink-2)}.desk-week i {height:4px;width:4px;border-radius:50%}.desk-week .logged {background:var(--accent)}
+.desk-repeat {width:100%;padding:15px;text-align:left;background:var(--desk-surface);border:1px solid var(--desk-line);border-radius:var(--desk-radius);color:var(--ink)}.desk-repeat small,.desk-repeat b {display:block}.desk-repeat small {color:var(--ink-2);margin-bottom:3px}.desk-repeat svg {width:20px;height:20px}.desk-repeat>svg {margin-left:auto}
+#view .dash-training-hero {background:linear-gradient(132deg,#252338,#42324c 66%,#604659);color:#fff4f7}
+#view .dash-training-hero p,#view .dash-training-hero .dash-eyebrow {color:#f2d9e5}
+#view .dash-vehicle {background:linear-gradient(128deg,#152830,#214448);color:#eff9f3}
+#view .dash-vehicle p,#view .dash-vehicle small,#view .dash-vehicle .dash-eyebrow {color:#cce4dd}
+#view .dash-program {min-height:100px;gap:4px}#view .dash-program svg {margin-bottom:4px}
+#view .dash-reminders .section-label {font-size:.86em;color:var(--ink);letter-spacing:0;text-transform:none}
+#view .dash-reminders .list {border-inline-start:3px solid color-mix(in srgb,var(--accent) 60%,var(--desk-line))}
+@media(min-width:900px) {
+ #view .dash-notes .notes-grid:not(.desk-note-list) {grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+ #view .dash-programs {grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+}

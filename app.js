@@ -520,6 +520,7 @@ function render(anim) {
   const top = ui.stack[ui.stack.length - 1]; const ed = !!(top && top.type === 'deditor');
   const root = document.documentElement; root.classList.toggle('fixed-screen', ed || (!top && ui.tab === 'diary')); root.classList.toggle('editor-screen', ed); root.classList.toggle('plans-screen', !top && ui.tab === 'plans');
   root.dataset.section = ui.tab;
+  root.dataset.bubbleMotion = S.settings.bubbleMotion === false ? 'off' : 'on';
   el.innerHTML = `<div class="view ${anim || ''}">${currentHTML()}</div>`;
   renderTabbar();
   deskRail();
@@ -1417,14 +1418,16 @@ ACT['d-open'] = (el) => { const i = S.diary.pages.findIndex((p) => p.id === el.d
 
 /* ================= Заметки ================= */
 RENDER.notes = function () {
+  const compact = prefs().noteLayout === 'list';
   const count = (c) => S.notes.filter((n) => c === 'all' || n.cat === c).length;
   const chips = [['all', 'Все'], ...Object.entries(CATS)].map(([id, name]) =>
     `<button class="chip ${ui.noteCat === id ? 'on' : ''}" data-act="note-cat" data-cat="${id}">${id !== 'all' ? `<span class="dot cat-${id}"></span>` : ''}${name}<span class="n">${count(id)}</span></button>`).join('');
   ui.mounts.push(renderNoteList);
   return head('Заметки', '', plusBtn('new-note', 'Новая заметка')) +
     `<label class="search">${I.search}<input type="search" id="noteSearch" placeholder="Поиск по заметкам" value="${esc(ui.noteQuery)}" autocomplete="off"></label>
-     <div class="chips">${chips}</div><div class="notes-grid" id="noteList"></div>`;
+     <div class="chips">${chips}</div><div class="desk-note-tools"><b>${S.notes.length} ${plural(S.notes.length,'заметка','заметки','заметок')}</b><button data-act="desk-note-layout" aria-pressed="${compact}">${compact ? 'Карточками' : 'Списком'}</button></div><div class="notes-grid ${compact ? 'desk-note-list' : ''}" id="noteList"></div>`;
 };
+ACT['desk-note-layout'] = () => { S.settings.prefs = Object.assign(prefs(), {noteLayout:prefs().noteLayout === 'list' ? 'cards' : 'list'}); save(); render(); };
 function renderNoteList() {
   const q = ui.noteQuery.trim().toLowerCase();
   const list = S.notes.filter((n) => (ui.noteCat === 'all' || n.cat === ui.noteCat) && (!q || (n.title + ' ' + n.body).toLowerCase().includes(q)))
@@ -2572,8 +2575,8 @@ function suggestContractor(o, text) {
 RENDER.objects = function () {
   let html = head('Объекты', '', plusBtn('obj-new', 'Новый объект'));
   if (!S.objects.length) return html + `<div class="card empty"><b>Объектов пока нет</b>Добавьте объект, чтобы вести замечания, обходы и сроки подрядчиков.<button class="btn sm primary" data-act="obj-new">Добавить объект</button></div>`;
-  html += S.objects.map((o) => {
-    const c = objCounts(o); const p = c.total ? Math.round(c.done / c.total * 100) : 0;
+  const ranked = S.objects.map(o => ({o, c:objCounts(o)})).sort((a,b) => b.c.overdue-a.c.overdue || b.c.soon-a.c.soon || b.c.open-a.c.open);
+  html += ranked.map(({o,c}) => { const p = c.total ? Math.round(c.done / c.total * 100) : 0;
     return `<button class="card obj-card" data-act="obj-open" data-id="${o.id}"><span class="obj-top"><span class="sec-ic">${I.building}</span><span class="grow"><span class="t">${esc(o.name)}</span><span class="m">${o.contractors.length} ${plural(o.contractors.length, 'подрядчик', 'подрядчика', 'подрядчиков')}, срок устранения ${o.days} ${plural(o.days, 'день', 'дня', 'дней')}</span></span><span class="chev">${I.right}</span></span>
       <span class="stat-row"><span><b>${c.open}</b>в работе</span><span class="${c.overdue ? 'bad' : ''}"><b>${c.overdue}</b>просрочено</span><span class="${c.soon ? 'warn' : ''}"><b>${c.soon}</b>скоро срок</span><span class="ok"><b>${c.done}</b>устранено</span></span>
       ${c.total ? `<span class="bar ok"><i style="width:${p}%"></i></span>` : ''}</button>`;
@@ -2820,6 +2823,12 @@ RENDER.food = function () {
   const left = g.kcal - t.kcal;
   let html = head('Питание', '', `<button class="icon-btn" data-act="food-goals" aria-label="Норма">${I.gear}</button>${plusBtn('add-food', 'Добавить еду')}`);
   html += `<div class="month-nav"><button class="icon-btn" data-act="food-day" data-dir="-1" aria-label="Предыдущий день">${I.left}</button><b>${isToday ? 'Сегодня' : cap(relDay(dt))}${isToday ? '' : ', ' + WD_SHORT[dt.getDay()]}</b><button class="icon-btn" data-act="food-day" data-dir="1" aria-label="Следующий день" ${isToday ? 'disabled' : ''}>${I.right}</button></div>`;
+  const monday = addDays(dt, -((dt.getDay()+6)%7));
+  const logged = new Set(S.food.entries.map(entry => entry.date));
+  html += '<nav class="desk-week" aria-label="Дни питания">' + Array.from({length:7}, (_,index) => {
+    const date = addDays(monday,index), iso = isoOf(date);
+    return '<button data-act="food-goto" data-d="'+iso+'" '+(iso > todayISO() ? 'disabled' : '')+' '+(iso === d ? 'aria-current="date"' : '')+'><small>'+WD_SHORT[date.getDay()]+'</small><b>'+date.getDate()+'</b><i class="'+(logged.has(iso)?'logged':'')+'"></i></button>';
+  }).join('')+'</nav>';
   html += `<div class="card food-sum"><div class="ring-wrap">${kcalRing(t.kcal, g.kcal, 118)}<div class="ring-txt"><b>${nf.format(Math.round(t.kcal))}</b><span>из ${nf.format(g.kcal)} ккал</span></div></div>
     <div class="macros">${macroBar('Белки', t.p, g.p, 'p')}${macroBar('Жиры', t.f, g.f, 'f')}${macroBar('Углеводы', t.c, g.c, 'c')}
     <div class="left-line ${left < 0 ? 'neg' : ''}">${left >= 0 ? `Осталось ${nf.format(Math.round(left))} ккал` : `Больше нормы на ${nf.format(Math.round(-left))} ккал`}${burned ? `<span>Тренировки: −${nf.format(Math.round(burned))}</span>` : ''}</div></div></div>`;
@@ -4730,8 +4739,8 @@ RENDER.car=function(){
  const c=S.car,f=fuelStats(),mk=todayISO().slice(0,7),items=S.services.map(s=>({s,st:svcStatus(s)})).sort((a,b)=>b.st.rank-a.st.rank||b.st.frac-a.st.frac);
  const urgent=items.filter(x=>x.st.cls==='bad'),soon=items.filter(x=>x.st.cls==='warn'),known=items.filter(x=>x.st.cls!=='none');
  const section=ui.carHub||'overview',tabs=[['overview','Обзор'],['service','ТО'],...(feat('fuel')?[['fuel','Топливо']]:[]),['log','История'],['todo','Задачи']];
- let html='<div class="dash-page dash-auto">'+head('Гараж','Всё о машине — без лишнего', '<button class="icon-btn" data-act="car-edit" aria-label="Настроить машину">'+I.gear+'</button>'+(section!=='overview'?plusBtn('car-add','Добавить запись'):''));
- html+='<section class="dash-vehicle"><div class="dash-eyebrow">MY GARAGE <span>'+esc(c.year||'LIFE AUTO')+'</span></div><div class="dash-vehicle-title">'+esc(c.name||'Ваша машина')+'</div><p>'+esc([c.body,c.engine].filter(Boolean).join(' · ')||'Добавьте машину и ведите её историю')+'</p><div class="dash-car-art">'+carSVG(c.color)+'</div><div class="dash-odo"><div><small>ТЕКУЩИЙ ПРОБЕГ</small><b>'+(c.mileage==null?'—':nf.format(c.mileage))+'<em> км</em></b></div><button class="btn sm" data-act="mileage">Обновить</button></div></section>';
+ let html='<div class="dash-page dash-auto">'+head('Гараж','', '<button class="icon-btn" data-act="car-edit" aria-label="Настроить машину">'+I.gear+'</button>'+(section!=='overview'?plusBtn('car-add','Добавить запись'):''));
+ if(section==='overview') html+='<section class="dash-vehicle"><div class="dash-eyebrow">Автомобиль <span>'+esc(c.year||'')+'</span></div><div class="dash-vehicle-title">'+esc(c.name||'Ваша машина')+'</div><p>'+esc([c.body,c.engine].filter(Boolean).join(' · ')||'Добавьте машину и ведите её историю')+'</p><div class="dash-car-art">'+carSVG(c.color)+'</div><div class="dash-odo"><div><small>ТЕКУЩИЙ ПРОБЕГ</small><b>'+(c.mileage==null?'—':nf.format(c.mileage))+'<em> км</em></b></div><button class="btn sm" data-act="mileage">Обновить</button></div></section>';
  html+=dashTabs(tabs,section,'car-hub');
  if(section!=='overview'){
   ui.carSec=tabs.some(x=>x[0]===section)?section:'service';
@@ -4752,8 +4761,8 @@ ACT['sport-hub']=el=>{ui.sportHub=el.dataset.sec;if(ui.sportHub!=='overview')ui.
 RENDER.sport=function(){
  const A=S.workoutActive,days=weekDays(),week=S.workouts.filter(w=>days.includes(isoOf(new Date(w.start))));
  const mins=week.reduce((sum,w)=>sum+Math.max(0,(w.end-w.start)/60000),0),section=ui.sportHub||'overview';
- let html='<div class="dash-page dash-training">'+head('Движение','Ваш ритм. Ваш прогресс.','');
- html+='<section class="dash-training-hero"><span class="dash-eyebrow">'+(A?'ТРЕНИРОВКА ИДЁТ':'ОДНО ЗАНЯТИЕ БЛИЖЕ К ЦЕЛИ')+'</span><div class="dash-training-symbol">'+I.dumbbell+'</div><h2>'+(A?esc(A.title):'Время для себя')+'</h2><p>'+(A?'Продолжайте с того места, где остановились.':'Зал, турник или пробежка — начните с удобной программы.')+'</p><button class="btn primary" data-act="'+(A?'w-open':'start-workout')+'">'+I.play+(A?'Продолжить тренировку':'Начать тренировку')+'</button>'+(A?'<span class="dash-active-time" data-elapsed="'+A.start+'">'+fmtDur(Date.now()-A.start)+'</span>':'')+'</section>';
+ let html='<div class="dash-page dash-training">'+head('Тренировки','',section === 'overview' ? '' : plusBtn('start-workout','Начать тренировку'));
+ if(section==='overview') html+='<section class="dash-training-hero"><span class="dash-eyebrow">'+(A?'Тренировка идёт':'Следующее занятие')+'</span><div class="dash-training-symbol">'+I.dumbbell+'</div><h2>'+(A?esc(A.title):'Начать тренировку')+'</h2><p>'+(A?'Продолжайте с того места, где остановились.':'Выберите программу или соберите занятие из упражнений.')+'</p><button class="btn primary" data-act="'+(A?'w-open':'start-workout')+'">'+I.play+(A?'Продолжить тренировку':'Начать тренировку')+'</button>'+(A?'<span class="dash-active-time" data-elapsed="'+A.start+'">'+fmtDur(Date.now()-A.start)+'</span>':'')+'</section>';
  html+=dashTabs([['overview','Обзор'],['prog','Программы'],['hist','История'],['lib','Упражнения'],['rec','Рекорды']],section,'sport-hub');
  if(section!=='overview'){
   ui.sportSec=section;
@@ -4761,8 +4770,10 @@ RENDER.sport=function(){
   return html+body+'</div>';
  }
  html+='<div class="dash-stats">'+dashStat('За неделю',String(week.length),'тренировок')+dashStat('В движении',String(Math.round(mins)),'минут')+dashStat('Всего',String(S.workouts.length),'занятий')+'</div><section class="card dash-week"><h2>Ваш ритм на неделе</h2>'+weekStrip()+'</section>';
+ const latest = [...S.workouts].sort((a,b)=>b.start-a.start)[0];
+ if(latest && !A) html += '<button class="desk-repeat" data-act="w-repeat" data-id="'+esc(latest.id)+'"><span>'+I.repeat+'</span><span><small>Повторить последнее занятие</small><b>'+esc(latest.title)+'</b></span>'+I.right+'</button>';
  const programs=[...S.wTemplates,...BUILTIN_PROGRAMS].slice(0,4);
- html+='<div class="dash-section"><h2>Выберите программу</h2><button class="link" data-act="sport-hub" data-sec="prog">Все</button></div><div class="dash-programs">'+programs.map((t,i)=>'<button class="dash-program" data-act="prog-start" data-id="'+esc(t.id)+'"><span class="dash-program-num">0'+(i+1)+'</span><span>'+I.dumbbell+'</span><b>'+esc(t.name)+'</b><small>'+t.items.length+' '+plural(t.items.length,'упражнение','упражнения','упражнений')+'</small></button>').join('')+'</div>';
+ html+='<div class="dash-section"><h2>Выберите программу</h2><button class="link" data-act="sport-hub" data-sec="prog">Все</button></div><div class="dash-programs">'+programs.map(t=>'<button class="dash-program" data-act="prog-start" data-id="'+esc(t.id)+'"><span>'+I.dumbbell+'</span><b>'+esc(t.name)+'</b><small>'+t.items.length+' '+plural(t.items.length,'упражнение','упражнения','упражнений')+'</small></button>').join('')+'</div>';
  const recent=[...S.workouts].sort((a,b)=>b.start-a.start).slice(0,3);
  html+='<div class="dash-section"><h2>Последние занятия</h2><button class="link" data-act="sport-hub" data-sec="hist">История</button></div>';
  html+=recent.length?'<div class="list">'+recent.map(w=>'<button class="row big" data-act="w-view" data-id="'+esc(w.id)+'"><span class="sec-ic">'+I.walk+'</span><span class="grow"><span class="t">'+esc(w.title)+'</span><span class="m">'+fmtShort(new Date(w.start))+' · '+fmtMin(Math.max(0,(w.end-w.start)/60000))+'</span></span><span class="chev">'+I.right+'</span></button>').join('')+'</div>':'<div class="card dash-onboard"><h2>Здесь будет ваша история</h2><p>Завершённые тренировки и личные рекорды сохранятся автоматически.</p></div>';
@@ -5543,7 +5554,7 @@ function renderFinance() {
   const label = range.mode === 'week' ? 'Неделя' : range.mode === 'custom' ? 'Свой период' : 'Месяц';
   const maxFlow = Math.max(1, ...snap.flow.map((d) => Math.max(d.income, d.spent)));
   let html = `<div class="dash-page fin-page">${head('Финансы', label + ' · ' + fmtShort(toDate(range.start)) + ' — ' + fmtShort(toDate(range.end)), plusBtn('fin-add', 'Добавить'))}`;
-  html += `<section class="fin-hero"><span class="p-kicker">Остаток</span><b class="fin-balance ${snap.balance < 0 ? 'amount-minus' : 'amount-plus'}" data-count-money="${snap.balance}">${money(snap.balance)}</b><div class="fin-split"><span>Доходы <b class="amount-plus">${money(snap.income)}</b></span><span>Расходы <b class="amount-minus">${money(snap.spent)}</b></span></div><div class="fin-safe"><span>Можно потратить</span><b class="${snap.safe < 0 ? 'amount-minus' : ''}">${money(snap.safe)}</b><small>доходы − расходы − платежи − долги к сроку</small></div></section>`;
+  if (seg === 'home') html += `<section class="fin-hero"><span class="p-kicker">Остаток</span><b class="fin-balance ${snap.balance < 0 ? 'amount-minus' : 'amount-plus'}" data-count-money="${snap.balance}">${money(snap.balance)}</b><div class="fin-split"><span>Доходы <b class="amount-plus">${money(snap.income)}</b></span><span>Расходы <b class="amount-minus">${money(snap.spent)}</b></span></div><div class="fin-safe"><span>Можно потратить</span><b class="${snap.safe < 0 ? 'amount-minus' : ''}">${money(snap.safe)}</b><small>доходы − расходы − платежи − долги к сроку</small></div></section>`;
   html += `<div class="seg fin-period">${[['week', 'Неделя'], ['month', 'Месяц'], ['custom', 'Свой']].map(([k, n]) => `<button type="button" data-act="fin-period" data-v="${k}" class="${range.mode === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
   if (range.mode === 'custom') html += `<div class="two fin-dates"><label class="field"><span>С</span><input type="date" id="finFrom" value="${esc(range.start)}"></label><label class="field"><span>По</span><input type="date" id="finTo" value="${esc(range.end)}"></label></div>`;
   html += `<div class="fin-segs">${[['home', 'Обзор'], ['ops', 'Операции'], ['bills', 'Платежи'], ['debts', 'Долги']].map(([k, n]) => `<button type="button" data-act="fin-seg" data-seg="${k}" class="${seg === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;

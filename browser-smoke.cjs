@@ -54,6 +54,12 @@ function exercise() {
       if (!document.querySelector('#deskRecordQuery')) throw Error('Catalog '+id);
       click('#tabbarNav [data-tab="home"]');
     }
+    click('.desk-directory [data-tab="food"]');
+    if (document.querySelectorAll('.desk-week button').length !== 7) throw Error('Food week');
+    click('#tabbarNav [data-tab="home"]');
+    click('.desk-directory [data-tab="notes"]');
+    click('[data-act="desk-note-layout"]');
+    if (!document.querySelector('#noteList.desk-note-list') || !JSON.parse(localStorage.getItem('life.v1')).settings.prefs.noteLayout) throw Error('Note layout');
     mark.textContent = 'PASS';
   } catch (error) { mark.textContent = error.stack || String(error); }
 }
@@ -75,8 +81,10 @@ test('Chrome workspace flows', {timeout:90000}, async () => {
   try {
     await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
     const url = 'http://127.0.0.1:'+server.address().port+'/?selftest';
-    const {stdout} = await run(process.env.CHROME_BIN || 'google-chrome', ['--headless','--disable-gpu','--disable-dev-shm-usage','--disable-background-networking','--window-size=390,844','--virtual-time-budget=6000','--user-data-dir='+profile,'--dump-dom',url], {maxBuffer:8*1024*1024,timeout:80000});
+    for (const size of ['390,844','1366,900']) {
+    const {stdout} = await run(process.env.CHROME_BIN || 'google-chrome', ['--headless','--disable-gpu','--disable-dev-shm-usage','--disable-background-networking','--window-size='+size,'--virtual-time-budget=6000','--user-data-dir='+path.join(profile,size),'--dump-dom',url], {maxBuffer:8*1024*1024,timeout:80000});
     const result = stdout.match(/<output id="smoke-result">([\s\S]*?)<\/output>/);
-    assert.equal(result && result[1], 'PASS');
+    assert.equal(result && result[1], 'PASS', size + ' ' + (result && result[1]));
+    }
   } finally {server.close();await fs.rm(profile,{recursive:true,force:true,maxRetries:3});}
 });
